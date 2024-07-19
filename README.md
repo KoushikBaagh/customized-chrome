@@ -1,4 +1,13 @@
 # ![Logo](chrome/app/theme/chromium/product_logo_64.png) Chromium
+#
+# Customized CHROME APP made with :heart: by Koushik
+## Restructured and optimized Chromium codebase to implement key User Interface modifications, including relocation of toolbar from top to bottom of screen.
+### [LIVE 🔗 working link](https://drive.google.com/file/d/11GtMB27O9aAMAleCuXYLVOCXgpKooZ5j/view?usp=sharing)
+# 
+
+
+
+
 
 Chromium is an open-source browser project that aims to build a safer, faster,
 and more stable way for all users to experience the web.
