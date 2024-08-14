@@ -14,14 +14,18 @@
 #include "base/test/task_environment.h"
 #include "base/time/time.h"
 #include "components/prefs/testing_pref_service.h"
-#include "components/privacy_sandbox/mock_tracking_protection_onboarding_delegate.h"
 #include "components/privacy_sandbox/privacy_sandbox_features.h"
 #include "components/privacy_sandbox/tracking_protection_prefs.h"
 #include "components/version_info/channel.h"
+#include "privacy_sandbox_notice_constants.h"
+#include "privacy_sandbox_notice_storage.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "tracking_protection_onboarding.h"
 
 namespace privacy_sandbox {
+
+namespace {
 
 using ::privacy_sandbox::tracking_protection::
     TrackingProtectionOnboardingStatus;
@@ -34,6 +38,9 @@ using NoticeAction =
     ::privacy_sandbox::TrackingProtectionOnboarding::NoticeAction;
 using SurfaceType =
     ::privacy_sandbox::TrackingProtectionOnboarding::SurfaceType;
+
+using ::testing::Combine;
+using ::testing::Values;
 
 class MockTrackingProtectionObserver
     : public TrackingProtectionOnboarding::Observer {
@@ -60,16 +67,8 @@ class TrackingProtectionOnboardingTest : public testing::Test {
 
   void RecreateOnboardingService(
       version_info::Channel channel = version_info::Channel::UNKNOWN) {
-    delegate_ = std::make_unique<MockTrackingProtectionOnboardingDelegate>();
     tracking_protection_onboarding_service_ =
-        std::make_unique<TrackingProtectionOnboarding>(std::move(delegate_),
-                                                       prefs(), channel);
-  }
-
-  MockTrackingProtectionOnboardingDelegate* GetMockDelegate() {
-    return (MockTrackingProtectionOnboardingDelegate*)
-        tracking_protection_onboarding()
-            ->delegate_.get();
+        std::make_unique<TrackingProtectionOnboarding>(prefs(), channel);
   }
 
   void SetUp() override { RecreateOnboardingService(); }
@@ -85,37 +84,9 @@ class TrackingProtectionOnboardingTest : public testing::Test {
   TestingPrefServiceSimple prefs_;
   std::unique_ptr<TrackingProtectionOnboarding>
       tracking_protection_onboarding_service_;
-  std::unique_ptr<MockTrackingProtectionOnboardingDelegate> delegate_;
   base::HistogramTester histogram_tester_;
   base::test::ScopedFeatureList feature_list_;
 };
-
-TEST_F(TrackingProtectionOnboardingTest,
-       IsEnterpriseManagedReturnsValueProvidedByDelegate) {
-  GetMockDelegate()->SetUpIsEnterpriseManaged(/*managed=*/false);
-  EXPECT_FALSE(tracking_protection_onboarding()->IsEnterpriseManaged());
-
-  GetMockDelegate()->SetUpIsEnterpriseManaged(/*managed=*/true);
-  EXPECT_TRUE(tracking_protection_onboarding()->IsEnterpriseManaged());
-}
-
-TEST_F(TrackingProtectionOnboardingTest,
-       IsNewProfileReturnsValueProvidedByDelegate) {
-  GetMockDelegate()->SetUpIsNewProfile(/*new_profile=*/true);
-  EXPECT_TRUE(tracking_protection_onboarding()->IsNewProfile());
-
-  GetMockDelegate()->SetUpIsNewProfile(/*new_profile=*/false);
-  EXPECT_FALSE(tracking_protection_onboarding()->IsNewProfile());
-}
-
-TEST_F(TrackingProtectionOnboardingTest,
-       AreThirdPartyCookiesBlockedReturnsValueProvidedByDelegate) {
-  GetMockDelegate()->SetUpAreThirdPartyCookiesBlocked(/*blocked=*/false);
-  EXPECT_FALSE(tracking_protection_onboarding()->AreThirdPartyCookiesBlocked());
-
-  GetMockDelegate()->SetUpAreThirdPartyCookiesBlocked(/*blocked=*/true);
-  EXPECT_TRUE(tracking_protection_onboarding()->AreThirdPartyCookiesBlocked());
-}
 
 TEST_F(TrackingProtectionOnboardingTest,
        OnboardingProfileTriggersOnboardingObservers) {
@@ -424,72 +395,11 @@ TEST_F(TrackingProtectionOnboardingTest,
             NoticeType::kNone);
 }
 
-TEST_F(TrackingProtectionOnboardingTest, GetRequiredNotice_Full3PCDDisabled) {
-  feature_list_.InitAndDisableFeature(
-      privacy_sandbox::kTrackingProtectionOnboarding);
-
-  EXPECT_EQ(tracking_protection_onboarding()->GetRequiredNotice(
-                SurfaceType::kDesktop),
-            NoticeType::kNone);
-}
-
-TEST_F(TrackingProtectionOnboardingTest, GetRequiredNotice_Full3PCDEnabled) {
-  feature_list_.InitAndEnableFeatureWithParameters(
-      privacy_sandbox::kTrackingProtectionOnboarding,
-      {{privacy_sandbox::kTrackingProtectionBlock3PC.name, "true"}});
-
-  EXPECT_EQ(tracking_protection_onboarding()->GetRequiredNotice(
-                SurfaceType::kDesktop),
-            NoticeType::kFull3PCDOnboarding);
-}
-
-TEST_F(TrackingProtectionOnboardingTest,
-       GetRequiredNotice_Full3PCDSilentOnboarding) {
-  feature_list_.InitAndEnableFeatureWithParameters(
-      privacy_sandbox::kTrackingProtectionOnboarding,
-      {{privacy_sandbox::kTrackingProtectionBlock3PC.name, "false"}});
-
-  EXPECT_EQ(tracking_protection_onboarding()->GetRequiredNotice(
-                SurfaceType::kDesktop),
-            NoticeType::kFull3PCDSilentOnboarding);
-}
-
-TEST_F(TrackingProtectionOnboardingTest,
-       GetRequiredNotice_Full3PCDEnabledWithIPP) {
-  feature_list_.InitWithFeaturesAndParameters(
-      {{privacy_sandbox::kTrackingProtectionOnboarding,
-        {{privacy_sandbox::kTrackingProtectionBlock3PC.name, "true"}}},
-       {privacy_sandbox::kIpProtectionUx, {}}},
-      {});
-
-  EXPECT_EQ(tracking_protection_onboarding()->GetRequiredNotice(
-                SurfaceType::kDesktop),
-            NoticeType::kFull3PCDOnboardingWithIPP);
-}
-
-TEST_F(TrackingProtectionOnboardingTest, GetRequiredNotice_ModeBAlreadyAcked) {
-  tracking_protection_onboarding()->MaybeMarkModeBEligible();
-  tracking_protection_onboarding()->NoticeShown(SurfaceType::kDesktop,
-                                                NoticeType::kModeBOnboarding);
-  tracking_protection_onboarding()->NoticeActionTaken(
-      SurfaceType::kDesktop, NoticeType::kModeBOnboarding,
-      NoticeAction::kGotIt);
-
-  feature_list_.InitAndEnableFeatureWithParameters(
-      privacy_sandbox::kTrackingProtectionOnboarding,
-      {{privacy_sandbox::kTrackingProtectionBlock3PC.name, "true"}});
-
-  EXPECT_EQ(tracking_protection_onboarding()->GetRequiredNotice(
-                SurfaceType::kDesktop),
-            NoticeType::kNone);
-}
-
 TEST_F(TrackingProtectionOnboardingTest, MaybeResetOnboardingPrefsInStable) {
   // Setup
-  delegate_ = std::make_unique<MockTrackingProtectionOnboardingDelegate>();
   tracking_protection_onboarding_service_ =
       std::make_unique<TrackingProtectionOnboarding>(
-          std::move(delegate_), prefs(), version_info::Channel::STABLE);
+          prefs(), version_info::Channel::STABLE);
   prefs()->SetInteger(
       prefs::kTrackingProtectionOnboardingStatus,
       static_cast<int>(TrackingProtectionOnboardingStatus::kOnboarded));
@@ -505,10 +415,9 @@ TEST_F(TrackingProtectionOnboardingTest, MaybeResetOnboardingPrefsInStable) {
 
 TEST_F(TrackingProtectionOnboardingTest, MaybeResetOnboardingPrefsInCanary) {
   // Setup
-  delegate_ = std::make_unique<MockTrackingProtectionOnboardingDelegate>();
   tracking_protection_onboarding_service_ =
       std::make_unique<TrackingProtectionOnboarding>(
-          std::move(delegate_), prefs(), version_info::Channel::CANARY);
+          prefs(), version_info::Channel::CANARY);
   prefs()->SetInteger(
       prefs::kTrackingProtectionOnboardingStatus,
       static_cast<int>(TrackingProtectionOnboardingStatus::kOnboarded));
@@ -525,10 +434,9 @@ TEST_F(TrackingProtectionOnboardingTest, MaybeResetOnboardingPrefsInCanary) {
 TEST_F(TrackingProtectionOnboardingTest,
        MaybeResetOnboardingPrefsInCanaryTriggersObserver) {
   // Setup
-  delegate_ = std::make_unique<MockTrackingProtectionOnboardingDelegate>();
   tracking_protection_onboarding_service_ =
       std::make_unique<TrackingProtectionOnboarding>(
-          std::move(delegate_), prefs(), version_info::Channel::CANARY);
+          prefs(), version_info::Channel::CANARY);
   prefs()->SetInteger(
       prefs::kTrackingProtectionOnboardingStatus,
       static_cast<int>(TrackingProtectionOnboardingStatus::kOnboarded));
@@ -1336,11 +1244,9 @@ TEST_F(TrackingProtectionSilentOnboardingTest, DidNoticeShownOnboardHistogram) {
 TEST_F(TrackingProtectionSilentOnboardingTest,
        MaybeResetOnboardingPrefsInStable) {
   // Setup
-  delegate_ = std::make_unique<MockTrackingProtectionOnboardingDelegate>();
-
   tracking_protection_onboarding_service_ =
       std::make_unique<TrackingProtectionOnboarding>(
-          std::move(delegate_), prefs(), version_info::Channel::STABLE);
+          prefs(), version_info::Channel::STABLE);
   prefs()->SetInteger(
       prefs::kTrackingProtectionSilentOnboardingStatus,
       static_cast<int>(TrackingProtectionOnboardingStatus::kOnboarded));
@@ -1357,11 +1263,9 @@ TEST_F(TrackingProtectionSilentOnboardingTest,
 TEST_F(TrackingProtectionSilentOnboardingTest,
        MaybeResetOnboardingPrefsInCanary) {
   // Setup
-  delegate_ = std::make_unique<MockTrackingProtectionOnboardingDelegate>();
-
   tracking_protection_onboarding_service_ =
       std::make_unique<TrackingProtectionOnboarding>(
-          std::move(delegate_), prefs(), version_info::Channel::CANARY);
+          prefs(), version_info::Channel::CANARY);
   prefs()->SetInteger(
       prefs::kTrackingProtectionSilentOnboardingStatus,
       static_cast<int>(TrackingProtectionOnboardingStatus::kOnboarded));
@@ -1379,11 +1283,9 @@ TEST_F(TrackingProtectionSilentOnboardingTest,
 TEST_F(TrackingProtectionSilentOnboardingTest,
        MaybeResetOnboardingPrefsInCanaryTriggersObserver) {
   // Setup
-  delegate_ = std::make_unique<MockTrackingProtectionOnboardingDelegate>();
-
   tracking_protection_onboarding_service_ =
       std::make_unique<TrackingProtectionOnboarding>(
-          std::move(delegate_), prefs(), version_info::Channel::CANARY);
+          prefs(), version_info::Channel::CANARY);
   prefs()->SetInteger(
       prefs::kTrackingProtectionSilentOnboardingStatus,
       static_cast<int>(TrackingProtectionOnboardingStatus::kOnboarded));
@@ -1541,4 +1443,5 @@ TEST_F(TrackingProtectionOnboardingStartupStateTest,
       "AckedSince",
       delay, 1);
 }
+}  // namespace
 }  // namespace privacy_sandbox

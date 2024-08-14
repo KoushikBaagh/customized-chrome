@@ -62,6 +62,7 @@
 #include "third_party/blink/renderer/core/scroll/programmatic_scroll_animator.h"
 #include "third_party/blink/renderer/core/scroll/scroll_alignment.h"
 #include "third_party/blink/renderer/core/scroll/scroll_animator_base.h"
+#include "third_party/blink/renderer/core/scroll/scroll_into_view_util.h"
 #include "third_party/blink/renderer/core/scroll/scroll_start_targets.h"
 #include "third_party/blink/renderer/core/scroll/scroll_types.h"
 #include "third_party/blink/renderer/core/scroll/scrollbar_theme.h"
@@ -551,7 +552,7 @@ void ScrollableArea::ScrollToScrollStartTarget(
     }
   }
   mojom::blink::ScrollIntoViewParamsPtr params =
-      ScrollAlignment::CreateScrollIntoViewParams(align_x, align_y);
+      scroll_into_view_util::CreateScrollIntoViewParams(align_x, align_y);
   params->behavior = mojom::blink::ScrollBehavior::kInstant;
   params->type = mojom::blink::ScrollType::kScrollStart;
   ScrollIntoView(
@@ -937,8 +938,7 @@ void ScrollableArea::SetScrollbarNeedsPaintInvalidation(
           // This will call SetNeedsDisplay() if the color changes (which is
           // the only reason for a SolidColorScrollbarLayer to update display).
           if (compositor->SetScrollbarSolidColor(
-                  element_id, scrollbar->GetTheme().GetSolidColor(
-                                  scrollbar->ScrollbarThumbColor()))) {
+                  element_id, scrollbar->GetTheme().ThumbColor(*scrollbar))) {
             scrollbar->ClearNeedsUpdateDisplay();
           }
         } else if (compositor->SetScrollbarNeedsDisplay(element_id)) {
@@ -1468,10 +1468,9 @@ void ScrollableArea::EnqueueScrollSnapChangingEvent() const {
 }
 
 ScrollOffset ScrollableArea::GetWebExposedScrollOffset() const {
-  ScrollOffset scroll_offset = GetScrollOffset();
-  if (RuntimeEnabledFeatures::WebExposedScrollOffsetEnabled()) {
-    return gfx::ToFlooredVector2d(scroll_offset);
-  }
+  ScrollOffset scroll_offset =
+      SnapScrollOffsetToPhysicalPixels(GetScrollOffset());
+
   // Ensure that, if fractional scroll offsets are not enabled, the scroll
   // offset is an floored value.
   CHECK_EQ(gfx::ToFlooredVector2d(scroll_offset), scroll_offset);

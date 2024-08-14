@@ -2,11 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "chrome/browser/android/httpclient/http_client.h"
 
 #include <string>
 #include <utility>
 
+#include "base/not_fatal_until.h"
 #include "content/public/browser/browser_thread.h"
 #include "net/http/http_request_headers.h"
 #include "net/http/http_response_headers.h"
@@ -103,7 +109,7 @@ void HttpClient::ReleaseUrlLoader(network::SimpleURLLoader* simple_loader) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   // Release the current loader.
   auto loader_iter = url_loaders_.find(simple_loader);
-  DCHECK(loader_iter != url_loaders_.end());
+  CHECK(loader_iter != url_loaders_.end(), base::NotFatalUntil::M130);
   url_loaders_.erase(loader_iter);
 }
 

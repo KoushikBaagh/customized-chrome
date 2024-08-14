@@ -45,6 +45,11 @@ chromium-metrics-reviews@google.com.
   <int value="2" label="Default and Attach"/>
 </enum>
 
+<enum name="Band6GHzSupport">
+  <int value="0" label="Unsupported"/>
+  <int value="1" label="Supported"/>
+</enum>
+
 <enum name="BooleanEverConnected">
   <int value="0" label="Never connected"/>
   <int value="1" label="Previously connected"/>
@@ -1086,17 +1091,6 @@ chromium-metrics-reviews@google.com.
   <int value="2" label="PortalSuspected"/>
   <int value="3" label="Portal"/>
   <int value="4" label="NoInternet"/>
-</enum>
-
-<enum name="NetworkPortalStatus">
-  <summary>
-    DEPRECATED. Remove with Network.NetworkPortalDetectorResult 2024-07-21.
-  </summary>
-  <int value="0" label="Unknown"/>
-  <int value="1" label="Offline"/>
-  <int value="2" label="Online"/>
-  <int value="3" label="Portal"/>
-  <int value="4" label="ProxyAuthRequired"/>
 </enum>
 
 <enum name="NetworkProblemType">

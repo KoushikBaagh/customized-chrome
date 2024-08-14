@@ -8,6 +8,7 @@
 
 #import "base/functional/bind.h"
 #import "base/location.h"
+#import "base/metrics/histogram_functions.h"
 #import "base/time/time.h"
 #import "base/values.h"
 #import "components/password_manager/core/browser/leak_detection/leak_detection_request_utils.h"
@@ -16,13 +17,13 @@
 #import "components/prefs/scoped_user_pref_update.h"
 #import "components/safe_browsing/core/common/safe_browsing_prefs.h"
 #import "components/version_info/version_info.h"
-#import "ios/chrome/browser/omaha/model/omaha_service.h"
 #import "ios/chrome/browser/passwords/model/ios_chrome_password_check_manager_factory.h"
 #import "ios/chrome/browser/safety_check/model/ios_chrome_safety_check_manager_utils.h"
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
-#import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state_manager.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
+#import "ios/chrome/browser/shared/model/profile/profile_manager_ios.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/ui/content_suggestions/content_suggestions_constants.h"
 #import "ios/chrome/browser/ui/ntp/metrics/home_metrics.h"
 #import "ios/chrome/browser/upgrade/model/upgrade_recommended_details.h"
@@ -65,6 +66,10 @@ IOSChromeSafetyCheckManager::IOSChromeSafetyCheckManager(
 
   password_check_manager->AddObserver(this);
 
+  if (IsOmahaServiceRefactorEnabled()) {
+    OmahaService::AddObserver(this);
+  }
+
   pref_change_registrar_.Init(pref_service);
 
   pref_change_registrar_.Add(
@@ -80,6 +85,26 @@ IOSChromeSafetyCheckManager::IOSChromeSafetyCheckManager(
           weak_ptr_factory_.GetWeakPtr()));
 
   RestorePreviousSafetyCheckState();
+
+  // Run the Safety Check automatically, if eligible.
+  //
+  // TODO(crbug.com/354706390): Re-evaluate autorun eligibility during scene
+  // state changes for better accuracy and to support future increased autorun
+  // frequency.
+  //
+  // TODO(crbug.com/354707092): Replace
+  // `GetLastSafetyCheckRunTimeAcrossAllEntrypoints()` with
+  // `GetLastSafetyCheckRunTime()` once the Safety Check (via Settings) is
+  // refactored to use `IOSChromeSafetyCheckManager`. For now
+  // `GetLastSafetyCheckRunTimeAcrossAllEntrypoints()` returns the last run
+  // time, across both entry points.
+  if (IsSafetyCheckNotificationsEnabled()) {
+    if (CanAutomaticallyRunSafetyCheck(
+            GetLatestSafetyCheckRunTimeAcrossAllEntrypoints(
+                local_pref_service))) {
+      StartSafetyCheck();
+    }
+  }
 }
 
 IOSChromeSafetyCheckManager::~IOSChromeSafetyCheckManager() {
@@ -88,6 +113,14 @@ IOSChromeSafetyCheckManager::~IOSChromeSafetyCheckManager() {
 
 void IOSChromeSafetyCheckManager::Shutdown() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  // `OmahaService` instances are not currently destroyed due to the
+  // `NoDestructor` implementation. This prevents `OmahaServiceObserver`'s
+  // `ServiceWillShutdown()` from being called as intended. As a workaround,
+  // manually remove the observation here to ensure proper cleanup.
+  if (IsOmahaServiceRefactorEnabled()) {
+    OmahaService::RemoveObserver(this);
+  }
 
   for (auto& observer : observers_) {
     observer.ManagerWillShutdown(this);
@@ -100,9 +133,12 @@ void IOSChromeSafetyCheckManager::Shutdown() {
   local_pref_service_ = nullptr;
 
   // Confirm that `IOSChromeSafetyCheckManager` is not observing any other
-  // services, particularly `IOSChromePasswordCheckManager`. This ensures safe
-  // destruction of `IOSChromeSafetyCheckManager`.
-  CHECK(!IsInObserverList());
+  // services, particularly `IOSChromePasswordCheckManager` and `OmahaService`.
+  // This ensures safe destruction of `IOSChromeSafetyCheckManager`.
+  CHECK(!IOSChromePasswordCheckManager::Observer::IsInObserverList());
+  if (IsOmahaServiceRefactorEnabled()) {
+    CHECK(!OmahaServiceObserver::IsInObserverList());
+  }
 }
 
 void IOSChromeSafetyCheckManager::StartSafetyCheck() {
@@ -275,6 +311,23 @@ void IOSChromeSafetyCheckManager::ManagerWillShutdown(
   password_check_manager->RemoveObserver(this);
 }
 
+void IOSChromeSafetyCheckManager::UpgradeRecommendedDetailsChanged(
+    UpgradeRecommendedDetails details) {
+  CHECK(IsOmahaServiceRefactorEnabled());
+
+  task_runner_->PostTask(
+      FROM_HERE,
+      base::BindOnce(&IOSChromeSafetyCheckManager::HandleOmahaResponse,
+                     weak_ptr_factory_.GetWeakPtr(), details));
+}
+
+void IOSChromeSafetyCheckManager::ServiceWillShutdown(
+    OmahaService* omaha_service) {
+  CHECK(IsOmahaServiceRefactorEnabled());
+
+  omaha_service->RemoveObserver(this);
+}
+
 SafeBrowsingSafetyCheckState
 IOSChromeSafetyCheckManager::GetSafeBrowsingCheckState() const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -336,13 +389,6 @@ void IOSChromeSafetyCheckManager::SetSafeBrowsingCheckState(
   }
 
   safe_browsing_check_state_ = state;
-
-  // The safe browsing state changed, log a freshness signal for Safety Check.
-  bool should_log_freshness = state != SafeBrowsingSafetyCheckState::kDefault;
-
-  if (should_log_freshness) {
-    RecordModuleFreshnessSignal(ContentSuggestionsModuleType::kSafetyCheck);
-  }
 
   local_pref_service_->SetString(
       prefs::kIosSafetyCheckManagerSafeBrowsingCheckResult,
@@ -433,6 +479,9 @@ void IOSChromeSafetyCheckManager::SetPasswordCheckState(
 
   if (should_log_freshness) {
     RecordModuleFreshnessSignal(ContentSuggestionsModuleType::kSafetyCheck);
+    base::UmaHistogramEnumeration(
+        "IOS.SafetyCheck.FreshnessTrigger",
+        IOSSafetyCheckFreshnessTrigger::kPasswordCheckStateChanged);
   }
 
   password_check_state_ = state;
@@ -489,6 +538,9 @@ void IOSChromeSafetyCheckManager::SetUpdateChromeCheckState(
 
   if (should_log_freshness) {
     RecordModuleFreshnessSignal(ContentSuggestionsModuleType::kSafetyCheck);
+    base::UmaHistogramEnumeration(
+        "IOS.SafetyCheck.FreshnessTrigger",
+        IOSSafetyCheckFreshnessTrigger::kUpdateChromeCheckStateChanged);
   }
 
   update_chrome_check_state_ = state;

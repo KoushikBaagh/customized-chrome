@@ -24,13 +24,24 @@ VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kAndroidBrowserControlsInViz);
 #endif  // BUILDFLAG(IS_ANDROID)
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kBackdropFilterMirrorEdgeMode);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kDelegatedCompositing);
-VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kUseDCompSurfacesForDelegatedInk);
+enum class DelegatedCompositingMode {
+  // Enable delegated compositing.
+  kFull,
 #if BUILDFLAG(IS_WIN)
-VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kDelegatedCompositingLimitToUi);
+  // Enable partially delegated compositing. In this mode, the web contents will
+  // be forced into its own render pass instead of merging into the root pass.
+  // This effectively makes it so only the browser UI quads get delegated
+  // compositing.
+  kLimitToUi,
 #endif
+};
+extern const VIZ_COMMON_EXPORT base::FeatureParam<DelegatedCompositingMode>
+    kDelegatedCompositingModeParam;
+VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kUseDCompSurfacesForDelegatedInk);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kRenderPassDrawnRect);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kRecordSkPicture);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kUseDrmBlackFullscreenOptimization);
+VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kUseFrameIntervalDecider);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kUseMultipleOverlays);
 VIZ_COMMON_EXPORT extern const char kMaxOverlaysParam[];
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kVideoDetectorIgnoreNonVideos);
@@ -48,6 +59,7 @@ VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebViewVulkanIntermediateBuffer);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kUseSurfaceLayerForVideoDefault);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebViewEnableADPF);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebViewEnableADPFRendererMain);
+VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebViewFrameRateHints);
 #endif
 #if BUILDFLAG(IS_APPLE)
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kCALayerNewLimit);
@@ -69,9 +81,6 @@ VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kDrawPredictedInkPoint);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kAllowUndamagedNonrootRenderPassToSkip);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kAllowForceMergeRenderPassWithRequireOverlayQuads);
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kRendererAllocatesImages);
-#endif
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kOnBeginFrameAcks);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kOnBeginFrameThrottleVideo);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kSharedBitmapToSharedImage);
@@ -92,6 +101,10 @@ VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kBatchMainThreadReleaseCallbacks);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kColorConversionInRenderer);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kLastVSyncArgsKillswitch);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kBlitRequestsForViewTransition);
+VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kVizNullHypothesis);
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kCrosContentAdjustedRefreshRate);
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 VIZ_COMMON_EXPORT extern const char kDraw1Point12Ms[];
 VIZ_COMMON_EXPORT extern const char kDraw2Points6Ms[];
@@ -104,6 +117,9 @@ VIZ_COMMON_EXPORT extern const char kPredictorLinear2[];
 VIZ_COMMON_EXPORT extern const char kPredictorLsq[];
 
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kDrawImmediatelyWhenInteractive);
+VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kAckOnSurfaceActivationWhenInteractive);
+
+VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kShutdownForFailedChannelCreation);
 
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kSnapshotEvictedRootSurface);
 VIZ_COMMON_EXPORT extern const base::FeatureParam<double>
@@ -123,9 +139,6 @@ VIZ_COMMON_EXPORT bool UseWebViewNewInvalidateHeuristic();
 VIZ_COMMON_EXPORT bool UseSurfaceLayerForVideo();
 VIZ_COMMON_EXPORT int MaxOverlaysConsidered();
 VIZ_COMMON_EXPORT bool ShouldOnBeginFrameThrottleVideo();
-#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-VIZ_COMMON_EXPORT bool ShouldRendererAllocateImages();
-#endif
 VIZ_COMMON_EXPORT bool IsOnBeginFrameAcksEnabled();
 VIZ_COMMON_EXPORT bool ShouldDrawImmediatelyWhenInteractive();
 VIZ_COMMON_EXPORT std::optional<double> SnapshotEvictedRootSurfaceScale();
@@ -133,6 +146,15 @@ VIZ_COMMON_EXPORT bool IsCVDisplayLinkBeginFrameSourceEnabled();
 VIZ_COMMON_EXPORT bool IsVSyncAlignedPresentEnabled();
 VIZ_COMMON_EXPORT int NumPendingFrameSupported();
 VIZ_COMMON_EXPORT bool ShouldLogFrameQuadInfo();
+VIZ_COMMON_EXPORT bool IsUsingFrameIntervalDecider();
+VIZ_COMMON_EXPORT std::optional<uint64_t>
+NumCooldownFramesForAckOnSurfaceActivationDuringInteraction();
+VIZ_COMMON_EXPORT extern const base::FeatureParam<int>
+    kNumCooldownFramesForAckOnSurfaceActivationDuringInteraction;
+VIZ_COMMON_EXPORT bool ShouldAckOnSurfaceActivationWhenInteractive();
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+VIZ_COMMON_EXPORT bool IsCrosContentAdjustedRefreshRateEnabled();
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 }  // namespace features
 

@@ -41,6 +41,17 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Ash.WelcomeTour.ChangedExperimentalArm"
+    enum="WelcomeTourExperimentalArm" expires_after="2025-07-01">
+  <owner>wutao@google.com</owner>
+  <owner>llin@google.com</owner>
+  <summary>
+    Records the first run experimental arm when there is an change between the
+    first run experimental arm and the activated experimental arm in subsequent
+    sessions.
+  </summary>
+</histogram>
+
 <histogram name="Ash.WelcomeTour.ChromeVoxEnabled.When"
     enum="WelcomeTourChromeVoxEnabled" expires_after="2025-07-01">
   <owner>wutao@chromium.org</owner>
@@ -58,6 +69,16 @@ chromium-metrics-reviews@google.com.
   <summary>
     Records the duration of the Welcome Tour when it has been completed,
     starting from when dialog shows.
+  </summary>
+</histogram>
+
+<histogram name="Ash.WelcomeTour.ExperimentalArm"
+    enum="WelcomeTourExperimentalArm" expires_after="2025-07-01">
+  <owner>wutao@google.com</owner>
+  <owner>llin@google.com</owner>
+  <summary>
+    Records in which experimental arm the user was active when an attempt was
+    made to show the Welcome Tour.
   </summary>
 </histogram>
 

@@ -243,14 +243,23 @@ class PasswordFormMetricsRecorder
     // security origin.
     kPublicSuffixMatch = 1,
     // A credential exists for an affiliated matched android app but not for the
-    // current security origin.
+    // current security origin. This is provided as a credential sharing
+    // affiliation by AffiliationService.
     kAffiliatedApp = 2,
     // A credential exists for an affiliated matched site but not for the
-    // current security origin.
+    // current security origin. This is provided as a credential sharing
+    // affiliation by AffiliationService.
     kAffiliatedWebsites = 3,
-    // A credential exists for a web site, which is grouped with the current
-    // domain by the `AffiliationService`.
-    kGroupedWebsites = 4,
+    // A credential exists for another entity, which is grouped with the current
+    // domain by the AffiliationService through a grouping affiliation.
+    kGrouped_Obsolete = 4,
+    // A credential exists for an Android application, which is grouped with the
+    // current domain by the AffiliationService through the grouping
+    // affiliations.
+    kGroupedApp = 5,
+    // A credential exists for a website, which is grouped with the current
+    // domain by the AffiliationService through the grouping affiliations.
+    kGroupedWebsites = 6,
     kMaxValue = kGroupedWebsites,
   };
 
@@ -437,9 +446,7 @@ class PasswordFormMetricsRecorder
   void RecordFirstFillingResult(int32_t result);
   void RecordFirstWaitForUsernameReason(WaitForUsernameReason reason);
   void RecordMatchedFormType(const PasswordForm& form);
-  void RecordPotentialPreferredMatch(
-      const PasswordForm* preferred_match,
-      const bool were_grouped_credentials_availible);
+  void RecordPotentialPreferredMatch(std::optional<MatchedFormType> form_type);
 
   // Calculates FillingAssistance metrics for |submitted_form|.
   void CalculateFillingAssistanceMetric(
@@ -489,6 +496,11 @@ class PasswordFormMetricsRecorder
       metrics_util::SubmittedFormFrame submitted_form_frame) {
     submitted_form_frame_ = submitted_form_frame;
   }
+#if BUILDFLAG(IS_ANDROID)
+  void set_form_submission_reached(bool value) {
+    form_submission_reached_ = value;
+  }
+#endif
 
  private:
   friend class base::RefCounted<PasswordFormMetricsRecorder>;
@@ -630,6 +642,12 @@ class PasswordFormMetricsRecorder
   // form that are filled by Chrome. This value includes all fields in the
   // form (not only username and passwords).
   std::optional<float> automation_rate_;
+
+#if BUILDFLAG(IS_ANDROID)
+  // Set to true when the form submission step is reached. Used to record
+  // form submission and avoid duplicate samples.
+  bool form_submission_reached_ = false;
+#endif
 };
 
 }  // namespace password_manager

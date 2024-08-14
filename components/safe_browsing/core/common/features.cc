@@ -119,19 +119,19 @@ BASE_FEATURE(kExtensionTelemetryConfiguration,
 
 BASE_FEATURE(kExtensionTelemetryDeclarativeNetRequestActionSignal,
              "SafeBrowsingExtensionTelemetryDeclarativeNetRequestActionSignal",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kExtensionTelemetryFileDataForCommandLineExtensions,
              "SafeBrowsingExtensionTelemetryFileDataForCommandLineExtensions",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kExtensionTelemetryForEnteprise,
-             "SafeBrowsingExtensionTelemetryForEnteprise",
+BASE_FEATURE(kExtensionTelemetryForEnterprise,
+             "SafeBrowsingExtensionTelemetryForEnterprise",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 const base::FeatureParam<int>
     kExtensionTelemetryEnterpriseReportingIntervalSeconds{
-        &kExtensionTelemetryForEnteprise, "EnterpriseReportingIntervalSeconds",
+        &kExtensionTelemetryForEnterprise, "EnterpriseReportingIntervalSeconds",
         /*default_value=*/300};
 
 BASE_FEATURE(kExtensionTelemetryPotentialPasswordTheft,
@@ -167,31 +167,21 @@ BASE_FEATURE(kExtensionTelemetryDisableOffstoreExtensions,
              "SafeBrowsingExtensionTelemetryDisableOffstoreExtensions",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kFriendlierSafeBrowsingSettingsEnhancedProtection,
-             "FriendlierSafeBrowsingSettingsEnhancedProtection",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kFriendlierSafeBrowsingSettingsStandardProtection,
-             "FriendlierSafeBrowsingSettingsStandardProtection",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kGooglePlayProtectPrompt,
              "SafeBrowsingGooglePlayProtectPrompt",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGooglePlayProtectInApkTelemetry,
              "SafeBrowsingGooglePlayProtectInApkTelemetry",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kGooglePlayProtectReducesWarnings,
+             "SafeBrowsingGooglePlayProtectReducesWarnings",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kHashPrefixRealTimeLookups,
              "SafeBrowsingHashPrefixRealTimeLookups",
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
-    BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_IOS)
-             base::FEATURE_ENABLED_BY_DEFAULT
-#else
-             base::FEATURE_DISABLED_BY_DEFAULT
-#endif
-);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 constexpr base::FeatureParam<std::string> kHashPrefixRealTimeLookupsRelayUrl{
     &kHashPrefixRealTimeLookups,
@@ -203,6 +193,14 @@ BASE_FEATURE(kHashPrefixRealTimeLookupsFasterOhttpKeyRotation,
              "SafeBrowsingHashPrefixRealTimeLookupsFasterOhttpKeyRotation",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kHashPrefixRealTimeLookupsSamplePing,
+             "SafeBrowsingHashPrefixRealTimeLookupsSamplePing",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+constexpr base::FeatureParam<int> kHashPrefixRealTimeLookupsSampleRate{
+    &kHashPrefixRealTimeLookupsSamplePing,
+    "HashPrefixRealTimeLookupsSampleRate", /*default_value=*/100};
+
 BASE_FEATURE(kDownloadsPageReferrerUrl,
              "DownloadsPageReferrerUrl",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -213,22 +211,12 @@ BASE_FEATURE(kLogAccountEnhancedProtectionStateInProtegoPings,
 
 BASE_FEATURE(kMmapSafeBrowsingDatabase,
              "MmapSafeBrowsingDatabase",
-// TODO(crbug.com/40061554): Fix iOS tests with this enabled.
-#if BUILDFLAG(IS_IOS)
-             base::FEATURE_DISABLED_BY_DEFAULT
-#else
              base::FEATURE_ENABLED_BY_DEFAULT
-#endif
 );
 
 constexpr base::FeatureParam<bool> kMmapSafeBrowsingDatabaseAsync{
     &kMmapSafeBrowsingDatabase, "MmapSafeBrowsingDatabaseAsync",
-// TODO(crbug.com/40061554): Fix iOS tests with this enabled.
-#if BUILDFLAG(IS_IOS)
-    /*default_value=*/false
-#else
     /*default_value=*/true
-#endif
 };
 
 BASE_FEATURE(kNestedArchives,
@@ -282,20 +270,11 @@ BASE_FEATURE(kSafeBrowsingCallNewGmsApiOnStartup,
 BASE_FEATURE(kSafeBrowsingNewGmsApiForBrowseUrlDatabaseCheck,
              "SafeBrowsingNewGmsApiForBrowseUrlDatabaseCheck",
              base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kSafeBrowsingNewGmsApiForSubresourceFilterCheck,
-             "SafeBrowsingNewGmsApiForSubresourceFilterCheck",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
 BASE_FEATURE(kSafeBrowsingOnUIThread,
              "SafeBrowsingOnUIThread",
-// TODO(crbug.com/40061554): Fix iOS tests with this enabled.
-#if BUILDFLAG(IS_IOS)
-             base::FEATURE_DISABLED_BY_DEFAULT
-#else
              base::FEATURE_ENABLED_BY_DEFAULT
-#endif
 );
 
 BASE_FEATURE(kSafeBrowsingReferrerChainWithCopyPasteNavigation,
@@ -393,7 +372,7 @@ base::Value::List GetFeatureStatusList() {
       &kEnhancedSafeBrowsingPromo,
       &kExtensionTelemetryDeclarativeNetRequestActionSignal,
       &kExtensionTelemetryDisableOffstoreExtensions,
-      &kExtensionTelemetryForEnteprise,
+      &kExtensionTelemetryForEnterprise,
       &kExtensionTelemetryInterceptRemoteHostsContactedInRenderer,
       &kExtensionTelemetryPotentialPasswordTheft,
       &kExtensionTelemetryReportContactedHosts,

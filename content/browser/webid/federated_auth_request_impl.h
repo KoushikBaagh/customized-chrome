@@ -173,18 +173,21 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
     return idp_data_for_display_;
   }
 
+  // These values are persisted to logs. Entries should not be renumbered and
+  // numeric values should never be reused.
   enum DialogType {
-    kNone,
-    kSelectAccount,
-    kAutoReauth,
-    kConfirmIdpLogin,
-    kError,
+    kNone = 0,
+    kSelectAccount = 1,
+    kAutoReauth = 2,
+    kConfirmIdpLogin = 3,
+    kError = 4,
     // Popups are not technically dialogs in the strict sense, but because they
     // are mutually exclusive with browser UI dialogs we use this enum for them
     // as well.
-    kLoginToIdpPopup,
-    kContinueOnPopup,
-    kErrorUrlPopup
+    kLoginToIdpPopup = 5,
+    kContinueOnPopup = 6,
+    kErrorUrlPopup = 7,
+    kMaxValue = kErrorUrlPopup
   };
   DialogType GetDialogType() const { return dialog_type_; }
 
@@ -373,6 +376,7 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
   void SendFailedTokenRequestMetrics(
       const GURL& metrics_endpoint,
       blink::mojom::FederatedAuthRequestResult result);
+  void SendSuccessfulTokenRequestMetrics(const GURL& idp_config_url);
 
   void CleanUp();
 

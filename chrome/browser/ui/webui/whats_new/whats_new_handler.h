@@ -38,16 +38,21 @@ class WhatsNewHandler : public whats_new::mojom::PageHandler {
   void GetServerUrl(GetServerUrlCallback callback) override;
   FRIEND_TEST_ALL_PREFIXES(WhatsNewHandlerTest, GetServerUrl);
   FRIEND_TEST_ALL_PREFIXES(WhatsNewHandlerTest, HistogramsAreEmitted);
+  FRIEND_TEST_ALL_PREFIXES(WhatsNewHandlerTest, V2SurveyIsTriggered);
   FRIEND_TEST_ALL_PREFIXES(WhatsNewHandlerTestWithCountry,
                            SurveyIsTriggeredInActiveCountries);
 
   void RecordTimeToLoadContent(base::Time time) override;
   void RecordVersionPageLoaded(bool is_auto_open) override;
-  void RecordModuleImpression(const std::string& module_name) override;
+  void RecordEditionPageLoaded(const std::string& page_uid,
+                               bool is_auto_open) override;
+  void RecordModuleImpression(const std::string& module_name,
+                              whats_new::mojom::ModulePosition) override;
   void RecordExploreMoreToggled(bool expanded) override;
   void RecordScrollDepth(whats_new::mojom::ScrollDepth depth) override;
   void RecordTimeOnPage(base::TimeDelta time) override;
-  void RecordModuleLinkClicked(const std::string& module_name) override;
+  void RecordModuleLinkClicked(const std::string& module_name,
+                               whats_new::mojom::ModulePosition) override;
 
   // Makes a request to show a HaTS survey.
   void TryShowHatsSurveyWithTimeout();

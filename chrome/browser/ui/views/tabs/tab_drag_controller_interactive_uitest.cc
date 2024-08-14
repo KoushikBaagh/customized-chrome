@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "chrome/browser/ui/views/tabs/tab_drag_controller_interactive_uitest.h"
 
 #include <stddef.h>
@@ -70,6 +75,7 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "third_party/blink/public/common/features.h"
 #include "ui/aura/env.h"
+#include "ui/base/mojom/ui_base_types.mojom-shared.h"
 #include "ui/base/test/ui_controls.h"
 #include "ui/compositor/layer.h"
 #include "ui/display/display.h"
@@ -539,14 +545,14 @@ IN_PROC_BROWSER_TEST_F(TabDragControllerTest, GestureEndShouldEndDragTest) {
 
   ui::GestureEvent gesture_tap_down(
       tab_1_center.x(), tab_1_center.x(), 0, base::TimeTicks(),
-      ui::GestureEventDetails(ui::ET_GESTURE_TAP_DOWN));
+      ui::GestureEventDetails(ui::EventType::kGestureTapDown));
   tab_strip->MaybeStartDrag(tab1, gesture_tap_down,
     tab_strip->GetSelectionModel());
   EXPECT_TRUE(TabDragController::IsActive());
 
-  ui::GestureEvent gesture_end(tab_1_center.x(), tab_1_center.x(), 0,
-                               base::TimeTicks(),
-                               ui::GestureEventDetails(ui::ET_GESTURE_END));
+  ui::GestureEvent gesture_end(
+      tab_1_center.x(), tab_1_center.x(), 0, base::TimeTicks(),
+      ui::GestureEventDetails(ui::EventType::kGestureEnd));
   HandleGestureEvent(tab_strip, &gesture_end);
   EXPECT_FALSE(TabDragController::IsActive());
   EXPECT_FALSE(tab_strip->GetDragContext()->IsDragSessionActive());
@@ -1633,8 +1639,8 @@ bool SubtreeShouldBeExplored(aura::Window* window,
   gfx::Point point_in_root = local_point;
   aura::Window::ConvertPointToTarget(window, window->GetRootWindow(),
                                      &point_in_root);
-  ui::MouseEvent event(ui::ET_MOUSE_MOVED, point_in_parent, point_in_root,
-                       base::TimeTicks::Now(), 0, 0);
+  ui::MouseEvent event(ui::EventType::kMouseMoved, point_in_parent,
+                       point_in_root, base::TimeTicks::Now(), 0, 0);
   return window->targeter()->SubtreeShouldBeExploredForEvent(window, event);
 }
 
@@ -1985,7 +1991,7 @@ class TestDialog : public views::DialogDelegateView {
  public:
   TestDialog() {
     SetFocusBehavior(FocusBehavior::ALWAYS);
-    SetModalType(ui::MODAL_TYPE_CHILD);
+    SetModalType(ui::mojom::ModalType::kChild);
     // Dialogs that take focus must have a name and role to pass accessibility
     // checks.
     GetViewAccessibility().SetRole(ax::mojom::Role::kDialog);
@@ -5247,6 +5253,76 @@ IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTest,
   ASSERT_TRUE(ReleaseInput());
 }
 
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+// Runs tests with a tabbed system web app that is locked for OnTask. This is
+// not related to normal web browsers.
+using DetachToBrowserTabDragControllerTestWithOnTaskLocked =
+    DetachToBrowserTabDragControllerTestWithTabbedSystemApp;
+
+IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTestWithOnTaskLocked,
+                       MoveTabOnDrag) {
+  // Install and launch mock app that can be locked for OnTask.
+  const webapps::AppId tabbed_app_id = InstallMockApp();
+  Browser* const app_browser = LaunchWebAppBrowser(tabbed_app_id);
+  ASSERT_EQ(2u, browser_list()->size());
+
+  // Close normal browser.
+  CloseBrowserSynchronously(browser());
+  ASSERT_EQ(1u, browser_list()->size());
+  SelectFirstBrowser();
+  ASSERT_EQ(app_browser, browser());
+  EXPECT_EQ(Browser::Type::TYPE_APP, browser_list()->get(0)->type());
+
+  // Lock the app for OnTask and set up app for testing drag behavior.
+  browser()->SetLockedForOnTask(true);
+  AddTabsAndResetBrowser(browser(), /*additional_tabs=*/3, GetAppUrl());
+  TabStripModel* const tab_strip_model = browser()->tab_strip_model();
+  ASSERT_EQ("0 1 2 3", IDString(tab_strip_model));
+
+  // Drag tab in the second index to the tab in the third index to switch tab
+  // positioning.
+  TabStrip* const tab_strip = GetTabStripForBrowser(browser());
+  ASSERT_TRUE(PressInput(GetCenterInScreenCoordinates(tab_strip->tab_at(1))));
+  ASSERT_TRUE(DragInputTo(GetCenterInScreenCoordinates(tab_strip->tab_at(2))));
+  ASSERT_TRUE(ReleaseInput());
+  StopAnimating(tab_strip);
+
+  // Verify tab is not detached and its position is updated.
+  ASSERT_EQ(1u, browser_list()->size());
+  EXPECT_EQ("0 2 1 3", IDString(tab_strip_model));
+}
+
+IN_PROC_BROWSER_TEST_P(DetachToBrowserTabDragControllerTestWithOnTaskLocked,
+                       TabDoesNotDetachOnDrag) {
+  // Install and launch mock app that can be locked for OnTask.
+  const webapps::AppId tabbed_app_id = InstallMockApp();
+  Browser* const app_browser = LaunchWebAppBrowser(tabbed_app_id);
+  ASSERT_EQ(2u, browser_list()->size());
+
+  // Close normal browser.
+  CloseBrowserSynchronously(browser());
+  ASSERT_EQ(1u, browser_list()->size());
+  SelectFirstBrowser();
+  ASSERT_EQ(app_browser, browser());
+  EXPECT_EQ(Browser::Type::TYPE_APP, browser_list()->get(0)->type());
+
+  // Lock the app for OnTask and set up app for testing drag behavior.
+  browser()->SetLockedForOnTask(true);
+  AddTabsAndResetBrowser(browser(), /*additional_tabs=*/3, GetAppUrl());
+
+  // Drag tab away from tab strip and verify it is not detached.
+  TabStrip* const tab_strip = GetTabStripForBrowser(browser());
+  const gfx::Point initial_drag_position =
+      GetCenterInScreenCoordinates(tab_strip->tab_at(1));
+  ASSERT_TRUE(PressInput(initial_drag_position));
+  ASSERT_TRUE(DragInputTo(initial_drag_position +
+                          gfx::Vector2d(0, GetDetachY(tab_strip) + 1)));
+  ASSERT_TRUE(ReleaseInput());
+  StopAnimating(tab_strip);
+  EXPECT_EQ(1u, browser_list()->size());
+}
+#endif
+
 #if BUILDFLAG(IS_CHROMEOS)
 INSTANTIATE_TEST_SUITE_P(
     TabDragging,
@@ -5316,6 +5392,13 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
     TabDragging,
     DetachToBrowserTabDragControllerTestWithTabbedSystemApp,
+    ::testing::Combine(
+        /*kSplitTabStrip=*/::testing::Bool(),
+        /*kTearOffWebAppTabOpensWebAppWindow=*/::testing::Values(false),
+        /*input_source=*/::testing::Values("mouse", "touch")));
+INSTANTIATE_TEST_SUITE_P(
+    TabDragging,
+    DetachToBrowserTabDragControllerTestWithOnTaskLocked,
     ::testing::Combine(
         /*kSplitTabStrip=*/::testing::Bool(),
         /*kTearOffWebAppTabOpensWebAppWindow=*/::testing::Values(false),

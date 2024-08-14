@@ -5,6 +5,7 @@
 import './cursor_tooltip.js';
 import './initial_gradient.js';
 import './selection_overlay.js';
+import './translate_button.js';
 import '//resources/cr_elements/cr_icon_button/cr_icon_button.js';
 import '//resources/cr_elements/icons.html.js';
 
@@ -13,6 +14,7 @@ import type {CrToastElement} from '//resources/cr_elements/cr_toast/cr_toast.js'
 import {assert} from '//resources/js/assert.js';
 import {skColorToHexColor} from '//resources/js/color_utils.js';
 import {EventTracker} from '//resources/js/event_tracker.js';
+import {loadTimeData} from '//resources/js/load_time_data.js';
 import type {BigBuffer} from '//resources/mojo/mojo/public/mojom/base/big_buffer.mojom-webui.js';
 import type {BigString} from '//resources/mojo/mojo/public/mojom/base/big_string.mojom-webui.js';
 import type {SkColor} from '//resources/mojo/skia/public/mojom/skcolor.mojom-webui.js';
@@ -27,7 +29,7 @@ import type {InitialGradientElement} from './initial_gradient.js';
 import type {OverlayTheme} from './lens.mojom-webui.js';
 import {UserAction} from './lens.mojom-webui.js';
 import {getTemplate} from './lens_overlay_app.html.js';
-import {recordLensOverlayInteraction} from './metrics_utils.js';
+import {recordLensOverlayInteraction, recordTimeToWebUIReady} from './metrics_utils.js';
 import type {SelectionOverlayElement} from './selection_overlay.js';
 
 export let INVOCATION_SOURCE: string = 'Unknown';
@@ -74,6 +76,11 @@ export class LensOverlayAppElement extends PolymerElement {
         type: Boolean,
         reflectToAttribute: true,
       },
+      isTranslateButtonVisible: {
+        type: Boolean,
+        value: loadTimeData.getBoolean('enableOverlayTranslateButton'),
+        readOnly: true,
+      },
       theme: {
         type: Object,
         value: getFallbackTheme,
@@ -100,6 +107,7 @@ export class LensOverlayAppElement extends PolymerElement {
 
   private browserProxy: BrowserProxy = BrowserProxyImpl.getInstance();
   private listenerIds: number[];
+  private invocationTime: number = loadTimeData.getValue('invocationTime');
 
   constructor() {
     super();
@@ -141,6 +149,7 @@ export class LensOverlayAppElement extends PolymerElement {
   override ready() {
     super.ready();
     this.addEventListener('pointermove', this.updateCursorPosition.bind(this));
+    recordTimeToWebUIReady(Number(Date.now() - this.invocationTime));
   }
 
   private handlePointerEnter() {
@@ -176,13 +185,21 @@ export class LensOverlayAppElement extends PolymerElement {
     this.browserProxy.handler.closeRequestedByOverlayCloseButton();
   }
 
-  private onFeedbackClick() {
+  private onFeedbackClick(event: MouseEvent|KeyboardEvent) {
+    if (event instanceof KeyboardEvent &&
+        !(event.key === 'Enter' || event.key === ' ')) {
+      return;
+    }
     this.browserProxy.handler.feedbackRequestedByOverlay();
     this.moreOptionsMenuVisible = false;
     recordLensOverlayInteraction(INVOCATION_SOURCE, UserAction.kSendFeedback);
   }
 
   private onLearnMoreClick(event: MouseEvent|KeyboardEvent) {
+    if (event instanceof KeyboardEvent &&
+        !(event.key === 'Enter' || event.key === ' ')) {
+      return;
+    }
     this.browserProxy.handler.infoRequestedByOverlay({
       middleButton: (event as MouseEvent).button === 1,
       altKey: event.altKey,
@@ -199,6 +216,10 @@ export class LensOverlayAppElement extends PolymerElement {
   }
 
   private onMyActivityClick(event: MouseEvent|KeyboardEvent) {
+    if (event instanceof KeyboardEvent &&
+        !(event.key === 'Enter' || event.key === ' ')) {
+      return;
+    }
     this.browserProxy.handler.activityRequestedByOverlay({
       middleButton: (event as MouseEvent).button === 1,
       altKey: event.altKey,

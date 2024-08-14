@@ -188,6 +188,10 @@ inline constexpr base::FeatureParam<double>
 // Nigori's TrustedVaultDebugInfo.
 BASE_DECLARE_FEATURE(kTrustedVaultAutoUpgradeSyntheticFieldTrial);
 
+// If enabled, uses new fields ThemeSpecifics to replace theme prefs, thus
+// avoiding use of preferences to sync themes.
+BASE_DECLARE_FEATURE(kMoveThemePrefsToSpecifics);
+
 #if BUILDFLAG(IS_ANDROID)
 // If enabled, WebAPK data will be synced for Backup&Restore purposes.
 BASE_DECLARE_FEATURE(kWebApkBackupAndRestoreBackend);
@@ -196,7 +200,6 @@ BASE_DECLARE_FEATURE(kWebApkBackupAndRestoreBackend);
 // If enabled, SyncTransportDataPrefs are account-keyed (instead of just for the
 // currently-signed-in account).
 BASE_DECLARE_FEATURE(kSyncAccountKeyedTransportPrefs);
-
 }  // namespace syncer
 
 #endif  // COMPONENTS_SYNC_BASE_FEATURES_H_

@@ -95,6 +95,16 @@ interface LidStateMonitor {
   Update(LidState lid_status);
 };
 
+// Interface for monitoring state of software privacy switch. The sw privacy
+// switch is available on th Privacy Hub of OS settings page. It allows users
+// to disable cameras at OS level for privacy concern. The state is detected
+// from Chrome browser process and is notified to Chrome Camera App in renderer
+// process.
+interface SWPrivacySwitchMonitor {
+  // Updates when the state of sw privacy switch got changed.
+  Update(bool is_sw_privacy_switch_on);
+};
+
 // The window states that we care about.
 enum WindowStateType {
   kMinimized = 0,
@@ -173,14 +183,6 @@ interface WindowStateController {
   Focus() => ();
 };
 
-enum ToteMetricFormat {
-  kPhoto = 0,
-  kScanJpg = 1,
-  kScanPdf = 2,
-  kVideoGif = 3,
-  kVideoMp4 = 4,
-};
-
 // Interface for communication between Chrome Camera App (Remote) and Chrome
 // (Receiver).
 interface CameraAppHelper {
@@ -244,9 +246,6 @@ interface CameraAppHelper {
   // will be used to generate the URI for the broadcast.
   SendNewCaptureBroadcast(bool is_video, string name);
 
-  // Notifies Tote client when a photo/pdf/video/gif is captured.
-  NotifyTote(ToteMetricFormat format, string name);
-
   // Monitors the deletion for given file |name| in the camera folder. The
   // function will return when the deletion happens, or when another monitor
   // request is raised, or when the error occurs. We can determine the cases
@@ -309,6 +308,11 @@ interface CameraAppHelper {
   // Calling the Update() whenever the lid state changes.
   SetLidStateMonitor(pending_remote<LidStateMonitor> monitor)
       => (LidState lid_status);
+
+  // Registers a SWPrivacySwitchMonitor instance and returns the initial status.
+  // Calling the Update() whenever the sw privacy switch state changes.
+  SetSWPrivacySwitchMonitor(pending_remote<SWPrivacySwitchMonitor> monitor)
+      => (bool is_sw_privacy_switch_on);
 
   // Gets an event sender which can be used to send events to CrOS Events.
   GetEventsSender() => (pending_remote<EventsSender> events_sender);

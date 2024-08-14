@@ -97,11 +97,9 @@ import org.chromium.chrome.browser.notifications.channels.SiteChannelsManager;
 import org.chromium.chrome.browser.permissions.PermissionTestRule;
 import org.chromium.chrome.browser.permissions.PermissionTestRule.PermissionUpdateWaiter;
 import org.chromium.chrome.browser.preferences.Pref;
-import org.chromium.chrome.browser.privacy_sandbox.FakeTrackingProtectionBridge;
-import org.chromium.chrome.browser.privacy_sandbox.TrackingProtectionBridgeJni;
 import org.chromium.chrome.browser.profiles.ProfileManager;
 import org.chromium.chrome.browser.settings.SettingsActivity;
-import org.chromium.chrome.browser.settings.SettingsLauncherImpl;
+import org.chromium.chrome.browser.settings.SettingsLauncherFactory;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.R;
@@ -116,8 +114,8 @@ import org.chromium.components.browser_ui.settings.ExpandablePreferenceGroup;
 import org.chromium.components.browser_ui.settings.SettingsLauncher;
 import org.chromium.components.browser_ui.site_settings.ContentSettingException;
 import org.chromium.components.browser_ui.site_settings.ContentSettingsResources;
-import org.chromium.components.browser_ui.site_settings.FPSCookieSettings;
 import org.chromium.components.browser_ui.site_settings.GroupedWebsitesSettings;
+import org.chromium.components.browser_ui.site_settings.RWSCookieSettings;
 import org.chromium.components.browser_ui.site_settings.SingleCategorySettings;
 import org.chromium.components.browser_ui.site_settings.SingleCategorySettingsConstants;
 import org.chromium.components.browser_ui.site_settings.SingleWebsiteSettings;
@@ -185,8 +183,6 @@ public class SiteSettingsTest {
 
     @Rule public JniMocker mocker = new JniMocker();
 
-    private FakeTrackingProtectionBridge mFakeTrackingProtectionBridge;
-
     private PermissionUpdateWaiter mPermissionUpdateWaiter;
 
     private static final String[] NULL_ARRAY = new String[0];
@@ -224,8 +220,6 @@ public class SiteSettingsTest {
         // Clean up cookies and permissions to ensure tests run in a clean environment.
         cleanUpCookiesAndPermissions();
         MockitoAnnotations.initMocks(this);
-        mFakeTrackingProtectionBridge = new FakeTrackingProtectionBridge();
-        mocker.mock(TrackingProtectionBridgeJni.TEST_HOOKS, mFakeTrackingProtectionBridge);
     }
 
     @After
@@ -734,12 +728,12 @@ public class SiteSettingsTest {
 
                     Bundle fragmentArgs = new Bundle();
                     fragmentArgs.putInt(
-                            FPSCookieSettings.EXTRA_COOKIE_PAGE_STATE, expectedCookieControlMode);
+                            RWSCookieSettings.EXTRA_COOKIE_PAGE_STATE, expectedCookieControlMode);
 
                     Mockito.verify(mSettingsLauncher)
                             .launchSettingsActivity(
                                     eq(websitePreferences.getContext()),
-                                    eq(FPSCookieSettings.class),
+                                    eq(RWSCookieSettings.class),
                                     refEq(fragmentArgs));
                 });
     }
@@ -1342,34 +1336,6 @@ public class SiteSettingsTest {
     @SmallTest
     @Feature({"Preferences"})
     public void testOnlyExpectedPreferencesThirdPartyCookies() {
-        testExpectedPreferences(
-                SiteSettingsCategory.Type.THIRD_PARTY_COOKIES,
-                new String[] {"info_text", "tri_state_cookie_toggle", "add_exception"},
-                new String[] {"info_text", "tri_state_cookie_toggle"});
-    }
-
-    @Test
-    @SmallTest
-    @Feature({"Preferences"})
-    @EnableFeatures({ChromeFeatureList.TRACKING_PROTECTION_SETTINGS_PAGE_ROLLBACK_NOTICE})
-    public void testOnlyExpectedPreferencesThirdPartyCookiesWhenUserOffboarded() {
-        mFakeTrackingProtectionBridge.setIsOffboarded(true);
-
-        testExpectedPreferences(
-                SiteSettingsCategory.Type.THIRD_PARTY_COOKIES,
-                new String[] {
-                    "card_preference", "info_text", "tri_state_cookie_toggle", "add_exception"
-                },
-                new String[] {"card_preference", "info_text", "tri_state_cookie_toggle"});
-    }
-
-    @Test
-    @SmallTest
-    @Feature({"Preferences"})
-    @EnableFeatures({ChromeFeatureList.TRACKING_PROTECTION_SETTINGS_PAGE_ROLLBACK_NOTICE})
-    public void testOnlyExpectedPreferencesThirdPartyCookiesWhenUserNotOffboarded() {
-        mFakeTrackingProtectionBridge.setIsOffboarded(false);
-
         testExpectedPreferences(
                 SiteSettingsCategory.Type.THIRD_PARTY_COOKIES,
                 new String[] {"info_text", "tri_state_cookie_toggle", "add_exception"},
@@ -2297,7 +2263,7 @@ public class SiteSettingsTest {
 
         triggerEmbargoForOrigin(url);
 
-        SettingsLauncher settingsLauncher = new SettingsLauncherImpl();
+        SettingsLauncher settingsLauncher = SettingsLauncherFactory.createSettingsLauncher();
         Context context = ApplicationProvider.getApplicationContext();
         Intent intent =
                 settingsLauncher.createSettingsActivityIntent(
@@ -2424,7 +2390,7 @@ public class SiteSettingsTest {
                     FederatedIdentityTestUtils.embargoFedCmForRelyingParty(new GURL(rpUrl));
                 });
 
-        SettingsLauncher settingsLauncher = new SettingsLauncherImpl();
+        SettingsLauncher settingsLauncher = SettingsLauncherFactory.createSettingsLauncher();
         Context context = ApplicationProvider.getApplicationContext();
         Intent intent =
                 settingsLauncher.createSettingsActivityIntent(
@@ -2603,6 +2569,9 @@ public class SiteSettingsTest {
     @Feature({"Preferences"})
     @EnableFeatures(ChromeFeatureList.SAFETY_HUB)
     public void testAutorevokePermissionsSwitch() {
+        HistogramWatcher histogramExpectation =
+                HistogramWatcher.newSingleRecordWatcher(
+                        SiteSettings.PERMISSION_AUTOREVOCATION_HISTOGRAM_NAME, true);
         // Set the initial toggle state.
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
@@ -2631,6 +2600,7 @@ public class SiteSettingsTest {
                             UserPrefs.get(getBrowserContextHandle())
                                     .getBoolean(Pref.UNUSED_SITE_PERMISSIONS_REVOCATION_ENABLED));
                 });
+        histogramExpectation.assertExpected();
 
         settingsActivity.finish();
     }
@@ -2730,18 +2700,6 @@ public class SiteSettingsTest {
         createCookieExceptions();
         renderCategoryPage(
                 SiteSettingsCategory.Type.THIRD_PARTY_COOKIES, "site_settings_cookies_page_fps");
-    }
-
-    @Test
-    @SmallTest
-    @Feature({"RenderTest"})
-    @EnableFeatures({ChromeFeatureList.TRACKING_PROTECTION_SETTINGS_PAGE_ROLLBACK_NOTICE})
-    public void testRenderThirdPartyCookiesPageWithOffboarderdUser() throws Exception {
-        mFakeTrackingProtectionBridge.setIsOffboarded(true);
-
-        renderCategoryPage(
-                SiteSettingsCategory.Type.THIRD_PARTY_COOKIES,
-                "site_settings_third_party_cookies_page_offboarded_user");
     }
 
     @Test

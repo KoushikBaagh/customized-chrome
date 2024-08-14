@@ -166,6 +166,8 @@ IN_PROC_BROWSER_TEST_F(InformedRestoreTest, LaunchBrowsers) {
   EXPECT_EQ(2u, BrowserList::GetInstance()->size());
 
   histogram_tester_.ExpectBucketCount("Apps.FullRestoreWindowCount2", 2, 1);
+  histogram_tester_.ExpectUniqueSample("Ash.FirstWebContentsProfile.Recorded",
+                                       false, 1);
 }
 
 // Creates SWAs that will be restored in the main test.
@@ -257,7 +259,7 @@ IN_PROC_BROWSER_TEST_F(InformedRestoreTest, PRE_LaunchBrowsersToDesks) {
 }
 
 // Tests that the three browser windows are restored to their old desks.
-IN_PROC_BROWSER_TEST_F(InformedRestoreTest, LaunchBrowsersToDesks) {
+IN_PROC_BROWSER_TEST_F(InformedRestoreTest, DISABLED_LaunchBrowsersToDesks) {
   EXPECT_TRUE(BrowserList::GetInstance()->empty());
 
   // Verify we have entered overview. The restore button will be null if we

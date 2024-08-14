@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 
 #include <algorithm>
@@ -297,9 +302,7 @@ int TabStripModel::InsertWebContentsAt(
     int add_types,
     std::optional<tab_groups::TabGroupId> group) {
   return InsertDetachedTabAt(
-      index,
-      std::make_unique<tabs::TabModel>(std::move(contents),
-                                       delegate()->IsNormalWindow()),
+      index, std::make_unique<tabs::TabModel>(std::move(contents), this),
       add_types, group);
 }
 
@@ -418,6 +421,9 @@ std::unique_ptr<DetachedWebContents> TabStripModel::DetachWebContentsImpl(
   std::optional<SessionID> id = std::nullopt;
   if (create_historical_tab) {
     id = delegate_->CreateHistoricalTab(tab->contents());
+  }
+  if (reason == TabStripModelChange::RemoveReason::kDeleted) {
+    tab->DestroyTabFeatures();
   }
 
   std::unique_ptr<tabs::TabModel> old_data =
@@ -933,14 +939,17 @@ std::unique_ptr<ScopedTabStripModalUI> TabStripModel::ShowModalUI() {
   return std::make_unique<ScopedTabStripModalUIImpl>(this);
 }
 
+void TabStripModel::ForceShowingModalUIForTesting(bool showing) {
+  showing_modal_ui_ = showing;
+}
+
 void TabStripModel::AddWebContents(
     std::unique_ptr<WebContents> contents,
     int index,
     ui::PageTransition transition,
     int add_types,
     std::optional<tab_groups::TabGroupId> group) {
-  auto tab = std::make_unique<tabs::TabModel>(std::move(contents),
-                                              delegate()->IsNormalWindow());
+  auto tab = std::make_unique<tabs::TabModel>(std::move(contents), this);
   AddTab(std::move(tab), index, transition, add_types, group);
 }
 
@@ -1480,7 +1489,6 @@ void TabStripModel::ExecuteContextMenuCommand(int context_index,
       // context menu, confirm the group deletion first, and then perform the
       // close, either through the callback provided to confirm, or directly if
       // the Confirm is allowing a synchronous delete.
-      if (pin && !groups_to_delete.empty()) {
         base::OnceCallback<void()> callback = base::BindOnce(
             [](TabStripModel* model, std::vector<int> indices,
                bool pin_indices) {
@@ -1488,16 +1496,16 @@ void TabStripModel::ExecuteContextMenuCommand(int context_index,
             },
             base::Unretained(this), indices, pin);
 
-        // If the delegate returns false for confirming the destroy of groups
-        // that means that the user needs to make a decision about the
-        // destruction first. prevent CloseTabs from being called.
-        if (!delegate_->ConfirmRemovingAllTabsFromGroups(groups_to_delete,
-                                                         std::move(callback))) {
-          return;
+        if (pin && !groups_to_delete.empty()) {
+          // If the delegate returns false for confirming the destroy of groups
+          // that means that the user needs to make a decision about the
+          // destruction first. prevent CloseTabs from being called.
+          return delegate_->OnRemovingAllTabsFromGroups(groups_to_delete,
+                                                        std::move(callback));
+        } else {
+          std::move(callback).Run();
         }
-      }
 
-      SetTabsPinned(indices, pin);
       break;
     }
 
@@ -1514,11 +1522,14 @@ void TabStripModel::ExecuteContextMenuCommand(int context_index,
       } else {
         std::vector<tab_groups::TabGroupId> groups_to_delete =
             GetGroupsDestroyedFromRemovingIndices(indices);
-        if (delegate_->ConfirmRemovingAllTabsFromGroups(
-                groups_to_delete,
-                base::BindOnce(&TabStripModel::RemoveFromGroup,
-                               base::Unretained(this), indices))) {
-          RemoveFromGroup(indices);
+
+        base::OnceCallback<void()> callback = base::BindOnce(
+            &TabStripModel::RemoveFromGroup, base::Unretained(this), indices);
+        if (!groups_to_delete.empty()) {
+          delegate_->OnRemovingAllTabsFromGroups(groups_to_delete,
+                                                 std::move(callback));
+        } else {
+          std::move(callback).Run();
         }
       }
       break;
@@ -1561,12 +1572,12 @@ void TabStripModel::ExecuteContextMenuCommand(int context_index,
             model->OpenTabGroupEditor(new_group_id.value());
           },
           base::Unretained(this), indices_to_add);
-      if (groups_to_delete.empty() ||
-          delegate_->ConfirmRemovingAllTabsFromGroups(groups_to_delete,
-                                                      std::move(callback))) {
-        std::optional<tab_groups::TabGroupId> new_group_id =
-            AddToNewGroup(indices_to_add);
-        OpenTabGroupEditor(new_group_id.value());
+
+      if (!groups_to_delete.empty()) {
+        return delegate_->OnRemovingAllTabsFromGroups(groups_to_delete,
+                                                      std::move(callback));
+      } else {
+        std::move(callback).Run();
       }
       break;
     }
@@ -1587,12 +1598,15 @@ void TabStripModel::ExecuteContextMenuCommand(int context_index,
       std::vector<int> indices_to_remove = GetIndicesForCommand(context_index);
       std::vector<tab_groups::TabGroupId> groups_to_delete =
           GetGroupsDestroyedFromRemovingIndices(indices_to_remove);
-      if (groups_to_delete.empty() ||
-          delegate_->ConfirmRemovingAllTabsFromGroups(
-              groups_to_delete,
-              base::BindOnce(&TabStripModel::RemoveFromGroup,
-                             base::Unretained(this), indices_to_remove))) {
-        RemoveFromGroup(indices_to_remove);
+
+      base::OnceCallback<void()> callback =
+          base::BindOnce(&TabStripModel::RemoveFromGroup,
+                         base::Unretained(this), indices_to_remove);
+      if (!groups_to_delete.empty()) {
+        return delegate_->OnRemovingAllTabsFromGroups(groups_to_delete,
+                                                      std::move(callback));
+      } else {
+        std::move(callback).Run();
       }
       break;
     }
@@ -1610,12 +1624,15 @@ void TabStripModel::ExecuteContextMenuCommand(int context_index,
       std::vector<int> indices_to_move = GetIndicesForCommand(context_index);
       std::vector<tab_groups::TabGroupId> groups_to_delete =
           GetGroupsDestroyedFromRemovingIndices(indices_to_move);
-      if (groups_to_delete.empty() ||
-          delegate_->ConfirmRemovingAllTabsFromGroups(
-              groups_to_delete,
-              base::BindOnce(&TabStripModelDelegate::MoveTabsToNewWindow,
-                             base::Unretained(delegate()), indices_to_move))) {
-        delegate()->MoveTabsToNewWindow(GetIndicesForCommand(context_index));
+
+      base::OnceCallback<void()> callback =
+          base::BindOnce(&TabStripModelDelegate::MoveTabsToNewWindow,
+                         base::Unretained(delegate()), indices_to_move);
+      if (!groups_to_delete.empty()) {
+        return delegate_->OnRemovingAllTabsFromGroups(groups_to_delete,
+                                                      std::move(callback));
+      } else {
+        std::move(callback).Run();
       }
       break;
     }
@@ -1702,13 +1719,16 @@ void TabStripModel::ExecuteAddToExistingGroupCommand(
   // to be deleted, but it is the group that is being added to then the there
   // are no actual deletions occuring. Otherwise the group deletion must be
   // confirmed.
-  if (groups_to_delete.size() == 0 ||
-      (groups_to_delete.size() == 1 && groups_to_delete[0] == group) ||
-      delegate_->ConfirmRemovingAllTabsFromGroups(
-          groups_to_delete,
-          base::BindOnce(&TabStripModel::AddToExistingGroup,
-                         base::Unretained(this), indices, group, false))) {
-    AddToExistingGroup(indices, group);
+  base::OnceCallback<void()> callback =
+      base::BindOnce(&TabStripModel::AddToExistingGroup, base::Unretained(this),
+                     indices, group, false);
+
+  if (!groups_to_delete.empty() &&
+      !(groups_to_delete.size() == 1 && groups_to_delete[0] == group)) {
+    delegate_->OnRemovingAllTabsFromGroups(groups_to_delete,
+                                           std::move(callback));
+  } else {
+    std::move(callback).Run();
   }
 }
 
@@ -1765,25 +1785,20 @@ void TabStripModel::ExecuteCloseTabsByIndicesCommand(
   // menu, confirm the group deletion first, and then perform the close, either
   // through the callback provided to confirm, or directly if the Confirm is
   // allowing a synchronous delete.
+  base::OnceCallback<void()> callback =
+      base::BindOnce(&TabStripModel::CloseTabs, base::Unretained(this),
+                     GetWebContentsesByIndices(indices_to_delete),
+                     TabCloseTypes::CLOSE_CREATE_HISTORICAL_TAB |
+                         TabCloseTypes::CLOSE_USER_GESTURE);
   if (!groups_to_delete.empty()) {
-    base::OnceCallback<void()> callback =
-        base::BindOnce(&TabStripModel::CloseTabs, base::Unretained(this),
-                       GetWebContentsesByIndices(indices_to_delete),
-                       TabCloseTypes::CLOSE_CREATE_HISTORICAL_TAB |
-                           TabCloseTypes::CLOSE_USER_GESTURE);
-
     // If the delegate returns false for confirming the destroy of groups
     // that means that the user needs to make a decision about the
     // destruction first. prevent CloseTabs from being called.
-    if (!delegate_->ConfirmDestroyingGroups(groups_to_delete,
-                                            std::move(callback))) {
-      return;
-    }
+    return delegate_->OnGroupsDestruction(groups_to_delete,
+                                          std::move(callback));
+  } else {
+    std::move(callback).Run();
   }
-
-  CloseTabs(GetWebContentsesByIndices(indices_to_delete),
-            TabCloseTypes::CLOSE_CREATE_HISTORICAL_TAB |
-                TabCloseTypes::CLOSE_USER_GESTURE);
 }
 
 bool TabStripModel::WillContextMenuMuteSites(int index) {

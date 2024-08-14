@@ -7,6 +7,8 @@
 #include "base/auto_reset.h"
 #include "base/containers/adapters.h"
 #include "base/containers/contains.h"
+#include "base/not_fatal_until.h"
+#include "base/trace_event/trace_event.h"
 #include "third_party/skia/include/core/SkRect.h"
 #include "third_party/skia/include/core/SkRegion.h"
 #include "ui/aura/env.h"
@@ -271,7 +273,8 @@ WindowOcclusionTracker::ComputeTargetOcclusionForWindow(Window* window) {
   // This doesn't update the occlusion states of any window, so we should only
   // require one pass.
   auto tracked_window_iter = tracked_windows_.find(window);
-  DCHECK(tracked_window_iter != tracked_windows_.end());
+  CHECK(tracked_window_iter != tracked_windows_.end(),
+        base::NotFatalUntil::M130);
 
   base::AutoReset<OcclusionData> auto_reset_occlusion_data(
       &tracked_window_iter->second, OcclusionData());
@@ -310,6 +313,9 @@ void WindowOcclusionTracker::MaybeComputeOcclusion() {
 
   base::AutoReset<int> auto_reset(
       &num_times_occlusion_recomputed_in_current_step_, 0);
+
+  TRACE_EVENT1("ui", "WindowOcclusionTracker::MaybeComputeOcclusion", "this",
+               reinterpret_cast<void*>(this));
 
   // Recompute occlusion states until either:
   // - They are stable, i.e. calling Window::SetOcclusionInfo() on all tracked
@@ -512,7 +518,7 @@ bool WindowOcclusionTracker::WindowHasContent(const Window* window) const {
 }
 
 void WindowOcclusionTracker::CleanupAnimatedWindows() {
-  base::EraseIf(animated_windows_, [=](Window* window) {
+  base::EraseIf(animated_windows_, [=, this](Window* window) {
     ui::LayerAnimator* const animator = window->layer()->GetAnimator();
     if (animator->IsAnimatingOnePropertyOf(
             kOcclusionCanChangeWhenPropertyAnimationEnds))
@@ -758,7 +764,7 @@ void WindowOcclusionTracker::TrackedWindowRemovedFromRoot(Window* window) {
   Window* const root_window = window->GetRootWindow();
   DCHECK(root_window);
   auto root_window_state_it = root_windows_.find(root_window);
-  DCHECK(root_window_state_it != root_windows_.end());
+  CHECK(root_window_state_it != root_windows_.end(), base::NotFatalUntil::M130);
   --root_window_state_it->second.num_tracked_windows;
   if (root_window_state_it->second.num_tracked_windows == 0) {
     RemoveObserverFromWindowAndDescendants(root_window);
@@ -839,7 +845,7 @@ void WindowOcclusionTracker::ForceWindowVisible(Window* window) {
 
 void WindowOcclusionTracker::RemoveForceWindowVisible(Window* window) {
   auto iter = forced_visible_count_map_.find(window);
-  DCHECK(iter != forced_visible_count_map_.end());
+  CHECK(iter != forced_visible_count_map_.end(), base::NotFatalUntil::M130);
   if (--iter->second == 0u) {
     forced_visible_count_map_.erase(iter);
     Window* root_window = window->GetRootWindow();
@@ -899,12 +905,13 @@ void WindowOcclusionTracker::OnWindowHierarchyChanged(
 }
 
 void WindowOcclusionTracker::OnWindowAdded(Window* window) {
-  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(
-      window, [=]() { return WindowMoveMayAffectOcclusionStates(window); });
+  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=, this]() {
+    return WindowMoveMayAffectOcclusionStates(window);
+  });
 }
 
 void WindowOcclusionTracker::OnWillRemoveWindow(Window* window) {
-  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=]() {
+  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=, this]() {
     return !WindowOrParentIsAnimated(window) &&
            WindowOrDescendantCanOccludeOtherWindows(window);
   });
@@ -913,7 +920,7 @@ void WindowOcclusionTracker::OnWillRemoveWindow(Window* window) {
 void WindowOcclusionTracker::OnWindowVisibilityChanged(Window* window,
                                                        bool visible) {
   MaybeObserveAnimatedWindow(window);
-  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=]() {
+  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=, this]() {
     // A child isn't visible when its parent isn't IsVisible(). Therefore, there
     // is no need to compute occlusion when Show() or Hide() is called on a
     // window with a hidden parent.
@@ -932,7 +939,7 @@ void WindowOcclusionTracker::OnWindowBoundsChanged(
   const bool animation_started =
       (reason == ui::PropertyChangeReason::FROM_ANIMATION) &&
       MaybeObserveAnimatedWindow(window);
-  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=]() {
+  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=, this]() {
     return animation_started || WindowMoveMayAffectOcclusionStates(window);
   });
 }
@@ -945,14 +952,14 @@ void WindowOcclusionTracker::OnWindowOpacitySet(
   const bool animation_started =
       (reason == ui::PropertyChangeReason::FROM_ANIMATION) &&
       MaybeObserveAnimatedWindow(window);
-  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=]() {
+  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=, this]() {
     return animation_started ||
            WindowOpacityChangeMayAffectOcclusionStates(window);
   });
 }
 
 void WindowOcclusionTracker::OnWindowAlphaShapeSet(Window* window) {
-  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=]() {
+  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=, this]() {
     return WindowOpacityChangeMayAffectOcclusionStates(window);
   });
 }
@@ -965,7 +972,7 @@ void WindowOcclusionTracker::OnWindowTransparentChanged(
   const bool animation_started =
       (reason == ui::PropertyChangeReason::FROM_ANIMATION) &&
       MaybeObserveAnimatedWindow(window);
-  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=]() {
+  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=, this]() {
     return animation_started ||
            WindowOpacityChangeMayAffectOcclusionStates(window);
   });
@@ -979,14 +986,15 @@ void WindowOcclusionTracker::OnWindowTransformed(
   const bool animation_started =
       (reason == ui::PropertyChangeReason::FROM_ANIMATION) &&
       MaybeObserveAnimatedWindow(window);
-  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=]() {
+  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=, this]() {
     return animation_started || WindowMoveMayAffectOcclusionStates(window);
   });
 }
 
 void WindowOcclusionTracker::OnWindowStackingChanged(Window* window) {
-  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(
-      window, [=]() { return WindowMoveMayAffectOcclusionStates(window); });
+  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=, this]() {
+    return WindowMoveMayAffectOcclusionStates(window);
+  });
 }
 
 void WindowOcclusionTracker::OnWindowDestroyed(Window* window) {
@@ -1039,7 +1047,7 @@ void WindowOcclusionTracker::OnWindowOpaqueRegionsForOcclusionChanged(
   // If the opaque regions for occlusion change, the occlusion state may be
   // affected if the effective opacity of the window changes (e.g. clearing the
   // regions for occlusion), or if their bounds change.
-  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=]() {
+  MarkRootWindowAsDirtyAndMaybeComputeOcclusionIf(window, [=, this]() {
     return WindowOpacityChangeMayAffectOcclusionStates(window) ||
            WindowMoveMayAffectOcclusionStates(window);
   });

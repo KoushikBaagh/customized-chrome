@@ -249,12 +249,14 @@ PdfAccessibilityTree::PdfAccessibilityTree(
     content::RenderFrame* render_frame,
     chrome_pdf::PdfAccessibilityActionHandler* action_handler,
     chrome_pdf::PdfAccessibilityImageFetcher* image_fetcher,
-    blink::WebPluginContainer* plugin_container)
+    blink::WebPluginContainer* plugin_container,
+    bool print_preview)
     : content::RenderFrameObserver(render_frame),
       render_frame_(render_frame),
       action_handler_(action_handler),
       image_fetcher_(image_fetcher),
-      plugin_container_(plugin_container) {
+      plugin_container_(plugin_container),
+      print_preview_(print_preview) {
   DCHECK(render_frame);
   DCHECK(action_handler_);
   DCHECK(image_fetcher_);
@@ -719,6 +721,18 @@ void PdfAccessibilityTree::SetOcrCompleteStatus() {
     LOG(FATAL) << tree_.error();
   }
   MarkPluginContainerDirty();
+
+#if BUILDFLAG(IS_CHROMEOS)
+  // `FireLayoutComplete()` will be captured by Select-to-Speak on ChromeOS for
+  // the "Accessibility.PdfOcr.ActiveWhenInaccessiblePdfOpened" metric.
+  // TODO(crbug/289010799): Remove `FireLayoutComplete()` when the
+  // Accessibility.PdfOcr.ActiveWhenInaccessiblePdfOpened histogram expires.
+  CHECK(render_frame());
+  content::RenderAccessibility* render_accessibility =
+      render_frame()->GetRenderAccessibility();
+  CHECK(render_accessibility);
+  render_accessibility->FireLayoutComplete();
+#endif  // BUILDFLAG(IS_CHROMEOS)
 }
 #endif  // BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
 
@@ -1297,12 +1311,16 @@ void PdfAccessibilityTree::MaybeHandleAccessibilityChange(
       // the browser process sent AXMode with `ui::AXMode::kPDFOcr` (i.e. after
       // `RenderAccessibilityManager` called `NotifyAccessibilityModeChange()`)
       // when its web contents were being created.
-      content::RenderAccessibility* render_accessibility =
-          render_frame() ? render_frame()->GetRenderAccessibility() : nullptr;
-      if (render_accessibility &&
-          render_accessibility->GetAXMode().has_mode(ui::AXMode::kPDFOcr) &&
-          !ocr_helper_) {
-        CreateOcrHelper();
+      // TODO(b/354068257): Enable OCR in print preview mode. OCR is disabled in
+      // print preview mode since PDFs are dynamically generated in preview mode
+      // and delayed image fetch for OCR is not possible.
+      if (!print_preview_ && !ocr_helper_) {
+        content::RenderAccessibility* render_accessibility =
+            render_frame() ? render_frame()->GetRenderAccessibility() : nullptr;
+        if (render_accessibility &&
+            render_accessibility->GetAXMode().has_mode(ui::AXMode::kPDFOcr)) {
+          CreateOcrHelper();
+        }
       }
 #endif  // BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
       action_handler_->EnableAccessibility();

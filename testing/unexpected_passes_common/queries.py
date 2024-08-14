@@ -3,26 +3,16 @@
 # found in the LICENSE file.
 """Methods related to querying the ResultDB BigQuery tables."""
 
-import concurrent.futures
-import json
 import logging
-import math
-import multiprocessing.pool
-import os
-import subprocess
-import threading
 import time
-from typing import (Any, Collection, Dict, Generator, Iterable, List, Optional,
-                    Tuple, Union)
+from typing import Collection, Dict, Generator, Iterable, List, Optional, Tuple
 
 from google.cloud import bigquery
 from google.cloud import bigquery_storage
 import pandas
-import six
 
 from typ import expectations_parser
 from typ import json_results
-from unexpected_passes_common import builders as builders_module
 from unexpected_passes_common import constants
 from unexpected_passes_common import data_types
 from unexpected_passes_common import expectations
@@ -45,27 +35,14 @@ PARTITIONED_SUBMITTED_BUILDS_TEMPLATE = """\
       AND start_time > TIMESTAMP_SUB(CURRENT_TIMESTAMP(),
                                      INTERVAL 30 DAY)"""
 
-RAW_SUBMITTED_BUILDS_TEMPLATE = """\
-    SELECT
-      CONCAT("build-", CAST(unnested_builds.id AS STRING)) as id
-    FROM
-      `commit-queue.raw.attempts`,
-      UNNEST(builds) as unnested_builds,
-      UNNEST(gerrit_changes) as unnested_changes
-    WHERE
-      luci_project = "{project_view}"
-      AND unnested_builds.host = "cr-buildbucket.appspot.com"
-      AND unnested_changes.submit_status = "SUCCESS"
-      AND start_time > TIMESTAMP_SUB(CURRENT_TIMESTAMP(),
-                                     INTERVAL 30 DAY)"""
-
 QueryResult = pandas.Series
 
 
 class BigQueryQuerier:
   """Class to handle all BigQuery queries for a script invocation."""
 
-  def __init__(self, suite: Optional[str], project: str, num_samples: int):
+  def __init__(self, suite: Optional[str], project: str, num_samples: int,
+               keep_unmatched_results: bool):
     """
     Args:
       suite: A string containing the name of the suite that is being queried
@@ -74,10 +51,13 @@ class BigQueryQuerier:
       project: A string containing the billing project to use for BigQuery.
       num_samples: An integer containing the number of builds to pull results
           from.
+      keep_unmatched_results: Whether to store and return unmatched results
+          for debugging purposes.
     """
     self._suite = suite
     self._project = project
     self._num_samples = num_samples or DEFAULT_NUM_SAMPLES
+    self._keep_unmatched_results = keep_unmatched_results
 
     assert self._num_samples > 0
 
@@ -153,8 +133,11 @@ class BigQueryQuerier:
                                               matching_builder.name)
         unmatched_results = expectation_map.AddResultList(
             prefixed_builder_name, results, expectation_files)
-        if unmatched_results:
-          all_unmatched_results[prefixed_builder_name] = unmatched_results
+        if self._keep_unmatched_results:
+          if unmatched_results:
+            all_unmatched_results[prefixed_builder_name] = unmatched_results
+        else:
+          logging.info('Dropping %d unmatched results', len(unmatched_results))
 
     logging.debug('Filling expectation map took %f', time.time() - start_time)
     return all_unmatched_results

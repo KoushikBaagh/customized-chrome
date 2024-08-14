@@ -4,9 +4,12 @@
 
 #include "chrome/browser/ai/ai_manager_keyed_service.h"
 
+#include <memory>
+
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_forward.h"
 #include "base/notreached.h"
 #include "base/strings/stringprintf.h"
 #include "base/task/task_traits.h"
@@ -21,7 +24,6 @@
 #include "components/optimization_guide/core/optimization_guide_features.h"
 #include "components/optimization_guide/core/optimization_guide_switches.h"
 #include "mojo/public/cpp/bindings/self_owned_receiver.h"
-#include "third_party/blink/public/mojom/ai/ai_manager.mojom-shared.h"
 #include "third_party/blink/public/mojom/ai/ai_manager.mojom.h"
 #include "third_party/blink/public/mojom/devtools/console_message.mojom-shared.h"
 
@@ -125,20 +127,15 @@ void AIManagerKeyedService::CanCreateTextSession(
   CanOptimizationGuideKeyedServiceCreateGenericSession(std::move(callback));
 }
 
-void AIManagerKeyedService::CreateTextSession(
-    mojo::PendingReceiver<blink::mojom::AITextSession> receiver,
-    blink::mojom::AITextSessionSamplingParamsPtr sampling_params,
-    CreateTextSessionCallback callback) {
+std::unique_ptr<AITextSession> AIManagerKeyedService::CreateTextSessionInternal(
+    const blink::mojom::AITextSessionSamplingParamsPtr& sampling_params,
+    const std::optional<const AITextSession::Context>& context) {
   CHECK(browser_context_);
   OptimizationGuideKeyedService* service =
       OptimizationGuideKeyedServiceFactory::GetForProfile(
-          Profile::FromBrowserContext(browser_context_));
+          Profile::FromBrowserContext(browser_context_.get()));
   if (!service) {
-    receivers_.ReportBadMessage(
-        "Caller should ensure `CanStartModelExecutionSession()` "
-        "returns true before calling this method.");
-    std::move(callback).Run(/*success=*/false);
-    return;
+    return nullptr;
   }
 
   optimization_guide::SessionConfigParams config_params =
@@ -153,25 +150,52 @@ void AIManagerKeyedService::CreateTextSession(
       session = service->StartSession(
           optimization_guide::ModelBasedCapabilityKey::kPromptApi,
           config_params);
-  // TODO(leimy): after this check is done by optimization guide and we can
-  // return that from `CanStartModelExecutionSession()`, we should replace this
-  // block by a CHECK, and stop returning any boolean value from this method.
   if (!session) {
-    std::move(callback).Run(/*success=*/false);
-    return;
+    return nullptr;
   }
-  // The new `AITextSession` shares the same lifetime with the `receiver`.
-  mojo::MakeSelfOwnedReceiver(
-      std::make_unique<AITextSession>(std::move(session),
-                                      config_params.sampling_params),
-      std::move(receiver));
-  std::move(callback).Run(/*success=*/true);
+
+  return std::make_unique<AITextSession>(
+      std::move(session), config_params.sampling_params,
+      browser_context_->GetWeakPtr(), context);
 }
 
-void AIManagerKeyedService::GetDefaultTextSessionSamplingParams(
-    GetDefaultTextSessionSamplingParamsCallback callback) {
-  std::move(callback).Run(blink::mojom::AITextSessionSamplingParams::New(
+void AIManagerKeyedService::CreateTextSession(
+    mojo::PendingReceiver<blink::mojom::AITextSession> receiver,
+    blink::mojom::AITextSessionSamplingParamsPtr sampling_params,
+    const std::optional<std::string>& system_prompt,
+    CreateTextSessionCallback callback) {
+  std::unique_ptr<AITextSession> session =
+      CreateTextSessionInternal(sampling_params);
+  if (!session) {
+    // TODO(crbug.com/343325183): probably we should consider returning an error
+    // enum and throw a clear exception from the blink side.
+    std::move(callback).Run(false);
+    return;
+  }
+
+  // TODO(crbug.com/356809696): instead of using `mojo::MakeSelfOwnedReceiver`,
+  // the session's lifetime should be associated with either the host of the
+  // document or worker.
+  if (!system_prompt.has_value()) {
+    // The new `AITextSession` shares the same lifetime with the `receiver`.
+    mojo::MakeSelfOwnedReceiver(std::move(session), std::move(receiver));
+    std::move(callback).Run(true);
+    return;
+  }
+
+  // If the system prompt is provided, we need to set the system prompt and
+  // invoke the callback after it.
+  static_cast<AITextSession*>(
+      mojo::MakeSelfOwnedReceiver(std::move(session), std::move(receiver))
+          ->impl())
+      ->SetSystemPrompt(system_prompt.value(), std::move(callback));
+}
+
+void AIManagerKeyedService::GetTextModelInfo(
+    GetTextModelInfoCallback callback) {
+  std::move(callback).Run(blink::mojom::AITextModelInfo::New(
       optimization_guide::features::GetOnDeviceModelDefaultTopK(),
+      optimization_guide::features::GetOnDeviceModelMaxTopK(),
       optimization_guide::features::GetOnDeviceModelDefaultTemperature()));
 }
 
@@ -206,6 +230,23 @@ void AIManagerKeyedService::
 
   std::move(callback).Run(
       /*result=*/blink::mojom::ModelAvailabilityCheckResult::kReadily);
+}
+
+void AIManagerKeyedService::CreateTextSessionForCloning(
+    base::PassKey<AITextSession> pass_key,
+    mojo::PendingReceiver<blink::mojom::AITextSession> receiver,
+    blink::mojom::AITextSessionSamplingParamsPtr sampling_params,
+    const AITextSession::Context& context,
+    base::OnceCallback<void(bool)> callback) {
+  std::unique_ptr<AITextSession> session =
+      CreateTextSessionInternal(sampling_params, context);
+  if (!session) {
+    std::move(callback).Run(false);
+    return;
+  }
+
+  mojo::MakeSelfOwnedReceiver(std::move(session), std::move(receiver));
+  std::move(callback).Run(true);
 }
 
 void AIManagerKeyedService::OnModelPathValidationComplete(

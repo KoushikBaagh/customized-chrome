@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "ash/wm/overview/overview_session.h"
 
 #include <memory>
@@ -30,11 +35,13 @@
 #include "ash/public/cpp/window_properties.h"
 #include "ash/root_window_controller.h"
 #include "ash/screen_util.h"
+#include "ash/session/session_controller_impl.h"
 #include "ash/shelf/shelf.h"
 #include "ash/shelf/shelf_view.h"
 #include "ash/shelf/shelf_view_test_api.h"
 #include "ash/shelf/shelf_widget.h"
 #include "ash/shell.h"
+#include "ash/strings/grit/ash_strings.h"
 #include "ash/style/close_button.h"
 #include "ash/style/rounded_label_widget.h"
 #include "ash/test/ash_test_base.h"
@@ -44,11 +51,13 @@
 #include "ash/wallpaper/views/wallpaper_widget_controller.h"
 #include "ash/wm/desks/desk.h"
 #include "ash/wm/desks/desk_action_button.h"
+#include "ash/wm/desks/desk_action_context_menu.h"
 #include "ash/wm/desks/desk_action_view.h"
 #include "ash/wm/desks/desk_bar_view_base.h"
 #include "ash/wm/desks/desk_icon_button.h"
 #include "ash/wm/desks/desks_constants.h"
 #include "ash/wm/desks/desks_controller.h"
+#include "ash/wm/desks/desks_test_api.h"
 #include "ash/wm/desks/desks_test_util.h"
 #include "ash/wm/desks/desks_util.h"
 #include "ash/wm/desks/overview_desk_bar_view.h"
@@ -61,7 +70,6 @@
 #include "ash/wm/overview/overview_constants.h"
 #include "ash/wm/overview/overview_controller.h"
 #include "ash/wm/overview/overview_drop_target.h"
-#include "ash/wm/overview/overview_focus_cycler_old.h"
 #include "ash/wm/overview/overview_grid.h"
 #include "ash/wm/overview/overview_grid_event_handler.h"
 #include "ash/wm/overview/overview_grid_test_api.h"
@@ -114,6 +122,8 @@
 #include "ui/aura/window_event_dispatcher.h"
 #include "ui/aura/window_tree_host.h"
 #include "ui/base/hit_test.h"
+#include "ui/base/l10n/l10n_util.h"
+#include "ui/base/mojom/ui_base_types.mojom-shared.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animation_element.h"
 #include "ui/compositor/layer_animation_sequence.h"
@@ -139,9 +149,11 @@
 #include "ui/gfx/geometry/transform.h"
 #include "ui/gfx/geometry/transform_util.h"
 #include "ui/gfx/geometry/vector2d.h"
+#include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/controls/menu/menu_item_view.h"
 #include "ui/views/widget/widget.h"
 #include "ui/wm/core/coordinate_conversion.h"
 #include "ui/wm/core/cursor_manager.h"
@@ -757,7 +769,7 @@ TEST_P(OverviewSessionTest, ClickOnWindowDuringTouch) {
 TEST_P(OverviewSessionTest, WindowDoesNotReceiveEvents) {
   std::unique_ptr<aura::Window> window(CreateTestWindow(gfx::Rect(400, 400)));
   const gfx::Point point1 = window->bounds().CenterPoint();
-  ui::MouseEvent event1(ui::ET_MOUSE_PRESSED, point1, point1,
+  ui::MouseEvent event1(ui::EventType::kMousePressed, point1, point1,
                         ui::EventTimeForNow(), ui::EF_NONE, ui::EF_NONE);
 
   aura::Window* root_window = Shell::GetPrimaryRootWindow();
@@ -774,7 +786,7 @@ TEST_P(OverviewSessionTest, WindowDoesNotReceiveEvents) {
   // The bounds have changed, take that into account.
   const gfx::Point point2 =
       GetTransformedBoundsInRootWindow(window.get()).CenterPoint();
-  ui::MouseEvent event2(ui::ET_MOUSE_PRESSED, point2, point2,
+  ui::MouseEvent event2(ui::EventType::kMousePressed, point2, point2,
                         ui::EventTimeForNow(), ui::EF_NONE, ui::EF_NONE);
 
   // Now the transparent window should be intercepting this event.
@@ -1410,7 +1422,7 @@ TEST_P(OverviewSessionTest, ModalChild) {
   const gfx::Rect bounds(400, 400);
   std::unique_ptr<aura::Window> window(CreateTestWindow(bounds));
   std::unique_ptr<aura::Window> child(CreateTestWindow(bounds));
-  child->SetProperty(aura::client::kModalKey, ui::MODAL_TYPE_WINDOW);
+  child->SetProperty(aura::client::kModalKey, ui::mojom::ModalType::kWindow);
   ::wm::AddTransientChild(window.get(), child.get());
   EXPECT_EQ(window->parent(), child->parent());
   ToggleOverview();
@@ -1427,7 +1439,7 @@ TEST_P(OverviewSessionTest, ClickModalWindowParent) {
   std::unique_ptr<aura::Window> window(CreateTestWindow(gfx::Rect(180, 180)));
   std::unique_ptr<aura::Window> child(
       CreateTestWindow(gfx::Rect(200, 0, 180, 180)));
-  child->SetProperty(aura::client::kModalKey, ui::MODAL_TYPE_WINDOW);
+  child->SetProperty(aura::client::kModalKey, ui::mojom::ModalType::kWindow);
   ::wm::AddTransientChild(window.get(), child.get());
   EXPECT_FALSE(WindowsOverlapping(window.get(), child.get()));
   EXPECT_EQ(window->parent(), child->parent());
@@ -2953,7 +2965,7 @@ TEST_P(OverviewSessionTest, DraggingWithTwoFingers) {
   // Dispatches a long press event at the event generators current location.
   // Long press is one way to start dragging in splitview.
   auto dispatch_long_press = [this]() {
-    ui::GestureEventDetails event_details(ui::ET_GESTURE_LONG_PRESS);
+    ui::GestureEventDetails event_details(ui::EventType::kGestureLongPress);
     const gfx::Point location = GetEventGenerator()->current_screen_location();
     ui::GestureEvent long_press(location.x(), location.y(), 0,
                                 ui::EventTimeForNow(), event_details);
@@ -3139,8 +3151,9 @@ class TestEventHandler : public ui::EventHandler {
   ~TestEventHandler() override = default;
   // ui::EventHandler:
   void OnKeyEvent(ui::KeyEvent* event) override {
-    if (event->type() != ui::ET_KEY_PRESSED)
+    if (event->type() != ui::EventType::kKeyPressed) {
       return;
+    }
 
     has_seen_event_ = true;
     event->SetHandled();
@@ -3337,21 +3350,41 @@ TEST_P(OverviewSessionTest, AccessibilityFocusAnnotator) {
 
   auto* focus_widget = views::Widget::GetWidgetForNativeWindow(
       GetOverviewSession()->GetOverviewFocusWindow());
-  DCHECK(focus_widget);
+  ASSERT_TRUE(focus_widget);
 
   OverviewGrid* grid = GetOverviewSession()->grid_list()[0].get();
   auto* desk_widget = const_cast<views::Widget*>(grid->desks_widget());
-  DCHECK(desk_widget);
-
-  SavedDeskSaveDeskButton* save_button = grid->GetSaveDeskForLaterButton();
-  DCHECK(save_button);
-  auto* save_widget = save_button->GetWidget();
+  ASSERT_TRUE(desk_widget);
 
   // Overview items are in MRU order, so the expected order in the grid list is
   // the reverse creation order.
   auto* item_widget1 = GetOverviewItemForWindow(window1.get())->item_widget();
   auto* item_widget2 = GetOverviewItemForWindow(window2.get())->item_widget();
   auto* item_widget3 = GetOverviewItemForWindow(window3.get())->item_widget();
+
+  // With this flag enabled, there are is no saved desk save desk container.
+  if (features::IsSavedDeskUiRevampEnabled()) {
+    // Order should be [focus_widget, item_widget1, item_widget2, item_widget3,
+    // desk_widget, save_widget].
+    CheckA11yOverrides("focus", focus_widget, desk_widget, item_widget1);
+    CheckA11yOverrides("item1", item_widget1, focus_widget, item_widget2);
+    CheckA11yOverrides("item2", item_widget2, item_widget1, item_widget3);
+    CheckA11yOverrides("item3", item_widget3, item_widget2, desk_widget);
+    CheckA11yOverrides("desk", desk_widget, item_widget3, focus_widget);
+
+    // Remove `window2`. The new order should be [focus_widget, item_widget1,
+    // item_widget3, desk_widget, save_widget].
+    window2.reset();
+    CheckA11yOverrides("focus", focus_widget, desk_widget, item_widget1);
+    CheckA11yOverrides("item1", item_widget1, focus_widget, item_widget3);
+    CheckA11yOverrides("item3", item_widget3, item_widget1, desk_widget);
+    CheckA11yOverrides("desk", desk_widget, item_widget3, focus_widget);
+    return;
+  }
+
+  SavedDeskSaveDeskButton* save_button = grid->GetSaveDeskForLaterButton();
+  ASSERT_TRUE(save_button);
+  views::Widget* save_widget = save_button->GetWidget();
 
   // Order should be [focus_widget, item_widget1, item_widget2, item_widget3,
   // desk_widget, save_widget].
@@ -3362,7 +3395,7 @@ TEST_P(OverviewSessionTest, AccessibilityFocusAnnotator) {
   CheckA11yOverrides("desk", desk_widget, item_widget3, save_widget);
   CheckA11yOverrides("save", save_widget, desk_widget, focus_widget);
 
-  // Remove |window2|. The new order should be [focus_widget, item_widget1,
+  // Remove `window2`. The new order should be [focus_widget, item_widget1,
   // item_widget3, desk_widget, save_widget].
   window2.reset();
   CheckA11yOverrides("focus", focus_widget, save_widget, item_widget1);
@@ -3903,7 +3936,7 @@ TEST_P(OverviewSessionTest,
   ASSERT_EQ(2u, grids.size());
   auto* grid0 = grids[0].get();
   ASSERT_TRUE(grid0);
-  const auto& overview_items = grid0->window_list();
+  const auto& overview_items = grid0->item_list();
   ASSERT_EQ(overview_items.size(), 1u);
   EXPECT_TRUE(IsWindowInItsCorrespondingOverviewGrid(window.get()));
 
@@ -3988,7 +4021,7 @@ TEST_P(OverviewSessionTest,
   ASSERT_EQ(2u, grids.size());
   auto grid0 = grids[0].get();
   ASSERT_TRUE(grid0);
-  const auto& overview_items = grid0->window_list();
+  const auto& overview_items = grid0->item_list();
   ASSERT_EQ(overview_items.size(), 1u);
   EXPECT_TRUE(IsWindowInItsCorrespondingOverviewGrid(window.get()));
 
@@ -4010,6 +4043,23 @@ TEST_P(OverviewSessionTest,
   // Verify that there will be no crash when activating the minimized Crostini
   // window.
   event_generator->ClickLeftButton();
+}
+
+TEST_P(OverviewSessionTest, OverviewItemViewAccessibleProperties) {
+  std::unique_ptr<aura::Window> window(CreateTestWindow());
+  wm::ActivateWindow(window.get());
+  ToggleOverview();
+  auto* overview_item_view =
+      static_cast<OverviewItem*>(GetOverviewItemForWindow(window.get()))
+          ->overview_item_view();
+  ui::AXNodeData data;
+
+  ASSERT_TRUE(overview_item_view);
+  overview_item_view->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.role, ax::mojom::Role::kGenericContainer);
+  EXPECT_EQ(overview_item_view->GetViewAccessibility().GetCachedDescription(),
+            l10n_util::GetStringUTF16(
+                IDS_ASH_OVERVIEW_CLOSABLE_HIGHLIGHT_ITEM_A11Y_EXTRA_TIP));
 }
 
 // If you update the parameterisation of OverviewSessionTest also update the
@@ -5290,13 +5340,21 @@ TEST_P(OverviewRasterScaleTest,
   // it is moved to the active desk1.
   const auto* overview_grid =
       GetOverviewGridForRoot(Shell::GetPrimaryRootWindow());
-  EXPECT_EQ(1u, overview_grid->window_list().size());
+  EXPECT_EQ(1u, overview_grid->item_list().size());
   const auto* desks_bar_view = overview_grid->desks_bar_view();
   ASSERT_TRUE(desks_bar_view);
   ASSERT_EQ(3u, desks_bar_view->mini_views().size());
   auto* mini_view = desks_bar_view->mini_views()[2].get();
   EXPECT_EQ(desk3, mini_view->desk());
-  CombineDesksViaMiniView(mini_view, GetEventGenerator());
+  if (features::IsSavedDeskUiRevampEnabled()) {
+    views::MenuItemView* combine_item_view =
+        DesksTestApi::OpenDeskContextMenuAndGetMenuItem(
+            Shell::GetPrimaryRootWindow(), DeskBarViewBase::Type::kOverview,
+            /*index=*/2, DeskActionContextMenu::CommandId::kCombineDesks);
+    LeftClickOn(combine_item_view);
+  } else {
+    CombineDesksViaMiniView(mini_view, GetEventGenerator());
+  }
 
   EXPECT_TRUE(desk1->is_active());
   EXPECT_EQ(empty, tracker1.TakeRasterScaleChanges());
@@ -5306,10 +5364,18 @@ TEST_P(OverviewRasterScaleTest,
 
   // Now combine the active desk (`desk1`), and expect only `window2` to be
   // updated.
-  EXPECT_EQ(2u, overview_grid->window_list().size());
+  EXPECT_EQ(2u, overview_grid->item_list().size());
   mini_view = desks_bar_view->mini_views()[0];
   EXPECT_EQ(desk1, mini_view->desk());
-  CombineDesksViaMiniView(mini_view, GetEventGenerator());
+  if (features::IsSavedDeskUiRevampEnabled()) {
+    views::MenuItemView* combine_item_view =
+        DesksTestApi::OpenDeskContextMenuAndGetMenuItem(
+            Shell::GetPrimaryRootWindow(), DeskBarViewBase::Type::kOverview,
+            /*index=*/0, DeskActionContextMenu::CommandId::kCombineDesks);
+    LeftClickOn(combine_item_view);
+  } else {
+    CombineDesksViaMiniView(mini_view, GetEventGenerator());
+  }
 
   EXPECT_TRUE(desk2->is_active());
   EXPECT_EQ(empty, tracker1.TakeRasterScaleChanges());
@@ -5902,7 +5968,7 @@ class TabletModeOverviewSessionTest : public OverviewTestBase {
         gfx::ToRoundedPoint(item->target_bounds().CenterPoint());
     ui::GestureEvent long_press(
         point.x(), point.y(), 0, base::TimeTicks::Now(),
-        ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+        ui::GestureEventDetails(ui::EventType::kGestureLongPress));
     GetEventGenerator()->Dispatch(&long_press);
   }
 
@@ -6049,8 +6115,8 @@ TEST_F(TabletModeOverviewSessionTest, WindowDestroyWhileScrolling) {
   const int y = 200;
   base::TimeTicks timestamp = ui::EventTimeForNow();
   auto* event_generator = GetEventGenerator();
-  ui::TouchEvent press(ui::ET_TOUCH_PRESSED, gfx::Point(x, y), timestamp,
-                       ui::PointerDetails());
+  ui::TouchEvent press(ui::EventType::kTouchPressed, gfx::Point(x, y),
+                       timestamp, ui::PointerDetails());
   event_generator->Dispatch(&press);
 
   // Scroll a bit to the left, so the overview items that are offscreen on the
@@ -6058,7 +6124,7 @@ TEST_F(TabletModeOverviewSessionTest, WindowDestroyWhileScrolling) {
   const base::TimeDelta step_delay = base::Milliseconds(5);
   for (int i = 0; i < 10; ++i) {
     timestamp += step_delay;
-    ui::TouchEvent move(ui::ET_TOUCH_MOVED, gfx::Point(x, y), timestamp,
+    ui::TouchEvent move(ui::EventType::kTouchMoved, gfx::Point(x, y), timestamp,
                         ui::PointerDetails());
     event_generator->Dispatch(&move);
     x -= 5;
@@ -6070,14 +6136,14 @@ TEST_F(TabletModeOverviewSessionTest, WindowDestroyWhileScrolling) {
   // Continue scrolling and then end the scroll. There should be no crash.
   for (int i = 0; i < 10; ++i) {
     timestamp += step_delay;
-    ui::TouchEvent move(ui::ET_TOUCH_MOVED, gfx::Point(x, y), timestamp,
+    ui::TouchEvent move(ui::EventType::kTouchMoved, gfx::Point(x, y), timestamp,
                         ui::PointerDetails());
     event_generator->Dispatch(&move);
     x -= 5;
   }
 
-  ui::TouchEvent release(ui::ET_TOUCH_RELEASED, gfx::Point(x, y), timestamp,
-                         ui::PointerDetails());
+  ui::TouchEvent release(ui::EventType::kTouchReleased, gfx::Point(x, y),
+                         timestamp, ui::PointerDetails());
   event_generator->Dispatch(&release);
 }
 
@@ -6166,9 +6232,9 @@ TEST_F(TabletModeOverviewSessionTest, StackingOrderAfterGestureEvent) {
   auto* item = GetOverviewItemForWindow(window2.get());
   const gfx::PointF item_center = item->target_bounds().CenterPoint();
   DispatchLongPress(item);
-  ui::GestureEvent gesture_end(item_center.x(), item_center.y(), 0,
-                               ui::EventTimeForNow(),
-                               ui::GestureEventDetails(ui::ET_GESTURE_END));
+  ui::GestureEvent gesture_end(
+      item_center.x(), item_center.y(), 0, ui::EventTimeForNow(),
+      ui::GestureEventDetails(ui::EventType::kGestureEnd));
   item->HandleGestureEvent(&gesture_end, item);
   EXPECT_TRUE(window_util::IsStackedBelow(window2.get(), window1.get()));
 
@@ -9840,7 +9906,7 @@ TEST_F(SplitViewOverviewSessionInClamshellTest,
           .CenterPoint());
   generator->PressTouch();
   // Drag the divider by an amount big enough to be considered
-  // ET_GESTURE_SCROLL_BEGIN.
+  // EventType::kGestureScrollBegin.
   generator->MoveTouchBy(7, 0);
   EXPECT_TRUE(snapped_window_state_delegate->drag_in_progress());
   EXPECT_NE(nullptr, snapped_window_state->drag_details());
@@ -10634,16 +10700,16 @@ TEST_F(SplitViewOverviewSessionInClamshellTestMultiDisplayOnly,
   GetOverviewSession()->Drag(item4, gfx::PointF(1200.f, 0.f));
   // On the grid where the drag starts (|grid2|), the drop target is inserted at
   // the index immediately following the dragged item (|item4|).
-  ASSERT_EQ(4u, grid2->window_list().size());
-  EXPECT_EQ(GetDropTarget(1), grid2->window_list()[2].get());
+  ASSERT_EQ(4u, grid2->item_list().size());
+  EXPECT_EQ(GetDropTarget(1), grid2->item_list()[2].get());
   // Drag over |grid1|.
   cursor_manager->SetDisplay(display_with_root1);
   GetOverviewSession()->Drag(item4, gfx::PointF(400.f, 0.f));
   // On other grids (such as |grid1|), the drop target is inserted at the
   // correct position according to MRU order (between the overview items for
   // |window3| and |window5|).
-  ASSERT_EQ(4u, grid1->window_list().size());
-  EXPECT_EQ(GetDropTarget(0), grid1->window_list()[2].get());
+  ASSERT_EQ(4u, grid1->item_list().size());
+  EXPECT_EQ(GetDropTarget(0), grid1->item_list()[2].get());
 }
 
 // Verify that the drop target in each overview grid has the correct bounds when
@@ -11204,21 +11270,23 @@ TEST_F(SplitViewOverviewSessionInClamshellTestMultiDisplayOnly,
 }
 
 // -----------------------------------------------------------------------------
-// OakTest:
+// OverviewWallpaperTest:
 
-// Test fixture to validate Overview behavior with forest enabled.
-class OakTest : public OverviewTestBase {
+// Test fixture to validate wallpaper changes within overview, including clip,
+// rounded corners, and the wallpaper underlay, which is a themed solid color
+// layer stacked below the wallpaper.
+class OverviewWallpaperTest : public OverviewTestBase {
  public:
-  OakTest() {
+  OverviewWallpaperTest() {
     scoped_feature_list_.InitWithFeatures(
         /*enabled_features=*/{features::kForestFeature, features::kSnapGroup,
                               features::kOsSettingsRevampWayfinding,
                               features::kDeskBarWindowOcclusionOptimization},
         /*disabled_features=*/{});
   }
-  OakTest(const OakTest&) = delete;
-  OakTest& operator=(const OakTest&) = delete;
-  ~OakTest() override = default;
+  OverviewWallpaperTest(const OverviewWallpaperTest&) = delete;
+  OverviewWallpaperTest& operator=(const OverviewWallpaperTest&) = delete;
+  ~OverviewWallpaperTest() override = default;
 
   gfx::Rect GetDisplayBoundsForRootWindow(aura::Window* root_window) {
     return display::Screen::GetScreen()
@@ -11262,7 +11330,7 @@ class OakTest : public OverviewTestBase {
 // correctly during overview sessions, restores fully upon exit, and that the
 // wallpaper underlay layer's visibility refreshes properly upon entering and
 // exiting overview.
-TEST_F(OakTest, WallpaperClipRectAndRoundedCorners) {
+TEST_F(OverviewWallpaperTest, WallpaperClipRectAndRoundedCorners) {
   const gfx::Rect display_bounds(
       GetDisplayBoundsForRootWindow(Shell::GetPrimaryRootWindow()));
   auto* wallpaper_widget_controller =
@@ -11303,7 +11371,7 @@ TEST_F(OakTest, WallpaperClipRectAndRoundedCorners) {
 
 // Tests that the wallpaper clipping and wallpaper underlay layer refresh their
 // bounds appropriately on display change.
-TEST_F(OakTest, DisplayChange) {
+TEST_F(OverviewWallpaperTest, DisplayChange) {
   auto* wallpaper_widget_controller =
       Shell::GetPrimaryRootWindowController()->wallpaper_widget_controller();
   auto* wallpaper_view_layer =
@@ -11340,7 +11408,7 @@ TEST_F(OakTest, DisplayChange) {
 
 // Tests that when rotating display, the bounds of the clip wallpaper will be
 // adjusted properly.
-TEST_F(OakTest, DisplayRotation) {
+TEST_F(OverviewWallpaperTest, DisplayRotation) {
   UpdateDisplay("900x600");
   auto* wallpaper_widget_controller =
       Shell::GetPrimaryRootWindowController()->wallpaper_widget_controller();
@@ -11365,7 +11433,7 @@ TEST_F(OakTest, DisplayRotation) {
 
 // Verifies that wallpaper clipping and underlay layer visibility update
 // properly on multiple displays during overview transitions.
-TEST_F(OakTest, MultiDisplayTest) {
+TEST_F(OverviewWallpaperTest, MultiDisplayTest) {
   UpdateDisplay("800x700,801+0-800x700,1602+0-800x700");
   display::DisplayManager* display_manager = Shell::Get()->display_manager();
   ASSERT_EQ(3U, display_manager->GetNumDisplays());
@@ -11381,7 +11449,7 @@ TEST_F(OakTest, MultiDisplayTest) {
 
 // Tests that wallpaper clip rect updates properly on all displays on overview
 // grid effective bounds change (e.g., virtual desktop bar state changes).
-TEST_F(OakTest, WallpaperClipRefreshWithMultiDisplay) {
+TEST_F(OverviewWallpaperTest, WallpaperClipRefreshWithMultiDisplay) {
   UpdateDisplay("800x700,801+0-800x700,1602+0-800x700");
   display::DisplayManager* display_manager = Shell::Get()->display_manager();
   ASSERT_EQ(3U, display_manager->GetNumDisplays());
@@ -11411,7 +11479,7 @@ TEST_F(OakTest, WallpaperClipRefreshWithMultiDisplay) {
 
 // Tests that the wallpaper is clipped in partial overview mode and adjusts
 // correctly when the snapped window is resized.
-TEST_F(OakTest, PartialOverviewVisualsAndResize) {
+TEST_F(OverviewWallpaperTest, PartialOverviewVisualsAndResize) {
   const gfx::Rect display_bounds(
       GetDisplayBoundsForRootWindow(Shell::GetPrimaryRootWindow()));
   auto* wallpaper_view_layer = GetWallpaperViewLayer();
@@ -11456,7 +11524,7 @@ TEST_F(OakTest, PartialOverviewVisualsAndResize) {
 
 // Tests that snapping a window in full Overview hides desks widgets; closing
 // the window restores full Overview and shows the desks widgets again.
-TEST_F(OakTest, HideDesksWidgetInPartialOverview) {
+TEST_F(OverviewWallpaperTest, HideDesksWidgetInPartialOverview) {
   std::unique_ptr<aura::Window> win1(
       CreateAppWindow(gfx::Rect(10, 10, 200, 100)));
   std::unique_ptr<aura::Window> win2(
@@ -11493,7 +11561,7 @@ TEST_F(OakTest, HideDesksWidgetInPartialOverview) {
 
 // Tests the no windows widget doesn't show during dragging to partial overview.
 // Regression test for http://b/313505530.
-TEST_F(OakTest, NoWindowsWidget) {
+TEST_F(OverviewWallpaperTest, NoWindowsWidget) {
   UpdateDisplay("800x600,800x600");
   const aura::Window::Windows root_windows = Shell::GetAllRootWindows();
   DesksController::Get()->NewDesk(DesksCreationRemovalSource::kButton);
@@ -11535,17 +11603,13 @@ TEST_F(OakTest, NoWindowsWidget) {
   // Test the split view UI is on display 1 but not display 2, with no toast on
   // display 2.
   VerifySplitViewOverviewSession(w1.get());
-  if (ash::features::IsOverviewNewFocusEnabled()) {
-    EXPECT_FALSE(grid1->GetSplitViewSetupView());
-  } else {
-    EXPECT_FALSE(grid1->GetSplitViewSetupViewOld());
-  }
+  EXPECT_FALSE(grid1->GetSplitViewSetupView());
 }
 
 // Tests that the wallpaper view layer clips correctly with animation upon
 // entering Overview mode and that both the wallpaper view layer and underlay
 // layer restore properly upon exiting.
-TEST_F(OakTest, WallpaperClipAnimation) {
+TEST_F(OverviewWallpaperTest, WallpaperClipAnimation) {
   ui::ScopedAnimationDurationScaleMode animation_scale(
       ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
   const gfx::Rect display_bounds(
@@ -11589,9 +11653,41 @@ TEST_F(OakTest, WallpaperClipAnimation) {
   EXPECT_TRUE(wallpaper_view_layer->clip_rect().IsEmpty());
 }
 
+// Tests that we skip the wallpaper clipping when there is a maximized window.
+TEST_F(OverviewWallpaperTest, NoAnimationWithMaximizedWindow) {
+  std::unique_ptr<aura::Window> window1(CreateAppWindow());
+  const WMEvent maximize_event(WM_EVENT_MAXIMIZE);
+  WindowState::Get(window1.get())->OnWMEvent(&maximize_event);
+  ASSERT_TRUE(WindowState::Get(window1.get())->IsMaximized());
+
+  ui::ScopedAnimationDurationScaleMode animation_scale(
+      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+
+  // The wallpaper is completely occluded by the maximized window + shelf here,
+  // so we can optimize and skip the animation.
+  ToggleOverview();
+  ui::Layer* wallpaper_view_layer = GetWallpaperViewLayer();
+  ui::LayerAnimator* animator = wallpaper_view_layer->GetAnimator();
+  EXPECT_FALSE(animator->is_animating());
+
+  WaitForOverviewEnterAnimation();
+  VerifyLayersBoundsOnAllDisplays(/*in_overview=*/true);
+
+  // The wallpaper is visible in overview, so it has to animate.
+  ToggleOverview();
+  EXPECT_TRUE(animator->is_animating());
+  WaitForOverviewExitAnimation();
+
+  // The wallpaper is not tracked as an overview exit animation. Ensure it's
+  // animation is complete here. This is a no-op if the wallpaper animation
+  // completes before the overview exit animations.
+  ui::LayerAnimationStoppedWaiter().Wait(wallpaper_view_layer);
+  VerifyLayersBoundsOnAllDisplays(/*in_overview=*/false);
+}
+
 // Tests that the shelf's opaque background transitions from visible (default)
 // to invisible (overview) and back to visible (overview exit).
-TEST_F(OakTest, ShelfOpaqueBackground) {
+TEST_F(OverviewWallpaperTest, ShelfOpaqueBackground) {
   EXPECT_FALSE(display::Screen::GetScreen()->InTabletMode());
   ShelfWidget* shelf_widget = GetPrimaryShelf()->shelf_widget();
   ui::Layer* opaque_background_layer =
@@ -11608,8 +11704,8 @@ TEST_F(OakTest, ShelfOpaqueBackground) {
 }
 
 // Tests that wallpaper clip rect bounds update upon virtual desk bar state
-// changes, and that oak does not configure the desk bar background.
-TEST_F(OakTest, VirtualDesksBarStateChange) {
+// changes, and that desk bar background is not configured.
+TEST_F(OverviewWallpaperTest, VirtualDesksBarStateChange) {
   const gfx::Rect display_bounds(
       GetDisplayBoundsForRootWindow(Shell::GetPrimaryRootWindow()));
   auto* wallpaper_widget_controller =
@@ -11657,7 +11753,7 @@ TEST_F(OakTest, VirtualDesksBarStateChange) {
 
 // Tests that the wallpaper clip does not intersect the desk bar when while
 // dragging an item. Regression test for http://b/339882124.
-TEST_F(OakTest, VerticalDeskBar) {
+TEST_F(OverviewWallpaperTest, VerticalDeskBar) {
   UpdateDisplay("800x1200");
   DesksController::Get()->NewDesk(DesksCreationRemovalSource::kButton);
 
@@ -11679,17 +11775,14 @@ TEST_F(OakTest, VerticalDeskBar) {
   // the wallpaper view is the size of the root window, it is also in root
   // window bounds, so a conversion is unnecessary.
   auto* desks_bar_view = GetOverviewSession()->grid_list()[0]->desks_bar_view();
-  auto* wallpaper_view_layer = Shell::GetPrimaryRootWindowController()
-                                   ->wallpaper_widget_controller()
-                                   ->wallpaper_view()
-                                   ->layer();
+  auto* wallpaper_view_layer = GetWallpaperViewLayer();
   const int desk_bar_bottom = desks_bar_view->GetBoundsInScreen().bottom();
   const int clip_top = wallpaper_view_layer->clip_rect().y();
   // A little overlap is ok since the desk bar has a transparent background.
   EXPECT_NEAR(desk_bar_bottom, clip_top, 30);
 }
 
-TEST_F(OakTest, CenterOverviewItems) {
+TEST_F(OverviewWallpaperTest, CenterOverviewItems) {
   auto window1 = CreateAppWindow(gfx::Rect(0, 0, 100, 50));
   auto window2 = CreateAppWindow(gfx::Rect(20, 10, 200, 100));
   auto window3 = CreateAppWindow(gfx::Rect(30, 20, 300, 200));
@@ -11708,7 +11801,7 @@ TEST_F(OakTest, CenterOverviewItems) {
   const auto* overview_grid =
       GetOverviewGridForRoot(Shell::GetPrimaryRootWindow());
   ASSERT_TRUE(overview_grid);
-  const auto& overview_items = overview_grid->window_list();
+  const auto& overview_items = overview_grid->item_list();
   ASSERT_EQ(overview_items.size(), 11u);
 
   // If the middle of the bounding box which contains the bounds of the overview
@@ -11726,7 +11819,7 @@ TEST_F(OakTest, CenterOverviewItems) {
 // Tests that the drop target bounds are configured to match the overview item
 // it is a placeholder for with the center overview items processing. See
 // regression at http://b/330386194.
-TEST_F(OakTest, DropTargetBounds) {
+TEST_F(OverviewWallpaperTest, DropTargetBounds) {
   // Pre-add a desk to prevent the desks bar from expanding when dragging
   // starts.
   auto* desks_controller = DesksController::Get();
@@ -11748,7 +11841,7 @@ TEST_F(OakTest, DropTargetBounds) {
   aura::Window* primary_root_window = Shell::GetPrimaryRootWindow();
   auto* overview_grid = GetOverviewGridForRoot(primary_root_window);
   ASSERT_TRUE(overview_grid);
-  const auto& item_list = overview_grid->window_list();
+  const auto& item_list = overview_grid->item_list();
   ASSERT_EQ(6u, item_list.size());
 
   for (const auto& overview_item : item_list) {

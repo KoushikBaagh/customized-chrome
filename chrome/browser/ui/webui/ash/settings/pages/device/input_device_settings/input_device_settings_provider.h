@@ -79,6 +79,8 @@ class InputDeviceSettingsProvider
   void ObserveKeyboardAmbientLightSensor(
       mojo::PendingRemote<mojom::KeyboardAmbientLightSensorObserver> observer)
       override;
+  void ObserveLidState(mojo::PendingRemote<mojom::LidStateObserver> observer,
+                       ObserveLidStateCallback callback) override;
 
   void RestoreDefaultKeyboardRemappings(uint32_t device_id) override;
   void SetKeyboardSettings(uint32_t device_id,
@@ -142,6 +144,12 @@ class InputDeviceSettingsProvider
       const ::ash::mojom::Touchpad& touchpad) override;
   void OnMouseCompanionAppInfoChanged(
       const ::ash::mojom::Mouse& mouse) override;
+  void OnKeyboardCompanionAppInfoChanged(
+      const ::ash::mojom::Keyboard& keyboard) override;
+  void OnTouchpadCompanionAppInfoChanged(
+      const ::ash::mojom::Touchpad& touchpad) override;
+  void OnGraphicsTabletCompanionAppInfoChanged(
+      const ::ash::mojom::GraphicsTablet& graphics_tablet) override;
 
   void StartObserving(uint32_t device_id) override;
   void StopObserving() override;
@@ -159,6 +167,10 @@ class InputDeviceSettingsProvider
       const power_manager::BacklightBrightnessChange& change) override;
   void KeyboardAmbientLightSensorEnabledChanged(
       const power_manager::AmbientLightSensorChange& change) override;
+  void LidEventReceived(chromeos::PowerManagerClient::LidState state,
+                        base::TimeTicks time) override;
+  void OnReceiveSwitchStates(
+      std::optional<chromeos::PowerManagerClient::SwitchStates> switch_states);
 
   // ash::ShellObserver:
   void OnShellDestroying() override;
@@ -208,6 +220,11 @@ class InputDeviceSettingsProvider
   // being out of focus or minimized. Default to true to require a valid widget
   // to observe devices.
   bool observing_paused_ = true;
+
+  // Whether the laptop lid is closed or open. On chromeboxes, this will always
+  // be false.
+  bool is_lid_open_ = false;
+
   // The list of device ids to observe when the settings app is focused or in
   // use by the user.
   base::flat_set<uint32_t> observing_devices_;
@@ -223,6 +240,7 @@ class InputDeviceSettingsProvider
   mojo::Remote<mojom::KeyboardBrightnessObserver> keyboard_brightness_observer_;
   mojo::Remote<mojom::KeyboardAmbientLightSensorObserver>
       keyboard_ambient_light_sensor_observer_;
+  mojo::RemoteSet<mojom::LidStateObserver> lid_state_observers_;
 
   raw_ptr<views::Widget> widget_ = nullptr;
 

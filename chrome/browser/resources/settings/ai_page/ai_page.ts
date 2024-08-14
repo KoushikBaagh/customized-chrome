@@ -98,6 +98,11 @@ export class SettingsAiPageElement extends SettingsAiPageElementBase {
         FeatureOptInState.ENABLED;
   }
 
+  private shouldShowMainToggle_(): boolean {
+    return this.showComposeControl_ || this.showTabOrganizationControl_ ||
+        this.showWallpaperSearchControl_;
+  }
+
   private getTabOrganizationHrCssClass_(): string {
     return this.showComposeControl_ ? 'hr' : '';
   }
@@ -105,14 +110,6 @@ export class SettingsAiPageElement extends SettingsAiPageElementBase {
   private getWallpaperSearchHrCssClass_(): string {
     return this.showComposeControl_ || this.showTabOrganizationControl_ ? 'hr' :
                                                                           '';
-  }
-
-  private getHistorySearchHrCssClass_(): string {
-    if (this.showComposeControl_ || this.showTabOrganizationControl_ ||
-        this.showWallpaperSearchControl_) {
-      return 'hr';
-    }
-    return '';
   }
 
   private onHistorySearchRowClick_() {

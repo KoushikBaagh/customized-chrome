@@ -54,14 +54,25 @@ extern const base::FeatureParam<double> kContentVisibilityThreshold;
 // and result inclusion.
 extern const base::FeatureParam<double> kSearchScoreThreshold;
 
+// Specifies whether to answer queries using an answerer (mock or ML). This
+// can be considered a toggle for v2 functionality.
+extern const base::FeatureParam<bool> kEnableAnswers;
+
 // Specifies whether to use the ML Answerer (if false, the mock is used).
 extern const base::FeatureParam<bool> kUseMlAnswerer;
+
+// Specifies the min score for generated answer from the ML answerer.
+extern const base::FeatureParam<double> kMlAnswererMinScore;
 
 // Specifies whether to use the ML Embedder to embed passages and queries.
 extern const base::FeatureParam<bool> kUseMlEmbedder;
 
-// Whether history embedding results should be shown in the omnibox outside of
-// the '@history' scope.
+// Whether history embedding results should be shown in the omnibox when in the
+// '@history' scope.
+extern const base::FeatureParam<bool> kOmniboxScoped;
+
+// Whether history embedding results should be shown in the omnibox when not in
+// the '@history' scope. If true, behaves as if `kOmniboxScoped` is also true.
 extern const base::FeatureParam<bool> kOmniboxUnscoped;
 
 // The maximum number of embeddings to submit to the primary (ML) embedder
@@ -101,7 +112,18 @@ extern const base::FeatureParam<bool> kUseDatabaseBeforeEmbedder;
 // Whether to enable the URL filter to skip blocked URLs to improve performance.
 extern const base::FeatureParam<bool> kUseUrlFilter;
 
-bool IsHistoryEmbeddingEnabled();
+// The amount of time in seconds that the passage embeddings service will idle
+// for before being torn down to reduce memory usage.
+extern const base::FeatureParam<base::TimeDelta> kEmbeddingsServiceTimeout;
+
+// Comma-separated list, all ASCII, expected to be lowercased; may contain a mix
+// of words and phrases.
+extern const base::FeatureParam<std::string> kFilterTerms;
+
+// Whether the history embeddings feature is enabled. This only checks if the
+// feature flags are enabled and does not check the user's opt-in preference.
+// See chrome/browser/history_embeddings/history_embeddings_utils.h.
+bool IsHistoryEmbeddingsEnabled();
 
 }  // namespace history_embeddings
 

@@ -23,9 +23,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-
 #include "third_party/blink/renderer/core/scheduler/dom_timer.h"
 
+#include <limits>
+
+#include "base/message_loop/message_pump.h"
 #include "base/numerics/clamped_math.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
@@ -57,8 +59,9 @@ constexpr int kMaxTimerNestingLevel = 5;
 constexpr base::TimeDelta kMinimumInterval = base::Milliseconds(4);
 
 base::TimeDelta GetMaxHighResolutionInterval() {
-  return base::FeatureList::IsEnabled(
-             features::kLowerHighResolutionTimerThreshold)
+  return base::MessagePump::GetAlignWakeUpsEnabled() &&
+                 base::FeatureList::IsEnabled(
+                     features::kLowerHighResolutionTimerThreshold)
              ? base::Milliseconds(4)
              : base::Milliseconds(32);
 }
@@ -124,10 +127,10 @@ class DOMTimerCoordinator : public GarbageCollected<DOMTimerCoordinator>,
  private:
   int NextID() {
     while (true) {
-      ++circular_sequential_id_;
-
-      if (circular_sequential_id_ <= 0) {
+      if (circular_sequential_id_ == std::numeric_limits<int>::max()) {
         circular_sequential_id_ = 1;
+      } else {
+        ++circular_sequential_id_;
       }
 
       if (!timers_.Contains(circular_sequential_id_)) {

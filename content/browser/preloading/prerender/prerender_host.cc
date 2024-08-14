@@ -887,7 +887,10 @@ PrerenderHost::AreCommonNavigationParamsCompatibleWithNavigation(
   // already checked for matching values. Adding a CHECK here to be safe.
   CHECK(common_params_);
   if (attributes_.url_match_predicate) {
-    CHECK(attributes_.url_match_predicate.Run(potential_activation.url));
+    // TODO(crbug.com/41494389): Figure out what we need to pass here as a
+    // web_url_match result instead of std::nullopt.
+    CHECK(attributes_.url_match_predicate.Run(potential_activation.url,
+                                              std::nullopt));
   } else if (no_vary_search_.has_value()) {
     CHECK(no_vary_search_->AreEquivalent(potential_activation.url,
                                          common_params_->url));
@@ -1117,6 +1120,7 @@ void PrerenderHost::SetFailureReason(
     case PrerenderFinalStatus::kTabClosedByUserGesture:
     case PrerenderFinalStatus::kTabClosedWithoutUserGesture:
     case PrerenderFinalStatus::kSpeculationRuleRemoved:
+    case PrerenderFinalStatus::kOtherPrerenderedPageActivated:
       return;
     case PrerenderFinalStatus::kDestroyed:
     case PrerenderFinalStatus::kLowEndDevice:
@@ -1184,6 +1188,7 @@ void PrerenderHost::SetFailureReason(
     case PrerenderFinalStatus::kJavaScriptInterfaceRemoved:
     case PrerenderFinalStatus::kAllPrerenderingCanceled:
     case PrerenderFinalStatus::kWindowClosed:
+    case PrerenderFinalStatus::kSlowNetwork:
       if (attempt_) {
         attempt_->SetFailureReason(
             ToPreloadingFailureReason(reason.final_status()));
@@ -1206,24 +1211,36 @@ void PrerenderHost::SetFailureReason(
   }
 }
 
-bool PrerenderHost::IsUrlMatch(const GURL& url) const {
+std::optional<UrlMatchType> PrerenderHost::IsUrlMatch(const GURL& url) const {
   // Triggers are not allowed to treat a cross-origin url as a matched url. It
   // would cause security risks.
   if (!url::IsSameOriginWith(attributes_.prerendering_url, url)) {
-    return false;
+    return std::nullopt;
   }
 
-  if (attributes_.url_match_predicate) {
-    return attributes_.url_match_predicate.Run(url);
-  }
+  std::optional<UrlMatchType> result;
 
   if (GetInitialUrl() == url) {
-    return true;
+    result = UrlMatchType::kExact;
   }
 
   // Check No-Vary-Search header and try and match.
-  return no_vary_search_.has_value() &&
-         no_vary_search_->AreEquivalent(GetInitialUrl(), url);
+  if (!result && no_vary_search_.has_value() &&
+      no_vary_search_->AreEquivalent(GetInitialUrl(), url)) {
+    result = UrlMatchType::kNoVarySearch;
+  }
+
+  if (!attributes_.url_match_predicate) {
+    return result;
+  }
+
+  // Override the result of default url match logic with the result
+  // from the custom url matching predicate call.
+  if (attributes_.url_match_predicate.Run(url, result)) {
+    return UrlMatchType::kURLPredicateMatch;
+  }
+
+  return std::nullopt;
 }
 
 bool PrerenderHost::IsNoVarySearchHintUrlMatch(const GURL& url) const {

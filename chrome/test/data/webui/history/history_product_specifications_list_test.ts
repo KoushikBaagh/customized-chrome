@@ -8,8 +8,8 @@ import {ensureLazyLoaded, ShoppingBrowserProxyImpl} from 'chrome://history/histo
 import type {CrCheckboxElement, ProductSpecificationsListsElement} from 'chrome://history/history.js';
 import {ShoppingPageCallbackRouter} from 'chrome://history/history.js';
 import {getDeepActiveElement} from 'chrome://resources/js/util.js';
-import {pressAndReleaseKeyOn} from 'chrome://resources/polymer/v3_0/iron-test-helpers/mock-interactions.js';
 import {assertDeepEquals, assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import {pressAndReleaseKeyOn} from 'chrome://webui-test/keyboard_mock_interactions.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
 import {TestMock} from 'chrome://webui-test/test_mock.js';
 
@@ -109,7 +109,7 @@ suite('ProductSpecificationsListTest', () => {
     assertTrue(!!cardTitleHeader);
     const heading = cardTitleHeader!.textContent;
     assertTrue(!!heading);
-    assertEquals('Product Specifications lists', heading.trim());
+    assertEquals('Comparison tables', heading.trim());
   });
 
 
@@ -150,7 +150,7 @@ suite('ProductSpecificationsListTest', () => {
     assertTrue(!!button);
     const buttonText = button!.textContent;
     assertTrue(!!buttonText);
-    assertEquals('Remove from lists', buttonText.trim());
+    assertEquals('Remove from tables', buttonText.trim());
   });
 
   test('clicking remove on menu removes the correct uuid', async function() {
@@ -339,5 +339,41 @@ suite('ProductSpecificationsListTest', () => {
     assertDeepEquals(
         new Set(['ex2', 'ex3', 'ex4']),
         productSpecificationsList.selectedItems);
+  });
+
+  test('search term changed', async function() {
+    await ensureLazyLoaded();
+    const items = productSpecificationsList.shadowRoot!.querySelectorAll(
+        'product-specifications-item');
+    assertEquals(4, items.length);
+    initProductSets();
+
+    productSpecificationsList.searchTerm = 'example2';
+    await flushTasks();
+    const newItems = productSpecificationsList.shadowRoot!.querySelectorAll(
+        'product-specifications-item');
+
+    assertEquals(1, newItems!.length);
+    assertDeepEquals('example2', newItems[0]!.item.name);
+  });
+
+  test('empty message renders when list empty', async function() {
+    // Reset shoppingAPI to return no product sets.
+    document.body.innerHTML = window.trustedTypes!.emptyHTML;
+    shoppingServiceApi.reset();
+    shoppingServiceApi.setResultFor(
+        'getAllProductSpecificationsSets', Promise.resolve({sets: []}));
+    productSpecificationsList =
+        document.createElement('product-specifications-lists');
+    document.body.appendChild(productSpecificationsList);
+    await ensureLazyLoaded();
+    await flushTasks();
+
+    const items = productSpecificationsList.shadowRoot!.querySelectorAll(
+        'product-specifications-item');
+    assertEquals(0, items.length);
+    const emptyMessage = productSpecificationsList.shadowRoot!.querySelector(
+        '.centered-message');
+    assertTrue(!!emptyMessage);
   });
 });

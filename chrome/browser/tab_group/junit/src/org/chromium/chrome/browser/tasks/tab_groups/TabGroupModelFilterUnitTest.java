@@ -69,6 +69,7 @@ import org.chromium.chrome.browser.tab.TabStateAttributes;
 import org.chromium.chrome.browser.tab.TabStateAttributes.DirtinessState;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncFeatures;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncFeaturesJni;
+import org.chromium.chrome.browser.tabmodel.TabClosureParams;
 import org.chromium.chrome.browser.tabmodel.TabList;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelObserver;
@@ -88,7 +89,6 @@ import java.util.Set;
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
 @EnableFeatures({
-    ChromeFeatureList.ANDROID_TAB_GROUP_STABLE_IDS,
     ChromeFeatureList.TAB_GROUP_PARITY_ANDROID,
     ChromeFeatureList.TAB_STRIP_GROUP_COLLAPSE
 })
@@ -616,7 +616,10 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
+    @EnableFeatures(ChromeFeatureList.TAB_GROUP_CREATION_DIALOG_ANDROID)
     public void addTab_TabLaunchedFromLongPressBackgroundInGroupToExistingGroup() {
+        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING.setForTesting(false);
+
         Tab newTab = prepareTab(NEW_TAB_ID_0, NEW_TAB_ID_0, null, TAB1_ID);
         doReturn(TabLaunchType.FROM_LONGPRESS_BACKGROUND_IN_GROUP).when(newTab).getLaunchType();
 
@@ -716,17 +719,6 @@ public class TabGroupModelFilterUnitTest {
         assertEquals(TAB3_ID, mTab2.getRootId());
         assertEquals(TAB3_ID, mTab3.getRootId());
         verify(mTabGroupModelFilterObserver).didChangeGroupRootId(TAB2_ID, TAB3_ID);
-    }
-
-    @Test
-    @DisableFeatures(ChromeFeatureList.ANDROID_TAB_GROUP_STABLE_IDS)
-    public void testGroupMembershipOfTabAfterClose_NoTabGroupId() {
-        assertTrue(mTabGroupModelFilter.isTabInTabGroup(mTab2));
-        assertTrue(mTabGroupModelFilter.isTabInTabGroup(mTab3));
-
-        mTabGroupModelFilter.closeTab(mTab2);
-        assertFalse(mTabGroupModelFilter.isTabInTabGroup(mTab2));
-        assertFalse(mTabGroupModelFilter.isTabInTabGroup(mTab3));
     }
 
     @Test
@@ -944,7 +936,10 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
+    @EnableFeatures(ChromeFeatureList.TAB_GROUP_CREATION_DIALOG_ANDROID)
     public void moveTabOutOfGroup_LastTab_WithTabGroupId() {
+        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING.setForTesting(false);
+
         List<Tab> expectedTabModelBeforeUngroup =
                 new ArrayList<>(Arrays.asList(mTab1, mTab2, mTab3, mTab4, mTab5, mTab6));
         assertArrayEquals(mTabs.toArray(), expectedTabModelBeforeUngroup.toArray());
@@ -1115,7 +1110,10 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
+    @EnableFeatures(ChromeFeatureList.TAB_GROUP_CREATION_DIALOG_ANDROID)
     public void mergeOneTabToTab_Forward() {
+        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING.setForTesting(false);
+
         List<Tab> expectedGroup = new ArrayList<>(Arrays.asList(mTab1, mTab4));
         List<Tab> expectedTabModel =
                 new ArrayList<>(Arrays.asList(mTab1, mTab4, mTab2, mTab3, mTab5, mTab6));
@@ -1199,7 +1197,10 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
+    @EnableFeatures(ChromeFeatureList.TAB_GROUP_CREATION_DIALOG_ANDROID)
     public void mergeOneTabToTab_Backward() {
+        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING.setForTesting(false);
+
         List<Tab> expectedGroup = new ArrayList<>(Arrays.asList(mTab4, mTab1));
         List<Tab> expectedTabModel =
                 new ArrayList<>(Arrays.asList(mTab2, mTab3, mTab4, mTab1, mTab5, mTab6));
@@ -1314,7 +1315,10 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
+    @EnableFeatures(ChromeFeatureList.TAB_GROUP_CREATION_DIALOG_ANDROID)
     public void mergeListOfTabsToGroup_AllForward() {
+        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING.setForTesting(false);
+
         Tab newTab = addTabToTabModel();
         List<Tab> tabsToMerge = new ArrayList<>(Arrays.asList(mTab4, newTab));
         List<Tab> expectedTabModel =
@@ -1342,7 +1346,10 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
+    @EnableFeatures(ChromeFeatureList.TAB_GROUP_CREATION_DIALOG_ANDROID)
     public void mergeListOfTabsToGroup_AnyDirection() {
+        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING.setForTesting(false);
+
         Tab newTab = addTabToTabModel();
         List<Tab> tabsToMerge = new ArrayList<>(Arrays.asList(mTab1, newTab));
         List<Tab> expectedTabModel =
@@ -1370,7 +1377,10 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
+    @EnableFeatures(ChromeFeatureList.TAB_GROUP_CREATION_DIALOG_ANDROID)
     public void mergeListOfTabsToGroup_InOrder() {
+        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING.setForTesting(false);
+
         Tab newTab0 = prepareTab(NEW_TAB_ID_0, NEW_TAB_ID_0, null, Tab.INVALID_TAB_ID);
         addTabToTabModel(-1, newTab0);
         Tab newTab1 = prepareTab(NEW_TAB_ID_1, NEW_TAB_ID_1, null, Tab.INVALID_TAB_ID);
@@ -1490,7 +1500,10 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
+    @EnableFeatures(ChromeFeatureList.TAB_GROUP_CREATION_DIALOG_ANDROID)
     public void merge_OtherGroupsLastShownIdUnchanged() {
+        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING.setForTesting(false);
+
         List<Tab> expectedGroup = new ArrayList<>(Arrays.asList(mTab1, mTab4));
         List<Tab> expectedTabModel =
                 new ArrayList<>(Arrays.asList(mTab1, mTab4, mTab2, mTab3, mTab5, mTab6));
@@ -1640,7 +1653,10 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
+    @EnableFeatures(ChromeFeatureList.TAB_GROUP_CREATION_DIALOG_ANDROID)
     public void undoGroupedTab_Forward_UpdateTabModel() {
+        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING.setForTesting(false);
+
         List<Tab> expectedTabModel =
                 new ArrayList<>(Arrays.asList(mTab1, mTab2, mTab3, mTab4, mTab5, mTab6));
 
@@ -1680,7 +1696,10 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
+    @EnableFeatures(ChromeFeatureList.TAB_GROUP_CREATION_DIALOG_ANDROID)
     public void undoGroupedTab_Backward_UpdateTabModel() {
+        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING.setForTesting(false);
+
         List<Tab> expectedTabModel =
                 new ArrayList<>(Arrays.asList(mTab1, mTab2, mTab3, mTab4, mTab5, mTab6));
 
@@ -2087,7 +2106,10 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
+    @EnableFeatures(ChromeFeatureList.TAB_GROUP_CREATION_DIALOG_ANDROID)
     public void mergeTabToTab_notifyFilterObserver() {
+        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING.setForTesting(false);
+
         // Override the setup behaviour for color SharedPreferences since after #didCreateNewGroup
         // is emitted, a color will have been set.
         when(mSharedPreferencesColor.getInt(anyString(), anyInt())).thenReturn(COLOR_ID);
@@ -2116,7 +2138,10 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
+    @EnableFeatures(ChromeFeatureList.TAB_GROUP_CREATION_DIALOG_ANDROID)
     public void mergeTabToTab_doNotNotifyFilterObserver() {
+        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING.setForTesting(false);
+
         Token tabGroupId = new Token(33L, 28L);
         when(mTokenJniMock.createRandom()).thenReturn(tabGroupId);
 
@@ -2130,31 +2155,34 @@ public class TabGroupModelFilterUnitTest {
     }
 
     @Test
-    public void testNullTabGroupIds() {
-        mTabGroupModelFilter.removeTabGroupIdsForAllTabGroups();
-
+    public void testTabGroupIds() {
         assertEquals(mTab1.getRootId(), TAB1_ROOT_ID);
-        assertNull(mTab1.getTabGroupId());
+        assertEquals(mTab1.getTabGroupId(), TAB1_TAB_GROUP_ID);
 
         assertEquals(mTab2.getRootId(), TAB2_ROOT_ID);
-        assertNull(mTab2.getTabGroupId());
+        assertEquals(mTab2.getTabGroupId(), TAB2_TAB_GROUP_ID);
 
         assertEquals(mTab3.getRootId(), TAB3_ROOT_ID);
-        assertNull(mTab3.getTabGroupId());
+        assertEquals(mTab3.getTabGroupId(), TAB3_TAB_GROUP_ID);
 
         assertEquals(mTab4.getRootId(), TAB4_ROOT_ID);
-        assertNull(mTab4.getTabGroupId());
+        assertEquals(mTab4.getTabGroupId(), TAB4_TAB_GROUP_ID);
 
         assertEquals(mTab5.getRootId(), TAB5_ROOT_ID);
-        assertNull(mTab5.getTabGroupId());
+        assertEquals(mTab5.getTabGroupId(), TAB5_TAB_GROUP_ID);
 
         assertEquals(mTab6.getRootId(), TAB6_ROOT_ID);
-        assertNull(mTab6.getTabGroupId());
+        assertEquals(mTab6.getTabGroupId(), TAB6_TAB_GROUP_ID);
     }
 
     @Test
     public void testAssignTabGroupIds() {
-        mTabGroupModelFilter.removeTabGroupIdsForAllTabGroups();
+        mTab1.setTabGroupId(null);
+        mTab2.setTabGroupId(null);
+        mTab3.setTabGroupId(null);
+        mTab4.setTabGroupId(null);
+        mTab5.setTabGroupId(null);
+        mTab6.setTabGroupId(null);
 
         Token tabGroupIdTab2 = new Token(1L, 2L);
         Token tabGroupIdTab5 = new Token(5L, 6L);
@@ -2346,13 +2374,15 @@ public class TabGroupModelFilterUnitTest {
 
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
         List<Tab> groupWithTab2AndTab3 = List.of(mTab2, mTab3);
-        // canUndo will always be true for pending tab closure, but use false just to verify it is
+        // allowUndo will always be true for pending tab closure, but use false just to verify it is
         // forwarded correctly.
-        mTabGroupModelFilter.closeMultipleTabs(
-                groupWithTab2AndTab3, /* canUndo= */ false, /* hideTabGroups= */ true);
-        verify(mTabModel)
-                .closeMultipleTabs(
-                        groupWithTab2AndTab3, /* canUndo= */ false, /* canRestore= */ true);
+        var params =
+                TabClosureParams.closeTabs(groupWithTab2AndTab3)
+                        .allowUndo(false)
+                        .hideTabGroups(true)
+                        .build();
+        mTabGroupModelFilter.closeTabs(params);
+        verify(mTabModel).closeTabs(params);
         assertTrue(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
 
         mTabGroupModelFilter.willCloseTab(mTab2, /* didCloseAlone= */ false);
@@ -2373,11 +2403,9 @@ public class TabGroupModelFilterUnitTest {
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
 
         List<Tab> groupWithTab2AndTab3 = List.of(mTab2, mTab3);
-        mTabGroupModelFilter.closeMultipleTabs(
-                groupWithTab2AndTab3, /* canUndo= */ true, /* hideTabGroups= */ true);
-        verify(mTabModel)
-                .closeMultipleTabs(
-                        groupWithTab2AndTab3, /* canUndo= */ true, /* canRestore= */ true);
+        var params = TabClosureParams.closeTabs(groupWithTab2AndTab3).hideTabGroups(true).build();
+        mTabGroupModelFilter.closeTabs(params);
+        verify(mTabModel).closeTabs(params);
         assertTrue(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
 
         mTabGroupModelFilter.willCloseTab(mTab2, /* didCloseAlone= */ false);
@@ -2404,11 +2432,9 @@ public class TabGroupModelFilterUnitTest {
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
 
         List<Tab> listWithTab2AndTab4 = List.of(mTab2, mTab4);
-        mTabGroupModelFilter.closeMultipleTabs(
-                listWithTab2AndTab4, /* canUndo= */ true, /* hideTabGroups= */ true);
-        verify(mTabModel)
-                .closeMultipleTabs(
-                        listWithTab2AndTab4, /* canUndo= */ true, /* canRestore= */ true);
+        var params = TabClosureParams.closeTabs(listWithTab2AndTab4).hideTabGroups(true).build();
+        mTabGroupModelFilter.closeTabs(params);
+        verify(mTabModel).closeTabs(params);
 
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
 
@@ -2422,8 +2448,9 @@ public class TabGroupModelFilterUnitTest {
 
         // Close the remainder of the group separately.
         List<Tab> groupWithTab3 = List.of(mTab3);
-        mTabGroupModelFilter.closeMultipleTabs(
-                groupWithTab3, /* canUndo= */ true, /* hideTabGroups= */ true);
+        params = TabClosureParams.closeTabs(groupWithTab3).hideTabGroups(true).build();
+        mTabGroupModelFilter.closeTabs(params);
+        verify(mTabModel).closeTabs(params);
         assertTrue(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
 
         mTabGroupModelFilter.willCloseTab(mTab3, /* didCloseAlone= */ false);
@@ -2440,11 +2467,9 @@ public class TabGroupModelFilterUnitTest {
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
 
         List<Tab> groupWithTab2AndTab3 = List.of(mTab2, mTab3);
-        mTabGroupModelFilter.closeMultipleTabs(
-                groupWithTab2AndTab3, /* canUndo= */ true, /* hideTabGroups= */ false);
-        verify(mTabModel)
-                .closeMultipleTabs(
-                        groupWithTab2AndTab3, /* canUndo= */ true, /* canRestore= */ true);
+        var params = TabClosureParams.closeTabs(groupWithTab2AndTab3).build();
+        mTabGroupModelFilter.closeTabs(params);
+        verify(mTabModel).closeTabs(params);
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
 
         mTabGroupModelFilter.willCloseTab(mTab2, /* didCloseAlone= */ false);
@@ -2467,8 +2492,9 @@ public class TabGroupModelFilterUnitTest {
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB5_TAB_GROUP_ID));
 
-        mTabGroupModelFilter.closeAllTabs(/* uponExit= */ false, /* hideTabGroups= */ true);
-        verify(mTabModel).closeAllTabs(/* uponExit= */ false);
+        var params = TabClosureParams.closeAllTabs().hideTabGroups(true).build();
+        mTabGroupModelFilter.closeTabs(params);
+        verify(mTabModel).closeTabs(params);
         assertTrue(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
         assertTrue(mTabGroupModelFilter.isTabGroupHiding(TAB5_TAB_GROUP_ID));
 
@@ -2515,8 +2541,9 @@ public class TabGroupModelFilterUnitTest {
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB5_TAB_GROUP_ID));
 
-        mTabGroupModelFilter.closeAllTabs(/* uponExit= */ false, /* hideTabGroups= */ true);
-        verify(mTabModel).closeAllTabs(/* uponExit= */ false);
+        var params = TabClosureParams.closeAllTabs().hideTabGroups(true).build();
+        mTabGroupModelFilter.closeTabs(params);
+        verify(mTabModel).closeTabs(params);
         assertTrue(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
         assertTrue(mTabGroupModelFilter.isTabGroupHiding(TAB5_TAB_GROUP_ID));
 
@@ -2556,8 +2583,9 @@ public class TabGroupModelFilterUnitTest {
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB5_TAB_GROUP_ID));
 
-        mTabGroupModelFilter.closeAllTabs(/* uponExit= */ false, /* hideTabGroups= */ false);
-        verify(mTabModel).closeAllTabs(/* uponExit= */ false);
+        var params = TabClosureParams.closeAllTabs().hideTabGroups(false).build();
+        mTabGroupModelFilter.closeTabs(params);
+        verify(mTabModel).closeTabs(params);
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB2_TAB_GROUP_ID));
         assertFalse(mTabGroupModelFilter.isTabGroupHiding(TAB5_TAB_GROUP_ID));
 

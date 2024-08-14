@@ -28,6 +28,7 @@
 #include "content/services/auction_worklet/auction_v8_helper.h"
 #include "content/services/auction_worklet/direct_from_seller_signals_requester.h"
 #include "content/services/auction_worklet/public/mojom/auction_shared_storage_host.mojom.h"
+#include "content/services/auction_worklet/public/mojom/auction_worklet_service.mojom-forward.h"
 #include "content/services/auction_worklet/public/mojom/auction_worklet_service.mojom.h"
 #include "content/services/auction_worklet/public/mojom/bidder_worklet.mojom.h"
 #include "content/services/auction_worklet/public/mojom/private_aggregation_request.mojom.h"
@@ -120,7 +121,8 @@ class CONTENT_EXPORT BidderWorklet : public mojom::BidderWorklet,
       const std::string& trusted_bidding_signals_slot_size_param,
       const url::Origin& top_window_origin,
       mojom::AuctionWorkletPermissionsPolicyStatePtr permissions_policy_state,
-      std::optional<uint16_t> experiment_group_id);
+      std::optional<uint16_t> experiment_group_id,
+      mojom::TrustedSignalsPublicKeyPtr public_key);
   explicit BidderWorklet(const BidderWorklet&) = delete;
   ~BidderWorklet() override;
   BidderWorklet& operator=(const BidderWorklet&) = delete;
@@ -177,8 +179,10 @@ class CONTENT_EXPORT BidderWorklet : public mojom::BidderWorklet,
   void SendPendingSignalsRequests() override;
   void ReportWin(
       bool is_for_additional_bid,
-      mojom::ReportingIdField reporting_id_field,
-      const std::string& reporting_id,
+      const std::optional<std::string>& interest_group_name_reporting_id,
+      const std::optional<std::string>& buyer_reporting_id,
+      const std::optional<std::string>& buyer_and_seller_reporting_id,
+      const std::optional<std::string>& selected_buyer_and_seller_reporting_id,
       const std::optional<std::string>& auction_signals_json,
       const std::optional<std::string>& per_buyer_signals_json,
       const std::optional<GURL>& direct_from_seller_per_buyer_signals,
@@ -256,6 +260,10 @@ class CONTENT_EXPORT BidderWorklet : public mojom::BidderWorklet,
     base::TimeDelta wait_direct_from_seller_signals;
     base::TimeDelta wait_promises;
 
+    // Time where the BidderWorklet finished waiting for GenerateBid
+    // dependencies, used to compute start and end times for latency phase UKMs.
+    base::TimeTicks generate_bid_start_time;
+
     // Set while loading is in progress.
     std::unique_ptr<TrustedSignalsRequestManager::Request>
         trusted_bidding_signals_request;
@@ -309,8 +317,10 @@ class CONTENT_EXPORT BidderWorklet : public mojom::BidderWorklet,
     ~ReportWinTask();
 
     bool is_for_additional_bid;
-    mojom::ReportingIdField reporting_id_field;
-    std::string reporting_id;
+    std::optional<std::string> interest_group_name_reporting_id;
+    std::optional<std::string> buyer_reporting_id;
+    std::optional<std::string> buyer_and_seller_reporting_id;
+    std::optional<std::string> selected_buyer_and_seller_reporting_id;
     std::optional<std::string> auction_signals_json;
     std::optional<std::string> per_buyer_signals_json;
     std::string seller_signals_json;
@@ -453,8 +463,11 @@ class CONTENT_EXPORT BidderWorklet : public mojom::BidderWorklet,
 
     void ReportWin(
         bool is_for_additional_bid,
-        mojom::ReportingIdField reporting_id_field,
-        const std::string& reporting_id,
+        const std::optional<std::string>& interest_group_name_reporting_id,
+        const std::optional<std::string>& buyer_reporting_id,
+        const std::optional<std::string>& buyer_and_seller_reporting_id,
+        const std::optional<std::string>&
+            selected_buyer_and_seller_reporting_id,
         const std::optional<std::string>& auction_signals_json,
         const std::optional<std::string>& per_buyer_signals_json,
         DirectFromSellerSignalsRequester::Result

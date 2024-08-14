@@ -6,6 +6,7 @@ package org.chromium.chrome.browser.tasks.tab_management;
 
 import static org.chromium.chrome.browser.tasks.tab_management.TabListModel.CardProperties.CARD_TYPE;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListModel.CardProperties.ModelType.TAB;
+import static org.chromium.chrome.browser.tasks.tab_management.TabProperties.USE_SHRINK_CLOSE_ANIMATION;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -141,11 +142,9 @@ public class TabListItemAnimator extends SimpleItemAnimator {
     private AnimatorHolder mMoves = new AnimatorHolder("Move");
     private AnimatorHolder mRemovals = new AnimatorHolder("Removal");
 
-    private final boolean mSkipRemovalDelay;
     private final boolean mRearrangeUseStandardEasing;
 
-    TabListItemAnimator(boolean skipRemovalDelay, boolean rearrangeUseStandardEasing) {
-        mSkipRemovalDelay = skipRemovalDelay;
+    TabListItemAnimator(boolean rearrangeUseStandardEasing) {
         mRearrangeUseStandardEasing = rearrangeUseStandardEasing;
     }
 
@@ -158,8 +157,6 @@ public class TabListItemAnimator extends SimpleItemAnimator {
         if (!hasRemovals && !hasMoves && !hasChanges && !hasAdds) {
             return;
         }
-
-        hasRemovals = hasRemovals && !mSkipRemovalDelay;
 
         // Run animations in the priority
         // - P1: Remove P1
@@ -433,18 +430,21 @@ public class TabListItemAnimator extends SimpleItemAnimator {
         }
 
         Animator animator = null;
-        if (TabUiFeatureUtilities.shouldUseListMode() || !isTabCard(holder)) {
+        if (TabUiFeatureUtilities.shouldUseListMode() || !shouldUseShrinkCloseAnimation(holder)) {
             animator = buildGenericRemoveAnimator(holder);
         } else {
-            animator = buildTabRemoveAnimator(holder);
+            animator = buildTabRemoveAnimatorForItemAnimator(holder);
         }
         mRemovals.put(holder, animator);
         return true;
     }
 
-    private static boolean isTabCard(ViewHolder holder) {
+    private static boolean shouldUseShrinkCloseAnimation(ViewHolder holder) {
         if (holder instanceof SimpleRecyclerViewAdapter.ViewHolder adapterHolder) {
-            return adapterHolder.model.get(CARD_TYPE) == TAB;
+            var model = adapterHolder.model;
+            if (model.get(CARD_TYPE) == TAB) {
+                return model.get(USE_SHRINK_CLOSE_ANIMATION);
+            }
         }
         return false;
     }
@@ -473,7 +473,8 @@ public class TabListItemAnimator extends SimpleItemAnimator {
         return alphaAnimator;
     }
 
-    private Animator buildTabRemoveAnimator(ViewHolder holder) {
+    /** Builds an animator that shrinks and fades a tab. */
+    public static Animator buildTabRemoveAnimator(ViewHolder holder) {
         // This is a new custom remove animation that happens in two parts.
         // Part 1 shrinks from 100% -> 60%.
         // Part 2 shrinks from 60% -> 0% while fading to 0 alpha.
@@ -492,12 +493,26 @@ public class TabListItemAnimator extends SimpleItemAnimator {
                 ObjectAnimator.ofFloat(view, View.SCALE_X, REMOVE_PART_2_FINAL_SCALE);
         ObjectAnimator part2ScaleY =
                 ObjectAnimator.ofFloat(view, View.SCALE_Y, REMOVE_PART_2_FINAL_SCALE);
-        ObjectAnimator part2Alpha = ObjectAnimator.ofFloat(view, View.ALPHA, 1.0f, 0.0f);
-        part2ShrinkAndFade.play(part2ScaleX).with(part2ScaleY).with(part2Alpha);
+        part2ShrinkAndFade.play(part2ScaleX).with(part2ScaleY);
         part2ShrinkAndFade.setDuration(REMOVE_PART_2_DURATION);
         part2ShrinkAndFade.setInterpolator(Interpolators.LINEAR_OUT_SLOW_IN_INTERPOLATOR);
 
         AnimatorSet animator = new AnimatorSet();
+        animator.addListener(
+                new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animator) {
+                        view.setScaleX(ORIGINAL_SCALE);
+                        view.setScaleY(ORIGINAL_SCALE);
+                        view.setAlpha(1f);
+                    }
+                });
+        animator.play(part1Shrink).before(part2ShrinkAndFade);
+        return animator;
+    }
+
+    private Animator buildTabRemoveAnimatorForItemAnimator(ViewHolder holder) {
+        Animator animator = buildTabRemoveAnimator(holder);
         animator.addListener(
                 new AnimatorListenerAdapter() {
                     @Override
@@ -507,15 +522,11 @@ public class TabListItemAnimator extends SimpleItemAnimator {
 
                     @Override
                     public void onAnimationEnd(Animator animator) {
-                        view.setScaleX(ORIGINAL_SCALE);
-                        view.setScaleY(ORIGINAL_SCALE);
-                        view.setAlpha(1.0f);
                         dispatchRemoveFinished(holder);
                         mRemovals.remove(holder);
                         dispatchFinishedWhenAllAnimationsDone();
                     }
                 });
-        animator.play(part1Shrink).before(part2ShrinkAndFade);
         return animator;
     }
 

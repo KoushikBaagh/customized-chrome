@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "ash/accelerators/accelerator_controller_impl.h"
 
 #include <string>
@@ -26,6 +31,7 @@
 #include "ash/public/cpp/accelerator_actions.h"
 #include "ash/public/cpp/accelerators.h"
 #include "ash/public/cpp/debug_delegate.h"
+#include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/system/input_device_settings/input_device_settings_notification_controller.h"
 #include "ash/system/power/power_button_controller.h"
@@ -887,6 +893,7 @@ bool AcceleratorControllerImpl::CanPerformAction(
     case AcceleratorAction::kDebugShowToast:
     case AcceleratorAction::kDebugShowSystemNudge:
     case AcceleratorAction::kDebugSystemUiStyleViewer:
+    case AcceleratorAction::kDebugStartSunfishSession:
     case AcceleratorAction::kDebugToggleDarkMode:
     case AcceleratorAction::kDebugToggleDynamicColor:
     case AcceleratorAction::kDebugClearUseKMeansPref:
@@ -1192,6 +1199,7 @@ void AcceleratorControllerImpl::PerformAction(
     case AcceleratorAction::kDebugShowInformedRestore:
     case AcceleratorAction::kDebugShowToast:
     case AcceleratorAction::kDebugShowSystemNudge:
+    case AcceleratorAction::kDebugStartSunfishSession:
     case AcceleratorAction::kDebugToggleDarkMode:
     case AcceleratorAction::kDebugToggleDynamicColor:
     case AcceleratorAction::kDebugClearUseKMeansPref:

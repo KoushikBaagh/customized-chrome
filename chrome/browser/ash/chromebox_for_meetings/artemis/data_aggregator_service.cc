@@ -27,18 +27,19 @@ constexpr size_t kDefaultLogBatchSize = 500;  // lines
 
 constexpr size_t kPayloadMaxSizeBytes = 500000;  // 500Kb
 constexpr base::TimeDelta kPayloadEnqueueTimeout = base::Minutes(10);
+constexpr size_t kMaxPayloadQueueSize = 3;  // # payloads
 
 constexpr base::TimeDelta kServiceAdaptorRetryDelay = base::Seconds(1);
 constexpr size_t kServiceAdaptorRetryMaxTries = 5;
 
 constexpr net::BackoffEntry::Policy kEnqueueRetryBackoffPolicy = {
-    0,          // Number of initial errors to ignore.
-    1000,       // Initial delay in ms.
-    2.0,        // Factor by which the waiting time will be multiplied.
-    0.2,        // Fuzzing percentage.
-    60 * 1000,  // Maximum delay in ms.
-    -1,         // Never discard the entry.
-    true,       // Use initial delay.
+    0,              // Number of initial errors to ignore.
+    1000,           // Initial delay in ms.
+    2.0,            // Factor by which the waiting time will be multiplied.
+    0.2,            // Fuzzing percentage.
+    60 * 1000 * 5,  // Maximum delay in ms.
+    -1,             // Never discard the entry.
+    true,           // Use initial delay.
 };
 
 // List of commands that should be polled frequently. Any commands
@@ -268,15 +269,18 @@ void DataAggregatorService::OnMojoDisconnect() {
 void DataAggregatorService::InitializeLocalSources() {
   // Add local command sources
   for (auto* const cmd : kLocalCommandSourcesFastPoll) {
+    VLOG(1) << "Adding command '" << cmd << "' to sources.";
     AddLocalCommandSource(cmd, kDefaultCommandPollFrequency);
   }
 
   for (auto* const cmd : kLocalCommandSourcesSlowPoll) {
+    VLOG(1) << "Adding command '" << cmd << "' to local sources.";
     AddLocalCommandSource(cmd, kExtendedCommandPollFrequency);
   }
 
   // Add local log file sources
   for (auto* const logfile : kLocalLogSources) {
+    VLOG(1) << "Adding log file '" << logfile << "' to local sources.";
     AddLocalLogSource(logfile);
   }
 }
@@ -396,6 +400,7 @@ void DataAggregatorService::StoreDeviceId(
 
 void DataAggregatorService::StartFetchTimer() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  VLOG(1) << "Artemis started. Listening for data.";
   fetch_timer_.Start(
       FROM_HERE, kFetchFrequency,
       base::BindRepeating(&DataAggregatorService::FetchFromAllSourcesAndEnqueue,
@@ -409,6 +414,8 @@ void DataAggregatorService::FetchFromAllSourcesAndEnqueue() {
   if (enqueue_in_progress_) {
     return;
   }
+
+  VLOG(1) << "Fetching data from " << data_source_map_.size() << " sources.";
 
   for (const auto& data_source : data_source_map_) {
     std::string source_name = data_source.first;
@@ -474,7 +481,9 @@ void DataAggregatorService::AppendEntriesToActivePayload(
   }
 
   if (IsPayloadReadyForUpload()) {
-    EnqueueTransportPayload();
+    VLOG(1) << "Payload is ready to be enqueued. Pushing to wire.";
+    AddActivePayloadToPendingQueue();
+    EnqueueNextPendingTransportPayload();
   }
 }
 
@@ -496,13 +505,43 @@ bool DataAggregatorService::IsPayloadReadyForUpload() const {
   return false;
 }
 
-void DataAggregatorService::EnqueueTransportPayload() {
+void DataAggregatorService::AddActivePayloadToPendingQueue() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
   auto timestamp =
       (base::Time::Now() - base::Time::UnixEpoch()).InMilliseconds();
 
-  active_transport_payload_.set_collection_timestamp_ms(timestamp);
+  // We want to take the necessary data from the active payload and
+  // create a new (equivalent) payload that we can push to our queue.
+  // To avoid a large deep copy, steal the log pointer from the active
+  // payload and reassign it to the new one.
+  proto::TransportPayload pending_payload;
+  pending_payload.set_permanent_id(active_transport_payload_.permanent_id());
+  pending_payload.set_collection_timestamp_ms(timestamp);
+
+  proto::LogPayload* curr_active_payload =
+      active_transport_payload_.release_log_payload();
+  pending_payload.set_allocated_log_payload(curr_active_payload);
+
+  pending_transport_payloads_.push(std::move(pending_payload));
+
+  // Drop front element if queue grows too large.
+  if (pending_transport_payloads_.size() > kMaxPayloadQueueSize) {
+    LOG(WARNING) << "Payload queue grew too large. Dropping oldest.";
+    pending_transport_payloads_.pop();
+  }
+
+  VLOG(3) << "Pushed payload into pending queue. New size: "
+          << pending_transport_payloads_.size();
+}
+
+void DataAggregatorService::EnqueueNextPendingTransportPayload() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  if (pending_transport_payloads_.empty()) {
+    LOG(WARNING) << "Requested payload enqueue, but payload queue is empty.";
+    return;
+  }
 
   auto enqueue_success_callback =
       base::BindOnce(&DataAggregatorService::HandleEnqueueResponse,
@@ -512,9 +551,10 @@ void DataAggregatorService::EnqueueTransportPayload() {
 
   // TODO(b/339455254): have each data source specify a priority instead
   // of assuming kLow for every enqueue.
-  uploader_remote_->Enqueue(active_transport_payload_.SerializeAsString(),
-                            chromeos::cfm::mojom::EnqueuePriority::kLow,
-                            std::move(enqueue_success_callback));
+  uploader_remote_->Enqueue(
+      pending_transport_payloads_.front().SerializeAsString(),
+      chromeos::cfm::mojom::EnqueuePriority::kLow,
+      std::move(enqueue_success_callback));
 }
 
 void DataAggregatorService::HandleEnqueueResponse(
@@ -530,19 +570,21 @@ void DataAggregatorService::HandleEnqueueResponse(
 
     base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
         FROM_HERE,
-        base::BindOnce(&DataAggregatorService::EnqueueTransportPayload,
-                       weak_ptr_factory_.GetWeakPtr()),
+        base::BindOnce(
+            &DataAggregatorService::EnqueueNextPendingTransportPayload,
+            weak_ptr_factory_.GetWeakPtr()),
         retry_delay);
     return;
   }
 
+  VLOG(1) << "Recent enqueue succeeded.";
   enqueue_retry_backoff_.Reset();
 
   // If the enqueue succeeded, Flush() all of the affected data sources so they
   // can update their internal pointers. Note that for non-incremental sources
   // this will likely just be a no-op.
   proto::LogPayload* log_payload =
-      active_transport_payload_.mutable_log_payload();
+      pending_transport_payloads_.front().mutable_log_payload();
   google::protobuf::RepeatedPtrField<proto::LogSet>* log_sets =
       log_payload->mutable_log_sets();
 
@@ -554,7 +596,13 @@ void DataAggregatorService::HandleEnqueueResponse(
   // Clean up.
   enqueue_in_progress_ = false;
   last_upload_time_ = base::TimeTicks::Now();
-  active_transport_payload_.clear_log_payload();
+  pending_transport_payloads_.pop();
+
+  // Try another transfer if the queue is still populated.
+  if (!pending_transport_payloads_.empty()) {
+    VLOG(2) << "More payloads in queue; enqueueing.";
+    EnqueueNextPendingTransportPayload();
+  }
 }
 
 DataAggregatorService::DataAggregatorService()
@@ -573,6 +621,7 @@ DataAggregatorService::DataAggregatorService()
   local_task_runner_->PostTask(FROM_HERE,
                                base::BindOnce(&PersistentDb::Initialize));
 
+  VLOG(1) << "Starting Artemis...";
   InitializeUploadEndpoint(/*num_tries=*/0);
 }
 

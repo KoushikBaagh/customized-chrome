@@ -374,6 +374,7 @@ the generic promo launch. -->
   <int value="12" label="Obsolete in M123 - Parcel Tracking See More"/>
   <int value="13" label="Set Up List Notifications"/>
   <int value="14" label="Placeholder"/>
+  <int value="15" label="Price Tracking Promo"/>
 </enum>
 
 <enum name="IOSMainThreadFreezeDetectionNotRunningAfterReportBlock">
@@ -635,6 +636,11 @@ the generic promo launch. -->
   <int value="6" label="Success"/>
 </enum>
 
+<enum name="IOSSafetyCheckFreshnessTrigger">
+  <int value="0" label="Password Check - State Changed"/>
+  <int value="1" label="Update Chrome Check - State Changed"/>
+</enum>
+
 <enum name="IOSSaveToDriveOutcomeType">
   <int value="0" label="Failure - WebState Hidden"/>
   <int value="1" label="Failure - WebState Destroyed"/>
@@ -838,6 +844,14 @@ the generic promo launch. -->
   <int value="2" label="Sign In"/>
   <int value="3" label="Error"/>
   <int value="4" label="SetUpList Continuation"/>
+  <int value="5" label="Docking"/>
+  <int value="6" label="Omnibox Position"/>
+</enum>
+
+<enum name="IOSTipsNotificationUserType">
+  <int value="0" label="Unknown"/>
+  <int value="1" label="Less Engaged"/>
+  <int value="2" label="Active Seeker"/>
 </enum>
 
 <enum name="IOSUpgradeCenterFailureReason">
@@ -1014,6 +1028,7 @@ the generic promo launch. -->
   <int value="2" label="Content"/>
   <int value="3" label="Tips"/>
   <int value="4" label="Sports"/>
+  <int value="5" label="Safety Check"/>
 </enum>
 
 <enum name="PushNotificationLifecycleEvent">
@@ -1117,6 +1132,9 @@ the generic promo launch. -->
   <int value="15" label="Password Manager Widget"/>
   <int value="16" label="Pinned Tabs"/>
   <int value="17" label="Inactive Tabs"/>
+  <int value="18" label="Package Tracking"/>
+  <int value="19" label="Password Sharing"/>
+  <int value="20" label="Customizable Overflow Menu"/>
 </enum>
 
 <enum name="WindowActivityOrigin">

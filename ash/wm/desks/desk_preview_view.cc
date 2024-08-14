@@ -538,7 +538,7 @@ void DeskPreviewView::RecreateDeskContentsMirrorLayers() {
       std::make_unique<ui::LayerTreeOwner>(
           std::move(mirrored_content_root_layer));
 
-  DeprecatedLayoutImmediately();
+  InvalidateLayout();
 }
 
 void DeskPreviewView::Close(bool primary_action) {
@@ -579,6 +579,14 @@ void DeskPreviewView::UpdateAccessibleName() {
     GetViewAccessibility().SetName(
         "", ax::mojom::NameFrom::kAttributeExplicitlyEmpty);
   }
+}
+
+void DeskPreviewView::AcceptSelection() {
+  DesksController::Get()->ActivateDesk(
+      mini_view_->desk(),
+      mini_view_->owner_bar()->type() == DeskBarViewBase::Type::kDeskButton
+          ? DesksSwitchSource::kDeskButtonMiniViewButton
+          : DesksSwitchSource::kMiniViewButton);
 }
 
 void DeskPreviewView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
@@ -640,18 +648,18 @@ void DeskPreviewView::OnGestureEvent(ui::GestureEvent* event) {
 
   switch (event->type()) {
     // Only long press can trigger drag & drop.
-    case ui::ET_GESTURE_LONG_PRESS:
+    case ui::EventType::kGestureLongPress:
       owner_bar->HandleLongPressEvent(mini_view_, *event);
       event->SetHandled();
       break;
-    case ui::ET_GESTURE_SCROLL_BEGIN:
+    case ui::EventType::kGestureScrollBegin:
       [[fallthrough]];
-    case ui::ET_GESTURE_SCROLL_UPDATE:
+    case ui::EventType::kGestureScrollUpdate:
       owner_bar->HandleDragEvent(mini_view_, *event);
       if (owner_bar->IsDraggingDesk())
         event->SetHandled();
       break;
-    case ui::ET_GESTURE_END:
+    case ui::EventType::kGestureEnd:
       if (owner_bar->HandleReleaseEvent(mini_view_, *event))
         event->SetHandled();
       break;
@@ -672,10 +680,6 @@ void DeskPreviewView::OnThemeChanged() {
 }
 
 void DeskPreviewView::OnFocus() {
-  if (mini_view_->owner_bar()->type() == DeskBarViewBase::Type::kOverview) {
-    MoveFocusToView(this);
-  }
-
   mini_view_->UpdateDeskButtonVisibility();
   mini_view_->UpdateFocusColor();
   View::OnFocus();
@@ -713,43 +717,6 @@ bool DeskPreviewView::AcceleratorPressed(const ui::Accelerator& accelerator) {
 
 bool DeskPreviewView::CanHandleAccelerators() const {
   return HasFocus() && views::Button::CanHandleAccelerators();
-}
-
-views::View* DeskPreviewView::GetView() {
-  return this;
-}
-
-void DeskPreviewView::MaybeActivateFocusedView() {
-  DesksController::Get()->ActivateDesk(
-      mini_view_->desk(),
-      mini_view_->owner_bar()->type() == DeskBarViewBase::Type::kDeskButton
-          ? DesksSwitchSource::kDeskButtonMiniViewButton
-          : DesksSwitchSource::kMiniViewButton);
-}
-
-void DeskPreviewView::MaybeCloseFocusedView(bool primary_action) {
-  Close(primary_action);
-}
-
-void DeskPreviewView::MaybeSwapFocusedView(bool right) {
-  Swap(right);
-}
-
-bool DeskPreviewView::MaybeActivateFocusedViewOnOverviewExit(
-    OverviewSession* overview_session) {
-  MaybeActivateFocusedView();
-  return true;
-}
-
-void DeskPreviewView::OnFocusableViewFocused() {
-  mini_view_->UpdateDeskButtonVisibility();
-  mini_view_->UpdateFocusColor();
-  mini_view_->owner_bar()->ScrollToShowViewIfNecessary(mini_view_);
-}
-
-void DeskPreviewView::OnFocusableViewBlurred() {
-  mini_view_->UpdateDeskButtonVisibility();
-  mini_view_->UpdateFocusColor();
 }
 
 void DeskPreviewView::OnWindowOcclusionChanged(aura::Window* window) {

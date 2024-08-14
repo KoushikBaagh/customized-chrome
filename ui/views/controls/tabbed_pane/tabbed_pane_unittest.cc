@@ -127,6 +127,14 @@ TEST_F(TabbedPaneTest, SizeAndLayoutInVerticalOrientation) {
   EXPECT_EQ(child1->bounds(), child2->bounds());
 }
 
+TEST_F(TabbedPaneTest, AccessibleAttributes) {
+  auto tabbed_pane = std::make_unique<TabbedPane>();
+
+  ui::AXNodeData data;
+  tabbed_pane->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.role, ax::mojom::Role::kTabList);
+}
+
 class TabbedPaneWithWidgetTest : public ViewsTestBase {
  public:
   TabbedPaneWithWidgetTest() = default;
@@ -167,7 +175,7 @@ class TabbedPaneWithWidgetTest : public ViewsTestBase {
 
   void SendKeyPressToSelectedTab(ui::KeyboardCode keyboard_code) {
     tabbed_pane_->GetSelectedTab()->OnKeyPressed(
-        ui::KeyEvent(ui::ET_KEY_PRESSED, keyboard_code,
+        ui::KeyEvent(ui::EventType::kKeyPressed, keyboard_code,
                      ui::UsLayoutKeyboardCodeToDomCode(keyboard_code), 0));
   }
 
@@ -449,6 +457,24 @@ TEST_F(TabbedPaneWithWidgetTest, AccessibleNameTest) {
   GetTabAt(0)->GetViewAccessibility().GetAccessibleNodeData(&data);
   EXPECT_EQ(u"", data.GetString16Attribute(ax::mojom::StringAttribute::kName));
   EXPECT_EQ(ax::mojom::NameFrom::kAttributeExplicitlyEmpty, data.GetNameFrom());
+}
+
+TEST_F(TabbedPaneWithWidgetTest, AccessibleSelected) {
+  tabbed_pane_->AddTab(u"Tab1", std::make_unique<View>());
+  ui::AXNodeData data;
+
+  GetTabAt(0)->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_TRUE(data.GetBoolAttribute(ax::mojom::BoolAttribute::kSelected));
+
+  data = ui::AXNodeData();
+  GetTabAt(0)->SetSelected(false);
+  GetTabAt(0)->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_FALSE(data.GetBoolAttribute(ax::mojom::BoolAttribute::kSelected));
+
+  data = ui::AXNodeData();
+  GetTabAt(0)->SetSelected(true);
+  GetTabAt(0)->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_TRUE(data.GetBoolAttribute(ax::mojom::BoolAttribute::kSelected));
 }
 
 }  // namespace views::test

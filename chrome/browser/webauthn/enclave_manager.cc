@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "chrome/browser/webauthn/enclave_manager.h"
 
 #include <array>
@@ -138,7 +143,6 @@ struct EnclaveManager::PendingAction {
                             // state.
   std::unique_ptr<EnclaveLocalState::WrappedPIN> wrapped_pin;
   std::optional<std::string> pin_public_key;
-  bool clear_secrets;
 #if BUILDFLAG(IS_MAC)
   std::unique_ptr<device::enclave::ICloudRecoveryKey> icloud_recovery_key;
 #endif                      // BUILDFLAG(IS_MAC)
@@ -361,8 +365,10 @@ cbor::Value BuildRegistrationMessage(
                              : enclave::kSoftwareKey;
   pub_keys.emplace(key_type, identity_key.GetSubjectPublicKeyInfo());
   if (uv_key) {
-    pub_keys.emplace(enclave::kUserVerificationKey,
-                     uv_key->key().GetPublicKey());
+    const char* uv_key_type = uv_key->key().IsHardwareBacked()
+                                  ? enclave::kUserVerificationKey
+                                  : enclave::kSoftwareUserVerificationKey;
+    pub_keys.emplace(uv_key_type, uv_key->key().GetPublicKey());
   }
 
   cbor::Value::MapValue request1;
@@ -396,18 +402,6 @@ cbor::Value BuildUnregisterMessage(const std::string& device_id) {
   request.emplace(enclave::kRequestCommandKey, enclave::kForgetCommandName);
   request.emplace(enclave::kRegisterDeviceIdKey,
                   std::vector<uint8_t>(device_id.begin(), device_id.end()));
-
-  cbor::Value::ArrayValue requests;
-  requests.emplace_back(std::move(request));
-
-  return cbor::Value(std::move(requests));
-}
-
-cbor::Value BuildSetPINGenerationHighWaterMessage(int64_t generation) {
-  cbor::Value::MapValue request;
-  request.emplace(enclave::kRequestCommandKey,
-                  enclave::kSetPinGenerationHighWaterCommandName);
-  request.emplace(enclave::kGeneration, generation);
 
   cbor::Value::ArrayValue requests;
   requests.emplace_back(std::move(request));
@@ -907,8 +901,8 @@ base::flat_map<int32_t, std::vector<uint8_t>> GetNewSecretsToStore(
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 UserVerifyingKeyProviderConfigChromeos MakeUserVerifyingKeyConfig(
     EnclaveManager::UVKeyOptions options) {
-  UserVerifyingKeyProviderConfigChromeos config{.dialog_controller =
-                                                    options.dialog_controller};
+  UserVerifyingKeyProviderConfigChromeos config{
+      .dialog_controller = options.dialog_controller, .rp_id = options.rp_id};
   if (options.render_frame_host_id) {
     auto* rfh = content::RenderFrameHost::FromID(options.render_frame_host_id);
     // This is ultimately invoked from GpmEnclaveController, which can't outlive
@@ -1128,7 +1122,6 @@ class EnclaveManager::StateMachine {
     kRenewingPIN,
     kWaitingForEnclaveTokenForUnregister,
     kUnregistering,
-    kUpdatingPINHighWater,
     kSyncingWithSecurityDomain,
   };
 
@@ -1271,10 +1264,6 @@ class EnclaveManager::StateMachine {
         DoUnregistering(std::move(event));
         break;
 
-      case State::kUpdatingPINHighWater:
-        DoUpdatingPINHighWater(std::move(event));
-        break;
-
       case State::kSyncingWithSecurityDomain:
         DoSyncingWithSecurityDomain(std::move(event));
         break;
@@ -1355,8 +1344,6 @@ class EnclaveManager::StateMachine {
         return "WaitingForEnclaveTokenForUnregister";
       case State::kUnregistering:
         return "Unregistering";
-      case State::kUpdatingPINHighWater:
-        return "UpdatingPINHighWater";
       case State::kSyncingWithSecurityDomain:
         return "kSyncingWithSecurityDomain";
     }
@@ -1564,17 +1551,6 @@ class EnclaveManager::StateMachine {
       manager_->WriteState(&local_state_);
     }
 
-    if (action_->clear_secrets) {
-      user_->clear_wrapped_member_private_key();
-      user_->clear_member_public_key();
-      user_->clear_wrapped_pin();
-      user_->clear_pin_public_key();
-      user_->clear_wrapped_security_domain_secrets();
-      user_->clear_registered();
-      user_->clear_joined();
-      manager_->WriteState(&local_state_);
-    }
-
     success_ = true;
     state_ = State::kStop;
   }
@@ -1589,82 +1565,78 @@ class EnclaveManager::StateMachine {
 
     manager_->user_verifying_key_.reset();
 
-    AreUserVerifyingKeysSupported(
-        base::BindOnce(
-            [](base::WeakPtr<StateMachine> state_machine,
-               bool is_uv_key_supported) {
-              if (!state_machine) {
-                return;
-              }
-              // The key provider is only used to create a new key, but not sign
-              // with it, so passing empty options here is ok.
-              auto key_provider =
-                  GetUserVerifyingKeyProviderForCreateAndDeleteOnly();
-              if (!is_uv_key_supported || !key_provider) {
-                // UV keys are not available, so skip to generating an identity
-                // key.
-                state_machine->GenerateIdentityKey(nullptr);
-                return;
-              }
-              if (state_machine->user_->wrapped_uv_private_key().empty()) {
+    AreUserVerifyingKeysSupported(base::BindOnce(
+        [](base::WeakPtr<StateMachine> state_machine,
+           bool is_uv_key_supported) {
+          if (!state_machine) {
+            return;
+          }
+          // The key provider is only used to create a new key, but not sign
+          // with it, so passing empty options here is ok.
+          auto key_provider =
+              GetUserVerifyingKeyProviderForCreateAndDeleteOnly();
+          if (!is_uv_key_supported || !key_provider) {
+            // UV keys are not available, so skip to generating an identity
+            // key.
+            state_machine->GenerateIdentityKey(nullptr);
+            return;
+          }
+          if (state_machine->user_->wrapped_uv_private_key().empty()) {
 #if BUILDFLAG(IS_WIN)
-                // On Windows we don't want to create a UV key at registration
-                // time. Instead we defer creation until one is going to be
-                // used in a UV request.
-                state_machine->GenerateIdentityKey(DeferredUVKeyCreation());
+            // On Windows we don't want to create a UV key at registration
+            // time. Instead we defer creation until one is going to be
+            // used in a UV request.
+            state_machine->GenerateIdentityKey(DeferredUVKeyCreation());
 #else
-                // Create a new UV key.
-                key_provider->GenerateUserVerifyingSigningKey(
-                    device::enclave::kSigningAlgorithms,
-                    base::BindOnce(
-                        [](base::WeakPtr<StateMachine> state_machine,
-                           base::expected<
-                               std::unique_ptr<crypto::UserVerifyingSigningKey>,
-                               crypto::UserVerifyingKeyCreationError>
-                               maybe_uv_key) {
-                          if (!state_machine) {
-                            return;
-                          }
-                          std::unique_ptr<crypto::UserVerifyingSigningKey>
-                              uv_key;
-                          if (maybe_uv_key.has_value()) {
-                            uv_key = std::move(maybe_uv_key.value());
-                          } else {
-                            FIDO_LOG(ERROR)
-                                << "UV key creation failed with error "
-                                << static_cast<int>(maybe_uv_key.error());
-                          }
-                          state_machine->GenerateIdentityKey(std::move(uv_key));
-                        },
-                        state_machine));
+            // Create a new UV key.
+            key_provider->GenerateUserVerifyingSigningKey(
+                device::enclave::kSigningAlgorithms,
+                base::BindOnce(
+                    [](base::WeakPtr<StateMachine> state_machine,
+                       base::expected<
+                           std::unique_ptr<crypto::UserVerifyingSigningKey>,
+                           crypto::UserVerifyingKeyCreationError>
+                           maybe_uv_key) {
+                      if (!state_machine) {
+                        return;
+                      }
+                      std::unique_ptr<crypto::UserVerifyingSigningKey> uv_key;
+                      if (maybe_uv_key.has_value()) {
+                        uv_key = std::move(maybe_uv_key.value());
+                      } else {
+                        FIDO_LOG(ERROR)
+                            << "UV key creation failed with error "
+                            << static_cast<int>(maybe_uv_key.error());
+                      }
+                      state_machine->GenerateIdentityKey(std::move(uv_key));
+                    },
+                    state_machine));
 #endif
-                return;
-              }
-              // Use the existing UV key.
-              key_provider->GetUserVerifyingSigningKey(
-                  state_machine->user_->wrapped_uv_private_key(),
-                  base::BindOnce(
-                      [](base::WeakPtr<StateMachine> state_machine,
-                         base::expected<
-                             std::unique_ptr<crypto::UserVerifyingSigningKey>,
-                             crypto::UserVerifyingKeyCreationError>
-                             maybe_uv_key) {
-                        if (!state_machine) {
-                          return;
-                        }
-                        std::unique_ptr<crypto::UserVerifyingSigningKey> uv_key;
-                        if (maybe_uv_key.has_value()) {
-                          uv_key = std::move(maybe_uv_key.value());
-                        } else {
-                          FIDO_LOG(ERROR)
-                              << "UV key retrieval failed with error "
-                              << static_cast<int>(maybe_uv_key.error());
-                        }
-                        state_machine->GenerateIdentityKey(std::move(uv_key));
-                      },
-                      state_machine));
-            },
-            weak_ptr_factory_.GetWeakPtr()));
+            return;
+          }
+          // Use the existing UV key.
+          key_provider->GetUserVerifyingSigningKey(
+              state_machine->user_->wrapped_uv_private_key(),
+              base::BindOnce(
+                  [](base::WeakPtr<StateMachine> state_machine,
+                     base::expected<
+                         std::unique_ptr<crypto::UserVerifyingSigningKey>,
+                         crypto::UserVerifyingKeyCreationError> maybe_uv_key) {
+                    if (!state_machine) {
+                      return;
+                    }
+                    std::unique_ptr<crypto::UserVerifyingSigningKey> uv_key;
+                    if (maybe_uv_key.has_value()) {
+                      uv_key = std::move(maybe_uv_key.value());
+                    } else {
+                      FIDO_LOG(ERROR) << "UV key retrieval failed with error "
+                                      << static_cast<int>(maybe_uv_key.error());
+                    }
+                    state_machine->GenerateIdentityKey(std::move(uv_key));
+                  },
+                  state_machine));
+        },
+        weak_ptr_factory_.GetWeakPtr()));
   }
 
   void GenerateIdentityKey(MaybeUVKey uv_key) {
@@ -2091,7 +2063,6 @@ class EnclaveManager::StateMachine {
     crypto::RandBytes(vault_handle_without_type);
 
     state_ = State::kChangingPIN;
-    token_ = token;
     std::vector<uint8_t> wrapped_secret =
         GetCurrentWrappedSecretForUser(user_).second;
     enclave::Transact(
@@ -2289,47 +2260,13 @@ class EnclaveManager::StateMachine {
     state_ = State::kStop;
     success_ =
         status == trusted_vault::TrustedVaultRegistrationStatus::kSuccess;
-
-    if (success_) {
-      user_->set_last_refreshed_pin_epoch_secs(
-          base::Time::Now().InSecondsFSinceUnixEpoch());
-      manager_->WriteState(&local_state_);
-    } else {
+    if (!success_) {
       return;
     }
 
-    if (is_pin_update_) {
-      // Update the highwater mark at the enclave now that the new PIN has been
-      // committed to the security domain service.
-      state_ = State::kUpdatingPINHighWater;
-      CHECK(token_.has_value());
-      enclave::Transact(manager_->network_context_factory_,
-                        enclave::GetEnclaveIdentity(), *token_,
-                        /*reauthentication_token=*/std::nullopt,
-                        BuildSetPINGenerationHighWaterMessage(
-                            user_->wrapped_pin().generation()),
-                        manager_->IdentityKeySigningCallback(),
-                        base::BindOnce(&StateMachine::OnEnclaveResponse,
-                                       weak_ptr_factory_.GetWeakPtr()));
-    }
-  }
-
-  void DoUpdatingPINHighWater(Event event) {
-    // This call is advisory so it doesn't really matter if it fails, but
-    // failures are still reported so that things don't break silently, at
-    // least. The result will already have been logged at this point.
-    if (absl::holds_alternative<Failure>(event)) {
-      success_ = false;
-    } else {
-      cbor::Value response =
-          std::move(absl::get_if<EnclaveResponse>(&event)->value());
-      if (!IsAllOk(response, 1)) {
-        FIDO_LOG(ERROR) << "Setting high water resulted in error response: "
-                        << cbor::DiagnosticWriter::Write(response);
-        success_ = false;
-      }
-    }
-    state_ = State::kStop;
+    user_->set_last_refreshed_pin_epoch_secs(
+        base::Time::Now().InSecondsFSinceUnixEpoch());
+    manager_->WriteState(&local_state_);
   }
 
 #if BUILDFLAG(IS_MAC)
@@ -2642,10 +2579,6 @@ class EnclaveManager::StateMachine {
   std::optional<trusted_vault::MemberKeysSource> member_keys_source_;
   // When uploading a PIN, this contains the pending `WrappedPIN`.
   std::unique_ptr<EnclaveLocalState::WrappedPIN> wrapped_pin_proto_;
-  // token_ holds the OAuth token for communicating with the enclave. While we
-  // try to batch all the requests into a single transaction, sometimes they
-  // have to be split and so the token can be stashed here.
-  std::optional<std::string> token_;
 
   SEQUENCE_CHECKER(sequence_checker_);
   base::WeakPtrFactory<StateMachine> weak_ptr_factory_{this};
@@ -2870,7 +2803,6 @@ bool EnclaveManager::ConsiderSecurityDomainState(
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   CHECK(user_);
   bool ret = is_ready();
-  std::unique_ptr<PendingAction> action;
 
   if (user_->joined() &&
       state.state !=
@@ -2880,11 +2812,11 @@ bool EnclaveManager::ConsiderSecurityDomainState(
        user_->wrapped_security_domain_secrets().find(*state.key_version) ==
            user_->wrapped_security_domain_secrets().end())) {
     // The security domain has been reset.
-    action = std::make_unique<PendingAction>();
-    action->callback = std::move(callback);
-    action->clear_secrets = true;
-    ret = false;
+    ClearRegistration();
     FIDO_LOG(EVENT) << "The security domain has been reset.";
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(std::move(callback), true));
+    return false;
   }
 
   if (ret && state.gpm_pin_metadata.has_value()) {
@@ -2895,23 +2827,21 @@ bool EnclaveManager::ConsiderSecurityDomainState(
       if (metadata.public_key.has_value() &&
           (!user_->has_wrapped_pin() ||
            user_->wrapped_pin().generation() != wrapped_pin->generation())) {
-        action = std::make_unique<PendingAction>();
+        std::unique_ptr<PendingAction> action =
+            std::make_unique<PendingAction>();
         action->callback = std::move(callback);
         action->update_wrapped_pin = true;
         action->wrapped_pin = std::move(wrapped_pin);
         action->pin_public_key = *metadata.public_key;
         FIDO_LOG(EVENT) << "The GPM PIN has been updated";
+        pending_actions_.emplace_back(std::move(action));
+        Act();
       }
     } else {
       FIDO_LOG(ERROR) << "Wrapped PIN from security domain update is invalid: "
                       << base::HexEncode(base::as_bytes(
                              base::make_span(metadata.wrapped_pin)));
     }
-  }
-
-  if (action) {
-    pending_actions_.emplace_back(std::move(action));
-    Act();
   }
 
   return ret;
@@ -3142,7 +3072,7 @@ enclave::SigningCallback EnclaveManager::UserVerifyingKeySigningCallback(
               uv_signing_key->key().Sign(
                   message_to_be_signed,
                   base::BindOnce(
-                      [](std::string device_id,
+                      [](std::string device_id, const bool is_hardware_backed,
                          base::OnceCallback<void(
                              std::optional<enclave::ClientSignature>)>
                              result_callback,
@@ -3161,11 +3091,15 @@ enclave::SigningCallback EnclaveManager::UserVerifyingKeySigningCallback(
                         client_signature.signature =
                             std::move(maybe_signature.value());
                         client_signature.key_type =
-                            enclave::ClientKeyType::kUserVerified;
+                            is_hardware_backed
+                                ? enclave::ClientKeyType::kUserVerified
+                                : enclave::ClientKeyType::kSoftwareUserVerified;
                         std::move(result_callback)
                             .Run(std::move(client_signature));
                       },
-                      std::move(device_id), std::move(result_callback)));
+                      std::move(device_id),
+                      uv_signing_key->key().IsHardwareBacked(),
+                      std::move(result_callback)));
             },
             enclave_manager->user_->device_id(),
             std::move(message_to_be_signed), std::move(result_callback));

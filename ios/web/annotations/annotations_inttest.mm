@@ -261,12 +261,13 @@ class AnnotationTextManagerTest : public web::WebTestWithWebState {
   }
 
   // Simulates clicking on annotation at given `index`.
-  void ClickAnnotation(int index) {
+  void ClickAnnotation(int index, bool viewport = false) {
     const base::TimeDelta kCallJavascriptFunctionTimeout =
         kWaitForJSCompletionTimeout;
     __block bool message_received = false;
     base::Value::List params;
     params.Append(index);
+    params.Append(viewport);
     MainWebFrame()->CallJavaScriptFunctionInContentWorld(
         "annotationsTest.clickAnnotation", params, content_world_,
         base::BindOnce(^(const base::Value* result) {
@@ -592,6 +593,47 @@ TEST_F(AnnotationTextManagerViewportTest, DecorateText) {
             "</body></html>");
 }
 
+// Tests the if the original node is updated, the annotation is restored.
+TEST_F(AnnotationTextManagerViewportTest, UpdateDecoratedText) {
+  LoadHtmlAndExtractText("<html><body>"
+                         "<p>text</p>"
+                         "<p id='annotated'>annotation</p>"
+                         "<p>text</p>"
+                         "</body></html>");
+
+  // Simulate page accessing the DOM, so out of the content world.
+  ExecuteJavaScript(@"var annotated_element = "
+                    @"document.getElementById('annotated').childNodes[0];");
+
+  std::string text = "text "
+                     "annotation "
+                     "text ";
+  EXPECT_EQ(text, observer()->extracted_text());
+
+  // Create annotation.
+  NSString* source = base::SysUTF8ToNSString(text);
+  CreateAndApplyAnnotations(source, @[ @"annotation" ], observer() -> seq_id());
+
+  EXPECT_EQ(observer()->successes(), 1);
+  EXPECT_EQ(observer()->annotations(), 1);
+
+  // Check the resulting html is annotating at the right place.
+  CheckHtml("<html><body>"
+            "<p>text</p>"
+            "<p><chrome_annotation>annotation</chrome_annotation></p>"
+            "<p>text</p>"
+            "</body></html>");
+
+  // Simulate page accessing the DOM, so out of the content world.
+  ExecuteJavaScript(@"annotated_element.textContent = 'ANNOTATION';");
+  // Check the annotation disappeared so that the change is visible.
+  CheckHtml("<html><body>"
+            "<p>text</p>"
+            "<p>ANNOTATION</p>"
+            "<p>text</p>"
+            "</body></html>");
+}
+
 // Tests on no-decoration tags.
 TEST_F(AnnotationTextManagerNoViewportTest, NoDecorateText) {
   LoadHtmlAndExtractText("<html><body>"
@@ -656,7 +698,7 @@ TEST_F(AnnotationTextManagerNoViewportTest, DecorateTextCrossingElements) {
   CheckHtml(html);
 }
 
-// Tests different annotation cases, including tags boundaries.
+// Tests decoration across elements for addresses.
 // Covers: RemoveDecorations
 TEST_F(AnnotationTextManagerViewportTest, DecorateTextCrossingElements) {
   std::string html = "<html><body>"
@@ -669,8 +711,10 @@ TEST_F(AnnotationTextManagerViewportTest, DecorateTextCrossingElements) {
   LoadHtmlAndExtractText(html);
 
   NSString* source = base::SysUTF8ToNSString(observer()->extracted_text());
-  CreateAndApplyAnnotations(source, @[ @"a", @"c d", @"f ghi j", @"l mno " ],
-                            observer() -> seq_id());
+  CreateAndApplyAnnotationsWithTypes(
+      source,
+      @{@"address" : @[ @"a", @"c d", @"f ghi j", @"l mno " ]},
+      observer()->seq_id());
 
   // Check the resulting html is annotating at the right place.
   CheckHtml("<html><body>"
@@ -683,6 +727,35 @@ TEST_F(AnnotationTextManagerViewportTest, DecorateTextCrossingElements) {
             "chrome_annotation></p>"
             "<p><chrome_annotation>mno</chrome_annotation></p>"
             "</body></html>");
+
+  // Make sure it's back to the original.
+  auto* manager = AnnotationsTextManager::FromWebState(web_state());
+  manager->RemoveDecorations();
+  CheckHtml(html);
+}
+
+// Tests no decoration accross elements for other types.
+// Covers: RemoveDecorations
+TEST_F(AnnotationTextManagerViewportTest, DontDecorateTextCrossingElements) {
+  std::string html = "<html><body>"
+                     "<p>abc</p>"
+                     "<p>def</p>"
+                     "<p>ghi</p>"
+                     "<p>jkl</p>"
+                     "<p>mno</p>"
+                     "</body></html>";
+  LoadHtmlAndExtractText(html);
+
+  NSString* source = base::SysUTF8ToNSString(observer()->extracted_text());
+  CreateAndApplyAnnotationsWithTypes(
+      source,
+      @{@"phone" : @[ @"a", @"c d", @"f ghi j", @"l mno " ]},
+      observer()->seq_id());
+
+  // Check the resulting html is annotating at the right place.
+  CheckHtml("<html><body>"
+            "<p><chrome_annotation>a</chrome_annotation>"
+            "bc</p><p>def</p><p>ghi</p><p>jkl</p><p>mno</p></body></html>");
 
   // Make sure it's back to the original.
   auto* manager = AnnotationsTextManager::FromWebState(web_state());
@@ -725,8 +798,10 @@ TEST_F(AnnotationTextManagerViewportTest, DecorateTextBreakElements) {
 
   NSString* source = base::SysUTF8ToNSString(observer()->extracted_text());
   // ` ‡ ` is used as a section break to avoid cross section annotations.
-  CreateAndApplyAnnotations(source, @[ @"abc ‡ \ndef" ],
-                            observer() -> seq_id());
+  // Only address is allowed across elements.
+  CreateAndApplyAnnotationsWithTypes(
+      source,
+      @{@"address" : @[ @"abc ‡ \ndef" ]}, observer()->seq_id());
 
   // Check the resulting html is annotating at the right place.
   CheckHtml("<html><body>"
@@ -766,7 +841,7 @@ TEST_F(AnnotationTextManagerViewportTest, ClickAnnotation) {
                          "</body></html>");
   NSString* source = base::SysUTF8ToNSString(observer()->extracted_text());
   CreateAndApplyAnnotations(source, @[ @"annotation" ], observer() -> seq_id());
-  ClickAnnotation(0);
+  ClickAnnotation(0, true);
   ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^{
     return observer()->clicks() == 1;
   }));
@@ -869,31 +944,33 @@ TEST_F(AnnotationTextManagerViewportTest, RemoveDecorationTypeTest) {
 
   // Check the resulting html is annotating at the right place.
   CheckHtml("<html><body>"
-            "<p><chrome_annotation>abc</chrome_annotation> "
+            "<p><chrome_annotation>abc</chrome_annotation><span> </span>"
             "<chrome_annotation>def</chrome_annotation></p>"
-            "<p>zzzzz <chrome_annotation>ghi</chrome_annotation> zzzzz</p>"
-            "<p>zzzzz <chrome_annotation>klm</chrome_annotation> zzzzz</p>"
+            "<p>zzzzz<span> </span><chrome_annotation>ghi</chrome_annotation>"
+            " zzzzz</p>"
+            "<p>zzzzz<span> </span><chrome_annotation>klm</chrome_annotation>"
+            " zzzzz</p>"
             "</body></html>");
 
   CountAnnotation();
   ASSERT_EQ(observer()->annotations(), 4);
 
-  ClickAnnotation(0);
+  ClickAnnotation(0, true);
   ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^{
     return observer()->clicks() == 1;
   }));
 
-  ClickAnnotation(1);
+  ClickAnnotation(1, true);
   ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^{
     return observer()->clicks() == 2;
   }));
 
-  ClickAnnotation(2);
+  ClickAnnotation(2, true);
   ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^{
     return observer()->clicks() == 3;
   }));
 
-  ClickAnnotation(3);
+  ClickAnnotation(3, true);
   ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^{
     return observer()->clicks() == 4;
   }));
@@ -901,20 +978,21 @@ TEST_F(AnnotationTextManagerViewportTest, RemoveDecorationTypeTest) {
   manager->RemoveDecorationsWithType("type1");
   // Check the resulting html is annotating at the right place.
   CheckHtml("<html><body>"
-            "<p>abc <chrome_annotation>def</chrome_annotation></p>"
+            "<p>abc<span> </span><chrome_annotation>def</chrome_annotation></p>"
             "<p>zzzzz ghi zzzzz</p>"
-            "<p>zzzzz <chrome_annotation>klm</chrome_annotation> zzzzz</p>"
+            "<p>zzzzz<span> </span><chrome_annotation>klm</chrome_annotation> "
+            "zzzzz</p>"
             "</body></html>");
 
   CountAnnotation();
   ASSERT_EQ(observer()->annotations(), 2);
 
-  ClickAnnotation(0);
+  ClickAnnotation(0, true);
   ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^{
     return observer()->clicks() == 5;
   }));
 
-  ClickAnnotation(1);
+  ClickAnnotation(1, true);
   ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^{
     return observer()->clicks() == 6;
   }));
@@ -985,7 +1063,7 @@ TEST_F(AnnotationTextManagerViewportTest, NavigationClearsAnnotation) {
   CreateAndApplyAnnotationsWithTypes(
       source,
       @{@"type1" : @[ @"annotation" ]}, observer()->seq_id());
-  ClickAnnotation(0);
+  ClickAnnotation(0, true);
   ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^{
     return observer()->clicks() == 1;
   }));
@@ -1007,7 +1085,7 @@ TEST_F(AnnotationTextManagerViewportTest, NavigationClearsAnnotation) {
             "<p><chrome_annotation>blurb</chrome_annotation></p>"
             "<p>bla</p>"
             "</body></html>");
-  ClickAnnotation(0);
+  ClickAnnotation(0, true);
   ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^{
     return observer()->clicks() == 2;
   }));
@@ -1019,7 +1097,7 @@ TEST_F(AnnotationTextManagerViewportTest, NavigationClearsAnnotation) {
   CreateAndApplyAnnotationsWithTypes(
       source,
       @{@"type1" : @[ @"annotation" ]}, observer()->seq_id());
-  ClickAnnotation(0);
+  ClickAnnotation(0, true);
   ASSERT_TRUE(WaitUntilConditionOrTimeout(kWaitForJSCompletionTimeout, ^{
     return observer()->clicks() == 3;
   }));

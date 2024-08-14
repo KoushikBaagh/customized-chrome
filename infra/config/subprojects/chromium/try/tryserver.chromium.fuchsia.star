@@ -5,10 +5,10 @@
 
 load("//lib/branches.star", "branches")
 load("//lib/builder_config.star", "builder_config")
-load("//lib/builder_url.star", "linkify_builder")
 load("//lib/builders.star", "builders", "os", "siso")
 load("//lib/consoles.star", "consoles")
 load("//lib/gn_args.star", "gn_args")
+load("//lib/html.star", "linkify_builder")
 load("//lib/try.star", "try_")
 load("//project.star", "settings")
 
@@ -202,7 +202,7 @@ try_.orchestrator_builder(
         # crbug.com/940930
         "chromium.enable_cleandead": 100,
         # b/346598710
-        "chromium.luci_analysis_v2": 50,
+        "chromium.luci_analysis_v2": 100,
     },
     main_list_view = "try",
     tryjob = try_.job(),

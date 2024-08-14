@@ -17,7 +17,7 @@
 #import "components/password_manager/core/browser/password_manager_client.h"
 #import "components/password_manager/core/browser/ui/credential_ui_entry.h"
 #import "components/password_manager/core/browser/ui/saved_passwords_presenter.h"
-#import "components/sync/base/model_type.h"
+#import "components/sync/base/data_type.h"
 #import "components/sync/service/sync_service.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/form_fetcher_consumer_bridge.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_action_cell.h"
@@ -312,7 +312,8 @@ BOOL AreCredentialsAtIndicesConnected(
                     contentInjector:self
                         menuActions:menuActions
         cellIndexAccessibilityLabel:cellIndexAccessibilityLabel
-             showAutofillFormButton:_showAutofillFormButton];
+             showAutofillFormButton:_showAutofillFormButton
+             shouldReauthToAutofill:![self isFromAllPasswordsContext]];
     [items addObject:item];
   }
   return items;
@@ -456,7 +457,7 @@ BOOL AreCredentialsAtIndicesConnected(
 // Creates a UIAction to edit a password from a UIMenu.
 - (UIAction*)createMenuEditActionForPassword:(PasswordForm)password {
   MenuScenarioHistogram menuScenario =
-      self.isActionSectionEnabled
+      [self isFromAllPasswordsContext]
           ? kMenuScenarioHistogramAutofillManualFallbackAllPasswordsEntry
           : kMenuScenarioHistogramAutofillManualFallbackPasswordEntry;
   ActionFactory* actionFactory =
@@ -464,11 +465,25 @@ BOOL AreCredentialsAtIndicesConnected(
 
   __weak __typeof(self) weakSelf = self;
   UIAction* editAction = [actionFactory actionToEditWithBlock:^{
-    [weakSelf.navigator
-        openPasswordDetailsInEditModeForCredential:CredentialUIEntry(password)];
+    [weakSelf openPasswordDetailsInEditMode:CredentialUIEntry(password)];
   }];
 
   return editAction;
+}
+
+// Requests the appropriate delegate to open the details of the given credential
+// in edit mode.
+- (void)openPasswordDetailsInEditMode:(CredentialUIEntry)credential {
+  if ([self isFromAllPasswordsContext]) {
+    [self.delegate manualFillPasswordMediator:self
+        didTriggerOpenPasswordDetailsInEditMode:credential];
+  } else {
+    [self.navigator openPasswordDetailsInEditModeForCredential:credential];
+  }
+}
+
+- (BOOL)isFromAllPasswordsContext {
+  return !self.isActionSectionEnabled;
 }
 
 #pragma mark - Setters
@@ -518,9 +533,20 @@ BOOL AreCredentialsAtIndicesConnected(
                              requiresHTTPS:requiresHTTPS];
 }
 
+- (void)autofillFormWithCredential:(ManualFillCredential*)credential
+                      shouldReauth:(BOOL)shouldReauth {
+  [self.delegate manualFillPasswordMediatorWillInjectContent:self];
+  [self.contentInjector autofillFormWithCredential:credential
+                                      shouldReauth:shouldReauth];
+}
+
 - (void)autofillFormWithSuggestion:(FormSuggestion*)formSuggestion {
   [self.delegate manualFillPasswordMediatorWillInjectContent:self];
   [self.contentInjector autofillFormWithSuggestion:formSuggestion];
+}
+
+- (BOOL)isActiveFormAPasswordForm {
+  return [self.contentInjector isActiveFormAPasswordForm];
 }
 
 #pragma mark - TableViewFaviconDataSource

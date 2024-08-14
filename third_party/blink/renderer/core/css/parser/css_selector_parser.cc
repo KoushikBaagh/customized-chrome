@@ -1161,7 +1161,10 @@ bool IsPseudoClassValidAfterPseudoElement(
     case CSSSelector::kPseudoSearchText:
       return pseudo_class == CSSSelector::kPseudoCurrent;
     case CSSSelector::kPseudoScrollMarker:
-      return pseudo_class == CSSSelector::kPseudoFocus;
+      // TODO(crbug.com/40824273): User action pseudos should be allowed more
+      // generally after pseudo elements.
+      return pseudo_class == CSSSelector::kPseudoFocus ||
+             pseudo_class == CSSSelector::kPseudoChecked;
     default:
       return false;
   }
@@ -1916,13 +1919,15 @@ bool CSSSelectorParser::ConsumeNestingParent(CSSParserTokenStream& stream) {
 
   if (is_inside_has_argument_) {
     // In case that a nesting parent selector is inside a :has() pseudo class,
-    // mark the :has() containing a pseudo selector so that the StyleEngine can
-    // invalidate the anchor element of the :has() for a pseudo state change
-    // in the parent selector. (crbug.com/1517866)
-    // This ignores whether the nesting parent actually contains a pseudo to
-    // avoid nesting parent lookup overhead and the complexity caused by
-    // reparenting style rules.
+    // mark the :has() containing a pseudo selector and a complex selector
+    // so that the StyleEngine can invalidate the anchor element of the :has()
+    // for a pseudo state change (crbug.com/1517866) or a complex selector
+    // state change (crbug.com/350946979) in the parent selector.
+    // These ignore whether the nesting parent actually contains a pseudo or
+    // complex selector to avoid nesting parent lookup overhead and the
+    // complexity caused by reparenting style rules.
     found_pseudo_in_has_argument_ = true;
+    found_complex_logical_combinations_in_has_argument_ = true;
   }
 
   return true;
@@ -2025,6 +2030,10 @@ CSSSelector::AttributeMatchType CSSSelectorParser::ConsumeAttributeFlags(
 
 bool CSSSelectorParser::ConsumeANPlusB(CSSParserTokenStream& stream,
                                        std::pair<int, int>& result) {
+  if (stream.AtEnd()) {
+    return false;
+  }
+
   const CSSParserToken& token = stream.Consume();
   if (token.GetType() == kNumberToken &&
       token.GetNumericValueType() == kIntegerValueType) {
@@ -2107,7 +2116,7 @@ bool CSSSelectorParser::ConsumeANPlusB(CSSParserTokenStream& stream,
   result.second = ClampTo<int>(b.NumericValue());
   if (sign == kMinusSign) {
     // Negating minimum integer returns itself, instead return max integer.
-    if (UNLIKELY(result.second == std::numeric_limits<int>::min())) {
+    if (result.second == std::numeric_limits<int>::min()) [[unlikely]] {
       result.second = std::numeric_limits<int>::max();
     } else {
       result.second = -result.second;

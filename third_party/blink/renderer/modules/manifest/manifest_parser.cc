@@ -297,6 +297,7 @@ bool ManifestParser::Parse() {
     return false;
   }
 
+  manifest_->manifest_url = manifest_url_;
   manifest_->name = ParseName(root_object.get());
   manifest_->short_name = ParseShortName(root_object.get());
   manifest_->description = ParseDescription(root_object.get());
@@ -1439,7 +1440,7 @@ HashMap<String, Vector<String>> ManifestParser::ParseFileHandlerAccept(
     int extension_overflow =
         total_file_handler_extension_count_ - kExtensionLimit;
     if (extension_overflow > 0) {
-      auto* erase_iter = extensions.end() - extension_overflow;
+      auto erase_iter = extensions.end() - extension_overflow;
       AddErrorInfo(
           "property 'accept': too many total file extensions, ignoring "
           "extensions starting from \"" +

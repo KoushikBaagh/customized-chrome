@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 
+#include <algorithm>
 #include <iterator>
 #include <memory>
 #include <set>
@@ -335,9 +336,9 @@ bool DoesPredictionCorrespondToField(
 
 // Returns the first element of |fields| which corresponds to |prediction|, or
 // null if there is no such element.
-ProcessedField* FindField(std::vector<ProcessedField>* processed_fields,
+ProcessedField* FindField(std::vector<ProcessedField>& processed_fields,
                           const PasswordFieldPrediction& prediction) {
-  for (ProcessedField& processed_field : *processed_fields) {
+  for (ProcessedField& processed_field : processed_fields) {
     if (DoesPredictionCorrespondToField(*processed_field.field, prediction)) {
       return &processed_field;
     }
@@ -380,9 +381,17 @@ const FormFieldData* FindConfirmationPasswordField(
              : nullptr;
 }
 
+bool HasPasswordFieldsWithUserInput(
+    const std::vector<ProcessedField>& processed_fields) {
+  return base::ranges::any_of(
+      processed_fields, [](const ProcessedField& field) {
+        return field.is_password && !field.field->user_input().empty();
+      });
+}
+
 // Tries to parse |processed_fields| based on server |predictions|. Uses |mode|
 // to decide which of two username hints are relevant, if present.
-void ParseUsingPredictions(std::vector<ProcessedField>* processed_fields,
+void ParseUsingPredictions(std::vector<ProcessedField>& processed_fields,
                            const FormPredictions& predictions,
                            FormDataParser::Mode mode,
                            SignificantFields* result) {
@@ -479,10 +488,11 @@ void ParseUsingPredictions(std::vector<ProcessedField>* processed_fields,
 
   if (result->is_single_username) {
     if (mode == FormDataParser::Mode::kSaving &&
-        (result->password || result->new_password)) {
-      // Contradicting predictions were received: the form was predicted to be
-      // both a single username form and a password form. Prioritize saving
-      // the password.
+        HasPasswordFieldsWithUserInput(processed_fields)) {
+      // Saving is no-op for single username forms. Therefore, in saving mode in
+      // case of doubt (where the form contains password fields with user
+      // input), ignore the SINGLE_USERNAME prediction to allow saving the
+      // password value.
       result->username = nullptr;
       result->is_single_username = false;
     } else {
@@ -1078,10 +1088,12 @@ FormParsingResult::FormParsingResult() = default;
 FormParsingResult::FormParsingResult(
     std::unique_ptr<PasswordForm> password_form,
     UsernameDetectionMethod username_detection_method,
-    bool is_new_password_reliable)
+    bool is_new_password_reliable,
+    std::vector<autofill::FieldRendererId> suggestion_banned_fields)
     : password_form(std::move(password_form)),
       username_detection_method(username_detection_method),
-      is_new_password_reliable(is_new_password_reliable) {}
+      is_new_password_reliable(is_new_password_reliable),
+      suggestion_banned_fields(std::move(suggestion_banned_fields)) {}
 
 FormParsingResult::FormParsingResult(FormParsingResult&& other) = default;
 
@@ -1118,7 +1130,7 @@ FormParsingResult FormDataParser::ParseAndReturnParsingResult(
 
   // (1) First, try to parse with server predictions.
   if (predictions_) {
-    ParseUsingPredictions(&processed_fields, *predictions_, mode,
+    ParseUsingPredictions(processed_fields, *predictions_, mode,
                           &significant_fields);
     if (significant_fields.username) {
       method = UsernameDetectionMethod::kServerSidePrediction;
@@ -1128,9 +1140,19 @@ FormParsingResult FormDataParser::ParseAndReturnParsingResult(
   // Fields with server prediction `CREDIT_CARD_FIELD`, `CREDIT_CARD_NUMBER`,
   // `NOT_USERNAME`, and `NOT_PASSWORD` must not be considered in base
   // heuristics parsing or parsing using autocomplete attributes.
+  std::vector<autofill::FieldRendererId> suggestion_banned_fields;
+  for (const ProcessedField& field : processed_fields) {
+    if (field.server_hints_non_credential_field) {
+      suggestion_banned_fields.push_back(field.field->renderer_id());
+    }
+  }
   std::erase_if(processed_fields, [](ProcessedField field) {
     return field.server_hints_non_credential_field;
   });
+  // Server classified all fields as not related to credentials, early return.
+  if (processed_fields.empty()) {
+    return FormParsingResult();
+  }
 
   // (2) If that failed, try to parse with autocomplete attributes.
   if (!significant_fields.is_single_username) {
@@ -1230,7 +1252,7 @@ FormParsingResult FormDataParser::ParseAndReturnParsingResult(
       AssemblePasswordForm(form_data, significant_fields,
                            std::move(all_alternative_passwords),
                            std::move(all_alternative_usernames), predictions_),
-      method, is_new_password_reliable);
+      method, is_new_password_reliable, suggestion_banned_fields);
 }
 
 std::unique_ptr<PasswordForm> FormDataParser::Parse(

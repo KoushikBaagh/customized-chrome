@@ -1044,6 +1044,9 @@ protocol::Response InspectorCSSAgent::getLocationForSelector(
       if (selector->SelectorText() == selector_text) {
         const CSSRuleSourceData* source_data =
             style_sheet->SourceDataForRule(css_style_rule);
+        if (source_data == nullptr) {
+          continue;
+        }
         std::unique_ptr<protocol::CSS::SourceRange> range =
             style_sheet->BuildSourceRangeObject(source_data->rule_header_range);
 
@@ -1089,8 +1092,6 @@ protocol::Response InspectorCSSAgent::getMatchedStylesForNode(
         inherited_pseudo_id_matches,
     Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>*
         css_keyframes_rules,
-    Maybe<protocol::Array<protocol::CSS::CSSPositionFallbackRule>>*
-        css_position_fallback_rules,
     Maybe<protocol::Array<protocol::CSS::CSSPositionTryRule>>*
         css_position_try_rules,
     Maybe<int>* active_position_fallback_index,

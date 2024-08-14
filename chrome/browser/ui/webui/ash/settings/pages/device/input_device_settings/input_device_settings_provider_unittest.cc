@@ -41,7 +41,8 @@ const ::ash::mojom::Keyboard kKeyboard1 =
                            /*modifier_keys=*/{},
                            /*top_row_action_keys=*/{},
                            ::ash::mojom::KeyboardSettings::New(),
-                           ::ash::mojom::BatteryInfo::New());
+                           ::ash::mojom::BatteryInfo::New(),
+                           ::ash::mojom::CompanionAppInfo::New());
 const ::ash::mojom::Keyboard kKeyboard2 =
     ::ash::mojom::Keyboard(/*name=*/"Logitech K580",
                            /*is_external=*/true,
@@ -51,7 +52,8 @@ const ::ash::mojom::Keyboard kKeyboard2 =
                            /*modifier_keys=*/{},
                            /*top_row_action_keys=*/{},
                            ::ash::mojom::KeyboardSettings::New(),
-                           ::ash::mojom::BatteryInfo::New());
+                           ::ash::mojom::BatteryInfo::New(),
+                           ::ash::mojom::CompanionAppInfo::New());
 const ::ash::mojom::Keyboard kKeyboard3 =
     ::ash::mojom::Keyboard(/*name=*/"HP 910 White Bluetooth Keyboard",
                            /*is_external=*/true,
@@ -61,7 +63,8 @@ const ::ash::mojom::Keyboard kKeyboard3 =
                            /*modifier_keys=*/{},
                            /*top_row_action_keys=*/{},
                            ::ash::mojom::KeyboardSettings::New(),
-                           ::ash::mojom::BatteryInfo::New());
+                           ::ash::mojom::BatteryInfo::New(),
+                           ::ash::mojom::CompanionAppInfo::New());
 const ::ash::mojom::Touchpad kTouchpad1 =
     ::ash::mojom::Touchpad(/*name=*/"test touchpad",
                            /*is_external=*/false,
@@ -69,7 +72,8 @@ const ::ash::mojom::Touchpad kTouchpad1 =
                            /*device_key=*/"fake-device-key3",
                            /*is_haptic=*/true,
                            ::ash::mojom::TouchpadSettings::New(),
-                           ::ash::mojom::BatteryInfo::New());
+                           ::ash::mojom::BatteryInfo::New(),
+                           ::ash::mojom::CompanionAppInfo::New());
 const ::ash::mojom::Touchpad kTouchpad2 =
     ::ash::mojom::Touchpad(/*name=*/"Logitech T650",
                            /*is_external=*/true,
@@ -77,7 +81,8 @@ const ::ash::mojom::Touchpad kTouchpad2 =
                            /*device_key=*/"fake-device-key4",
                            /*is_haptic=*/false,
                            ::ash::mojom::TouchpadSettings::New(),
-                           ::ash::mojom::BatteryInfo::New());
+                           ::ash::mojom::BatteryInfo::New(),
+                           ::ash::mojom::CompanionAppInfo::New());
 const ::ash::mojom::PointingStick kPointingStick1 =
     ::ash::mojom::PointingStick(/*name=*/"test pointing stick",
                                 /*is_external=*/false,
@@ -121,7 +126,8 @@ const ::ash::mojom::GraphicsTablet kGraphicsTablet1 =
         ::ash::mojom::CustomizationRestriction::kAllowCustomizations,
         ::ash::mojom::GraphicsTabletButtonConfig::kNoConfig,
         ::ash::mojom::GraphicsTabletSettings::New(),
-        ::ash::mojom::BatteryInfo::New());
+        ::ash::mojom::BatteryInfo::New(),
+        ::ash::mojom::CompanionAppInfo::New());
 const ::ash::mojom::GraphicsTablet kGraphicsTablet2 =
     ::ash::mojom::GraphicsTablet(
         /*name=*/"Huion H1060P",
@@ -131,7 +137,8 @@ const ::ash::mojom::GraphicsTablet kGraphicsTablet2 =
         ::ash::mojom::CustomizationRestriction::kAllowCustomizations,
         ::ash::mojom::GraphicsTabletButtonConfig::kNoConfig,
         ::ash::mojom::GraphicsTabletSettings::New(),
-        ::ash::mojom::BatteryInfo::New());
+        ::ash::mojom::BatteryInfo::New(),
+        ::ash::mojom::CompanionAppInfo::New());
 
 template <bool sorted = false, typename T>
 void ExpectListsEqual(const std::vector<T>& expected_list,
@@ -333,6 +340,25 @@ class FakeKeyboardAmbientLightSensorObserver
   bool keyboard_ambient_light_sensor_enabled_ = true;
 };
 
+class FakeLidStateObserver : public mojom::LidStateObserver {
+ public:
+  // mojom::LidStateObserver:
+  void OnLidStateChanged(bool is_lid_open) override {
+    ++num_lid_state_change_calls_;
+    is_lid_open_ = is_lid_open;
+  }
+
+  bool is_lid_open() { return is_lid_open_; }
+
+  int num_lid_state_change_calls() const { return num_lid_state_change_calls_; }
+
+  mojo::Receiver<mojom::LidStateObserver> receiver{this};
+
+ private:
+  int num_lid_state_change_calls_ = 0;
+  bool is_lid_open_ = true;
+};
+
 class FakeKeyboardBrightnessControlDelegate
     : public KeyboardBrightnessControlDelegate {
  public:
@@ -354,7 +380,9 @@ class FakeKeyboardBrightnessControlDelegate
       base::OnceCallback<void(std::optional<double>)> callback) override {
     std::move(callback).Run(keyboard_brightness_);
   }
-  void HandleSetKeyboardAmbientLightSensorEnabled(bool enabled) override {
+  void HandleSetKeyboardAmbientLightSensorEnabled(
+      bool enabled,
+      KeyboardAmbientLightSensorEnabledChangeSource source) override {
     keyboard_ambient_light_sensor_enabled_ = enabled;
   }
   void HandleGetKeyboardAmbientLightSensorEnabled(
@@ -1151,6 +1179,30 @@ TEST_F(InputDeviceSettingsProviderTest, KeyboardBrightnessObserverTest) {
 
   EXPECT_EQ(expected_brightness, fake_observer.keyboard_brightness());
   EXPECT_EQ(2, fake_observer.num_times_called());
+}
+
+TEST_F(InputDeviceSettingsProviderTest, LidStateObserverTest) {
+  FakeLidStateObserver fake_observer;
+  base::test::TestFuture<bool> future;
+
+  // Attach a lid state observer.
+  provider_->ObserveLidState(fake_observer.receiver.BindNewPipeAndPassRemote(),
+                             future.GetCallback());
+  base::RunLoop().RunUntilIdle();
+
+  // Open the lid.
+  provider_->LidEventReceived(chromeos::PowerManagerClient::LidState::OPEN,
+                              /*timestamp=*/{});
+  base::RunLoop().RunUntilIdle();
+  ASSERT_TRUE(fake_observer.is_lid_open());
+  EXPECT_EQ(1, fake_observer.num_lid_state_change_calls());
+
+  // Close the lid.
+  provider_->LidEventReceived(chromeos::PowerManagerClient::LidState::CLOSED,
+                              /*timestamp=*/{});
+  base::RunLoop().RunUntilIdle();
+  ASSERT_FALSE(fake_observer.is_lid_open());
+  EXPECT_EQ(2, fake_observer.num_lid_state_change_calls());
 }
 
 TEST_F(InputDeviceSettingsProviderTest,

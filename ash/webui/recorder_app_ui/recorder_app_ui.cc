@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "ash/webui/recorder_app_ui/recorder_app_ui.h"
 
 #include "ash/constants/ash_features.h"
@@ -254,6 +259,21 @@ void RecorderAppUI::LoadModel(
   model_progress_receivers_.Add(this, std::move(progress_receiver), uuid);
 }
 
+void RecorderAppUI::FormatModelInput(
+    const base::Uuid& model_id,
+    on_device_model::mojom::FormatFeature feature,
+    const base::flat_map<std::string, std::string>& fields,
+    FormatModelInputCallback callback) {
+  EnsureOnDeviceModelService();
+
+  if (!on_device_model_service_) {
+    std::move(callback).Run(std::nullopt);
+  }
+
+  on_device_model_service_->FormatInput(model_id, feature, fields,
+                                        std::move(callback));
+}
+
 void RecorderAppUI::Progress(double progress) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
@@ -429,6 +449,14 @@ void RecorderAppUI::LoadSpeechRecognizer(
   config->api_key = google_apis::GetSodaAPIKey();
   config->language_dlc_path = soda_language_path.value();
   config->library_dlc_path = soda_library_path.value();
+  config->enable_formatting =
+      chromeos::machine_learning::mojom::OptionalBool::kTrue;
+  // This forces to use the large model.
+  config->recognition_mode =
+      chromeos::machine_learning::mojom::SodaRecognitionMode::kIme;
+  config->speaker_diarization_mode = chromeos::machine_learning::mojom::
+      SpeakerDiarizationMode::kSpeakerLabelDetection;
+  config->max_speaker_count = 7;
 
   GetMlService()->LoadSpeechRecognizer(
       std::move(config), std::move(soda_client), std::move(soda_recognizer),

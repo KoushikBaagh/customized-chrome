@@ -12,9 +12,11 @@
 #include "chrome/browser/ui/lens/lens_overlay_side_panel_web_view.h"
 #include "chrome/browser/ui/lens/lens_overlay_url_builder.h"
 #include "chrome/browser/ui/lens/lens_untrusted_ui.h"
+#include "chrome/browser/ui/tabs/public/tab_features.h"
 #include "chrome/browser/ui/tabs/public/tab_interface.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_content_proxy.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_entry.h"
+#include "chrome/browser/ui/views/side_panel/side_panel_enums.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_registry.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_ui.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_util.h"
@@ -85,8 +87,9 @@ LensOverlaySidePanelCoordinator::~LensOverlaySidePanelCoordinator() {
     side_panel_web_view_ = nullptr;
   }
 
-  auto* registry = SidePanelRegistry::Get(
-      lens_overlay_controller_->GetTabInterface()->GetContents());
+  auto* registry = lens_overlay_controller_->GetTabInterface()
+                       ->GetTabFeatures()
+                       ->side_panel_registry();
   CHECK(registry);
 
   // Remove the side panel entry observer if it is present.
@@ -106,6 +109,12 @@ void LensOverlaySidePanelCoordinator::RegisterEntryAndShow() {
   GetSidePanelUI(lens_overlay_controller_)
       ->Show(SidePanelEntry::Id::kLensOverlayResults);
   lens_overlay_controller_->NotifyResultsPanelOpened();
+}
+
+void LensOverlaySidePanelCoordinator::OnEntryWillHide(
+    SidePanelEntry* entry,
+    SidePanelEntryHideReason reason) {
+  lens_overlay_controller_->OnSidePanelWillHide(reason);
 }
 
 void LensOverlaySidePanelCoordinator::OnEntryHidden(SidePanelEntry* entry) {
@@ -256,8 +265,9 @@ void LensOverlaySidePanelCoordinator::OpenURLInBrowser(
 }
 
 void LensOverlaySidePanelCoordinator::RegisterEntry() {
-  auto* registry = SidePanelRegistry::Get(
-      lens_overlay_controller_->GetTabInterface()->GetContents());
+  auto* registry = lens_overlay_controller_->GetTabInterface()
+                       ->GetTabFeatures()
+                       ->side_panel_registry();
   CHECK(registry);
 
   // If the entry is already registered, don't register it again.

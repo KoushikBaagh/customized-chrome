@@ -8,6 +8,7 @@
 #import "components/saved_tab_groups/types.h"
 #import "ios/chrome/browser/shared/model/web_state_list/tab_group.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
+#import "ios/web/public/navigation/navigation_context.h"
 #import "ios/web/public/web_state.h"
 
 namespace tab_groups {
@@ -61,6 +62,20 @@ LocalTabInfo GetLocalTabInfo(WebStateList* web_state_list,
 void CloseTabGroupLocally(const TabGroup* tab_group,
                           WebStateList* web_state_list,
                           TabGroupSyncService* sync_service);
+
+// Moves tab group to the `destination_tab_group_index` in
+// `destination_browser`. It is an error to try to move a tab across profiles
+// (incognito <-> regular).
+void MoveTabGroupToBrowser(const TabGroup* tab_group,
+                           Browser* destination_browser,
+                           int destination_tab_group_index);
+
+// Whether a navigation should update history. Used from IsSaveableNavigation().
+bool ShouldUpdateHistory(web::NavigationContext* navigation_context);
+
+// Whether the destination URL from a NavigationContext can be saved and
+// can be reloaded later on another machine.
+bool IsSaveableNavigation(web::NavigationContext* navigation_context);
 
 }  // namespace utils
 }  // namespace tab_groups

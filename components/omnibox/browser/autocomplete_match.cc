@@ -64,19 +64,6 @@ constexpr bool kIsAndroid = BUILDFLAG(IS_ANDROID);
 
 namespace {
 
-bool IsMatchTypeUrlScoringEligible(const AutocompleteMatch* match) {
-  const std::vector<AutocompleteMatchType::Type> ml_scoring_ineligible_types{
-      AutocompleteMatchType::URL_WHAT_YOU_TYPED,
-      AutocompleteMatchType::NAVSUGGEST,
-      AutocompleteMatchType::NAVSUGGEST_PERSONALIZED,
-      AutocompleteMatchType::TILE_NAVSUGGEST};
-
-  return std::find(ml_scoring_ineligible_types.begin(),
-                   ml_scoring_ineligible_types.end(),
-                   match->type) == ml_scoring_ineligible_types.end() &&
-         !AutocompleteMatch::IsSearchType(match->type);
-}
-
 #if (!BUILDFLAG(IS_ANDROID) || BUILDFLAG(ENABLE_VR)) && !BUILDFLAG(IS_IOS)
 // Used for `SEARCH_SUGGEST_TAIL` and `NULL_RESULT_MESSAGE` (e.g. starter pack)
 // type suggestion icons.
@@ -244,17 +231,6 @@ void RichAutocompletionParams::ClearParamsForTesting() {
 // AutocompleteMatch ----------------------------------------------------------
 
 // static
-const char* const AutocompleteMatch::kDocumentTypeStrings[]{
-    "none",        "drive_docs", "drive_forms", "drive_sheets", "drive_slides",
-    "drive_image", "drive_pdf",  "drive_video", "drive_folder", "drive_other"};
-
-static_assert(
-    std::size(AutocompleteMatch::kDocumentTypeStrings) ==
-        static_cast<int>(AutocompleteMatch::DocumentType::DOCUMENT_TYPE_SIZE),
-    "Sizes of AutocompleteMatch::kDocumentTypeStrings and "
-    "AutocompleteMatch::DocumentType don't match.");
-
-// static
 const char* AutocompleteMatch::DocumentTypeString(DocumentType type) {
   return kDocumentTypeStrings[static_cast<int>(type)];
 }
@@ -354,7 +330,11 @@ AutocompleteMatch::AutocompleteMatch(const AutocompleteMatch& match)
       suggest_tiles(match.suggest_tiles),
       scoring_signals(match.scoring_signals),
       culled_by_provider(match.culled_by_provider),
-      shortcut_boosted(match.shortcut_boosted) {}
+      shortcut_boosted(match.shortcut_boosted),
+      iph_type(match.iph_type),
+      iph_link_text(match.iph_link_text),
+      iph_link_url(match.iph_link_url),
+      feedback_type(match.feedback_type) {}
 
 AutocompleteMatch::AutocompleteMatch(AutocompleteMatch&& match) noexcept {
   *this = std::move(match);
@@ -415,6 +395,10 @@ AutocompleteMatch& AutocompleteMatch::operator=(
   scoring_signals = std::move(match.scoring_signals);
   culled_by_provider = std::move(match.culled_by_provider);
   shortcut_boosted = std::move(match.shortcut_boosted);
+  iph_type = std::move(match.iph_type);
+  iph_link_text = std::move(match.iph_link_text);
+  iph_link_url = std::move(match.iph_link_url);
+  feedback_type = std::move(match.feedback_type);
 #if BUILDFLAG(IS_ANDROID)
   DestroyJavaObject();
   std::swap(java_match_, match.java_match_);
@@ -493,6 +477,10 @@ AutocompleteMatch& AutocompleteMatch::operator=(
   scoring_signals = match.scoring_signals;
   culled_by_provider = match.culled_by_provider;
   shortcut_boosted = match.shortcut_boosted;
+  iph_type = match.iph_type;
+  iph_link_text = match.iph_link_text;
+  iph_link_url = match.iph_link_url;
+  feedback_type = match.feedback_type;
 
 #if BUILDFLAG(IS_ANDROID)
   // In case the target element previously held a java object, release it.
@@ -534,11 +522,8 @@ const gfx::VectorIcon& AutocompleteMatch::GetVectorIcon(
     const TemplateURL* turl) const {
   if (is_bookmark)
     return omnibox::kBookmarkChromeRefreshIcon;
-  if (omnibox_feature_configs::SuggestionAnswerMigration::Get().enabled &&
-      answer_template.has_value()) {
+  if (answer_type != omnibox::ANSWER_TYPE_UNSPECIFIED) {
     return AnswerTypeToAnswerIcon(answer_type);
-  } else if (answer.has_value()) {
-    return AnswerTypeToAnswerIcon(answer->type());
   }
 
   switch (type) {
@@ -561,19 +546,14 @@ const gfx::VectorIcon& AutocompleteMatch::GetVectorIcon(
     case Type::FEATURED_ENTERPRISE_SEARCH:
       return omnibox::kPageChromeRefreshIcon;
 
-    case Type::SEARCH_SUGGEST: {
-      if (IsTrendSuggestion()) {
-        return omnibox::kTrendingUpChromeRefreshIcon;
-      }
-      return vector_icons::kSearchChromeRefreshIcon;
-    }
+    case Type::SEARCH_SUGGEST:
+      return IsTrendSuggestion() ? omnibox::kTrendingUpChromeRefreshIcon
+                                 : vector_icons::kSearchChromeRefreshIcon;
 
-    case Type::PEDAL: {
-      if (takeover_action) {
-        return takeover_action->GetVectorIcon();
-      }
-      ABSL_FALLTHROUGH_INTENDED;
-    }
+    case Type::PEDAL:
+      return takeover_action ? takeover_action->GetVectorIcon()
+                             : vector_icons::kSearchChromeRefreshIcon;
+
     case Type::SEARCH_WHAT_YOU_TYPED:
     case Type::SEARCH_SUGGEST_ENTITY:
     case Type::SEARCH_SUGGEST_PROFILE:
@@ -587,10 +567,9 @@ const gfx::VectorIcon& AutocompleteMatch::GetVectorIcon(
       return vector_icons::kSearchChromeRefreshIcon;
 
     case Type::SEARCH_HISTORY:
-    case Type::SEARCH_SUGGEST_PERSONALIZED: {
+    case Type::SEARCH_SUGGEST_PERSONALIZED:
       DCHECK(IsSearchHistoryType(type));
       return vector_icons::kHistoryChromeRefreshIcon;
-    }
 
     case Type::EXTENSION_APP_DEPRECATED:
       return omnibox::kExtensionAppIcon;
@@ -599,19 +578,24 @@ const gfx::VectorIcon& AutocompleteMatch::GetVectorIcon(
       return omnibox::kCalculatorChromeRefreshIcon;
 
     case Type::NULL_RESULT_MESSAGE:
-#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
       // Select the icon according to the type of IPH. Otherwise (for No Results
       // Found), fallthrough to use the empty icon.
-      if (IsIPHSuggestion()) {
-        switch (FeaturedSearchProvider::GetIPHType(*this)) {
-          case FeaturedSearchProvider::IPHType::kGemini:
-            return omnibox::kSparkIcon;
-          case FeaturedSearchProvider::IPHType::kFeaturedEnterpriseSearch:
-            return omnibox::kEnterpriseIcon;
-        }
+      switch (iph_type) {
+        case IphType::kNone:
+          return empty_icon;
+        case IphType::kGemini:
+          return omnibox::kSparkIcon;
+        case IphType::kFeaturedEnterpriseSearch:
+          return omnibox::kEnterpriseIcon;
+        case IphType::kHistoryEmbeddingsSettingsPromo:
+          return omnibox::kSparkIcon;
+        case IphType::kHistoryEmbeddingsDisclaimer:
+          return empty_icon;
+        case IphType::kHistoryScopePromo:
+          return vector_icons::kHistoryChromeRefreshIcon;
+        case IphType::kHistoryEmbeddingsScopePromo:
+          return omnibox::kSparkIcon;
       }
-#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
-      ABSL_FALLTHROUGH_INTENDED;
 
     case Type::SEARCH_SUGGEST_TAIL:
       return empty_icon;
@@ -1278,7 +1262,7 @@ void AutocompleteMatch::RecordAdditionalInfo(const std::string& property,
                                    (base::Time::Now() - value).InHours()));
 }
 
-std::string AutocompleteMatch::GetAdditionalInfo(
+std::string AutocompleteMatch::GetAdditionalInfoForDebugging(
     const std::string& property) const {
   auto i(additional_info.find(property));
   return (i == additional_info.end()) ? std::string() : i->second;
@@ -1418,6 +1402,13 @@ bool AutocompleteMatch::IsVerbatimType() const {
          is_keyword_verbatim_match;
 }
 
+bool AutocompleteMatch::IsVerbatimUrlSuggestion() const {
+  return type == AutocompleteMatchType::URL_WHAT_YOU_TYPED ||
+         base::ranges::any_of(duplicate_matches, [](const auto& match) {
+           return match.type == AutocompleteMatchType::URL_WHAT_YOU_TYPED;
+         });
+}
+
 bool AutocompleteMatch::IsSearchProviderSearchSuggestion() const {
   const bool from_search_provider =
       (provider && provider->type() == AutocompleteProvider::TYPE_SEARCH);
@@ -1465,12 +1456,69 @@ int AutocompleteMatch::GetSortingOrder() const {
       shortcut_boosted) {
     return 2;
   }
+  if (IsIPHSuggestion())
+    return 5;
   return 4;
 }
 
-bool AutocompleteMatch::IsUrlScoringEligible() const {
-  return scoring_signals.has_value() && IsMatchTypeUrlScoringEligible(this) &&
-         !force_skip_ml_scoring;
+bool AutocompleteMatch::IsMlSignalLoggingEligible() const {
+  const auto& ml_config = OmniboxFieldTrial::GetMLConfig();
+  return type == AutocompleteMatchType::URL_WHAT_YOU_TYPED ||
+         type == AutocompleteMatchType::HISTORY_URL ||
+         type == AutocompleteMatchType::HISTORY_TITLE ||
+         type == AutocompleteMatchType::BOOKMARK_TITLE ||
+         type == AutocompleteMatchType::NAVSUGGEST ||
+         type == AutocompleteMatchType::NAVSUGGEST_PERSONALIZED ||
+         type == AutocompleteMatchType::TILE_NAVSUGGEST ||
+         (ml_config.shortcut_document_signals &&
+          type == AutocompleteMatchType::DOCUMENT_SUGGESTION) ||
+         AutocompleteMatch::IsSearchType(type) ||
+         AutocompleteMatch::IsVerbatimType();
+}
+
+bool AutocompleteMatch::IsMlScoringEligible() const {
+  if (!scoring_signals.has_value()) {
+    return false;
+  }
+  const auto& ml_config = OmniboxFieldTrial::GetMLConfig();
+
+  // Search suggestions are conditionally eligible for ML scoring.
+  if (AutocompleteMatch::IsSearchType(type)) {
+    return ml_config.enable_ml_scoring_for_searches;
+  }
+
+  // Verbatim URL suggestions are conditionally eligible for ML scoring.
+  // A "verbatim URL" suggestion is any suggestion that is UWYT itself or has
+  // been deduped with a UWYT suggestion.
+  if (AutocompleteMatch::IsVerbatimUrlSuggestion()) {
+    return ml_config.enable_ml_scoring_for_verbatim_urls;
+  }
+
+  // Certain suggestion types are manually excluded from ML scoring (since
+  // applying ML scoring to these suggestions currently results in suboptimal
+  // behavior).
+  if (type == AutocompleteMatchType::NAVSUGGEST ||
+      type == AutocompleteMatchType::NAVSUGGEST_PERSONALIZED ||
+      type == AutocompleteMatchType::TILE_NAVSUGGEST) {
+    return false;
+  }
+
+  // Do not apply ML scoring to stale suggestions sourced from the
+  // DocumentProvider cache.
+  if (type == AutocompleteMatchType::DOCUMENT_SUGGESTION && relevance == 0) {
+    return false;
+  }
+
+  // If any of the duplicates under this match are ineligible for ML scoring,
+  // then the top-level match (this) is also considered ineligible for ML
+  // scoring.
+  if (base::ranges::any_of(duplicate_matches, [](const auto& match) {
+        return !match.IsMlScoringEligible();
+      })) {
+    return false;
+  }
+
+  return true;
 }
 
 bool AutocompleteMatch::IsTrendSuggestion() const {
@@ -1478,13 +1526,7 @@ bool AutocompleteMatch::IsTrendSuggestion() const {
 }
 
 bool AutocompleteMatch::IsIPHSuggestion() const {
-  if (!OmniboxFieldTrial::IsFeaturedSearchIPHEnabled()) {
-    return false;
-  }
-
-  return type == AutocompleteMatchType::NULL_RESULT_MESSAGE &&
-         (provider &&
-          provider->type() == AutocompleteProvider::TYPE_FEATURED_SEARCH);
+  return iph_type != IphType::kNone;
 }
 
 void AutocompleteMatch::FilterOmniboxActions(
@@ -1693,8 +1735,11 @@ void AutocompleteMatch::UpgradeMatchWithPropertiesFrom(
   from_previous = from_previous && duplicate_match.from_previous;
 
   // Absorb the `actions` and `takeover_action` so they won't be buried.
+  // Don't absorb answer actions; they should always be created fresh.
   if (actions.empty() && !duplicate_match.actions.empty() &&
-      IsActionCompatible()) {
+      IsActionCompatible() &&
+      OmniboxAnswerAction::FromAction(duplicate_match.actions[0].get()) ==
+          nullptr) {
     actions = std::move(duplicate_match.actions);
     takeover_action = std::move(duplicate_match.takeover_action);
   }
@@ -1722,20 +1767,9 @@ void AutocompleteMatch::UpgradeMatchWithPropertiesFrom(
         duplicate_match.rich_autocompletion_triggered;
   }
 
-  // If either one of the matches is ineligible for ML scoring, then ensure that
-  // the final match is marked as ineligible for ML scoring. Search suggestions
-  // are guaranteed to be excluded from ML scoring at this time, so there's no
-  // need to set `force_skip_ml_scoring` for those matches.
-  if (base::FeatureList::IsEnabled(omnibox::kEnableForceSkipMlScoring) &&
-      (!IsUrlScoringEligible() || !duplicate_match.IsUrlScoringEligible()) &&
-      !AutocompleteMatch::IsSearchType(type)) {
-    force_skip_ml_scoring = true;
-    RecordAdditionalInfo("force skip ml scoring", "true");
-  }
-
-  // Merge scoring signals from duplicate match for ML model scoring and
-  // training.
-  if (OmniboxFieldTrial::IsPopulatingUrlScoringSignalsEnabled()) {
+  // Merge ML scoring signals from duplicate match when appropriate.
+  if (OmniboxFieldTrial::IsPopulatingUrlScoringSignalsEnabled() &&
+      IsMlSignalLoggingEligible()) {
     MergeScoringSignals(duplicate_match);
   }
 }
@@ -1743,13 +1777,15 @@ void AutocompleteMatch::UpgradeMatchWithPropertiesFrom(
 void AutocompleteMatch::MergeScoringSignals(const AutocompleteMatch& other) {
   // Keep consistent:
   // - omnibox_event.proto `ScoringSignals`
+  // - omnibox_scoring_signals.proto `OmniboxScoringSignals`
   // - autocomplete_scoring_model_handler.cc
   //   `AutocompleteScoringModelHandler::ExtractInputFromScoringSignals()`
   // - autocomplete_match.cc `AutocompleteMatch::MergeScoringSignals()`
   // - autocomplete_controller.cc `RecordScoringSignalCoverageForProvider()`
+  // - omnibox_metrics_provider.cc `GetScoringSignalsForLogging()`
   // - omnibox.mojom `struct Signals`
-  // - omnibox_page_handler.cc `TypeConverter<AutocompleteMatch::ScoringSignals,
-  //   mojom::SignalsPtr>`
+  // - omnibox_page_handler.cc
+  //   `TypeConverter<AutocompleteMatch::ScoringSignals, mojom::SignalsPtr>`
   // - omnibox_page_handler.cc `TypeConverter<mojom::SignalsPtr,
   //   AutocompleteMatch::ScoringSignals>`
   // - omnibox_util.ts `signalNames`
@@ -1765,9 +1801,10 @@ void AutocompleteMatch::MergeScoringSignals(const AutocompleteMatch& other) {
   const char kACMatchPropertyScoringSignalsMerged[] = "Scoring signals merged";
   RecordAdditionalInfo(
       kACMatchPropertyScoringSignalsMerged,
-      GetAdditionalInfo(kACMatchPropertyScoringSignalsMerged) +
+      GetAdditionalInfoForDebugging(kACMatchPropertyScoringSignalsMerged) +
           AutocompleteMatchType::ToString(other.type) + ", " +
-          other.GetAdditionalInfo(kACMatchPropertyScoringSignalsMerged));
+          other.GetAdditionalInfoForDebugging(
+              kACMatchPropertyScoringSignalsMerged));
 
   if (!scoring_signals.has_value()) {
     scoring_signals = std::make_optional<ScoringSignals>();
@@ -1974,6 +2011,39 @@ void AutocompleteMatch::MergeScoringSignals(const AutocompleteMatch& other) {
     scoring_signals->set_is_search_suggest_entity(
         scoring_signals->is_search_suggest_entity() ||
         other.scoring_signals->is_search_suggest_entity());
+  }
+
+  // Take the OR result.
+  if (other.scoring_signals->has_is_verbatim()) {
+    scoring_signals->set_is_verbatim(scoring_signals->is_verbatim() ||
+                                     other.scoring_signals->is_verbatim());
+  }
+
+  // Take the OR result.
+  if (other.scoring_signals->has_is_navsuggest()) {
+    scoring_signals->set_is_navsuggest(scoring_signals->is_navsuggest() ||
+                                       other.scoring_signals->is_navsuggest());
+  }
+
+  // Take the OR result.
+  if (other.scoring_signals->has_is_search_suggest_tail()) {
+    scoring_signals->set_is_search_suggest_tail(
+        scoring_signals->is_search_suggest_tail() ||
+        other.scoring_signals->is_search_suggest_tail());
+  }
+
+  // Take the OR result.
+  if (other.scoring_signals->has_is_answer_suggest()) {
+    scoring_signals->set_is_answer_suggest(
+        scoring_signals->is_answer_suggest() ||
+        other.scoring_signals->is_answer_suggest());
+  }
+
+  // Take the OR result.
+  if (other.scoring_signals->has_is_calculator_suggest()) {
+    scoring_signals->set_is_calculator_suggest(
+        scoring_signals->is_calculator_suggest() ||
+        other.scoring_signals->is_calculator_suggest());
   }
 }
 

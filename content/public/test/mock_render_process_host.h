@@ -130,9 +130,11 @@ class MockRenderProcessHost : public RenderProcessHost {
       RenderProcessHostPriorityClient* priority_client) override;
   void RemovePriorityClient(
       RenderProcessHostPriorityClient* priority_client) override;
-  void SetPriorityOverride(bool foreground) override;
+#if !BUILDFLAG(IS_ANDROID)
+  void SetPriorityOverride(base::Process::Priority priority) override;
   bool HasPriorityOverride() override;
   void ClearPriorityOverride() override;
+#endif
 #if BUILDFLAG(IS_ANDROID)
   ChildProcessImportance GetEffectiveImportance() override;
   base::android::ChildBindingState GetEffectiveChildBindingState() override;
@@ -158,7 +160,7 @@ class MockRenderProcessHost : public RenderProcessHost {
   std::unique_ptr<base::PersistentMemoryAllocator> TakeMetricsAllocator()
       override;
   const base::TimeTicks& GetLastInitTime() override;
-  bool IsProcessBackgrounded() override;
+  base::Process::Priority GetPriority() override;
   size_t GetWorkerRefCount() const;
   std::string GetKeepAliveDurations() const override;
   size_t GetShutdownDelayRefCount() const override;
@@ -167,9 +169,11 @@ class MockRenderProcessHost : public RenderProcessHost {
   void ForEachRenderFrameHost(
       base::FunctionRef<void(RenderFrameHost*)> on_render_frame_host) override;
   void RegisterRenderFrameHost(
-      const GlobalRenderFrameHostId& render_frame_host_id) override;
+      const GlobalRenderFrameHostId& render_frame_host_id,
+      bool is_outermost_main_frame) override;
   void UnregisterRenderFrameHost(
-      const GlobalRenderFrameHostId& render_frame_host_id) override;
+      const GlobalRenderFrameHostId& render_frame_host_id,
+      bool is_outermost_main_frame) override;
   void IncrementWorkerRefCount() override;
   void DecrementWorkerRefCount() override;
   void IncrementPendingReuseRefCount() override;
@@ -278,6 +282,7 @@ class MockRenderProcessHost : public RenderProcessHost {
 #endif
 
   void SetBatterySaverMode(bool battery_saver_mode_enabled) override {}
+  uint64_t GetPrivateMemoryFootprint() override;
 
   void PauseSocketManagerForRenderFrameHost(
       const GlobalRenderFrameHostId& render_frame_host_id) override {}
@@ -291,9 +296,7 @@ class MockRenderProcessHost : public RenderProcessHost {
   bool OnMessageReceived(const IPC::Message& msg) override;
   void OnChannelConnected(int32_t peer_pid) override;
 
-  void set_is_process_backgrounded(bool is_process_backgrounded) {
-    is_process_backgrounded_ = is_process_backgrounded;
-  }
+  void set_priority(base::Process::Priority priority) { priority_ = priority; }
 
   void SetProcess(base::Process&& new_process) {
     process = std::move(new_process);
@@ -334,7 +337,7 @@ class MockRenderProcessHost : public RenderProcessHost {
   bool delayed_cleanup_ = false;
   bool deletion_callback_called_;
   bool is_for_guests_only_;
-  bool is_process_backgrounded_;
+  base::Process::Priority priority_;
   bool is_unused_;
   bool is_ready_ = false;
   base::Process process;

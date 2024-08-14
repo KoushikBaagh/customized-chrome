@@ -56,6 +56,7 @@
 #include "third_party/blink/renderer/modules/webtransport/web_transport_error.h"
 #include "third_party/blink/renderer/platform/bindings/exception_code.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
+#include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/heap/persistent.h"
 #include "third_party/blink/renderer/platform/testing/task_environment.h"
 #include "third_party/blink/renderer/platform/testing/unit_test_helpers.h"
@@ -661,10 +662,11 @@ TEST_F(WebTransportTest, CloseAfterConnection) {
   ScriptPromiseTester closed_tester(
       scope.GetScriptState(), web_transport->closed(scope.GetScriptState()));
 
-  WebTransportCloseInfo close_info;
-  close_info.setCloseCode(42);
-  close_info.setReason("because");
-  web_transport->close(&close_info);
+  WebTransportCloseInfo* close_info =
+      MakeGarbageCollected<WebTransportCloseInfo>();
+  close_info->setCloseCode(42);
+  close_info->setReason("because");
+  web_transport->close(close_info);
 
   test::RunPendingTasks();
 
@@ -711,9 +713,10 @@ TEST_F(WebTransportTest, CloseWithReasonOnly) {
   ScriptPromiseTester closed_tester(
       scope.GetScriptState(), web_transport->closed(scope.GetScriptState()));
 
-  WebTransportCloseInfo close_info;
-  close_info.setReason("because");
-  web_transport->close(&close_info);
+  WebTransportCloseInfo* close_info =
+      MakeGarbageCollected<WebTransportCloseInfo>();
+  close_info->setReason("because");
+  web_transport->close(close_info);
 
   test::RunPendingTasks();
 }
@@ -1972,6 +1975,21 @@ TEST_F(WebTransportTest, OnClosed) {
   EXPECT_TRUE(close_info->hasReason());
   EXPECT_EQ(close_info->closeCode(), 99u);
   EXPECT_EQ(close_info->reason(), "reason");
+}
+
+// Regression test for https://crbug.com/347710668.
+TEST_F(WebTransportTest, ClosedAccessorCalledAfterOnClosed) {
+  V8TestingScope scope;
+
+  auto* web_transport =
+      CreateAndConnectSuccessfully(scope, "https://example.com");
+
+  web_transport->OnClosed(
+      network::mojom::blink::WebTransportCloseInfo::New(99, "reason"),
+      network::mojom::blink::WebTransportStats::New());
+
+  // If this doesn't crash then the test passed.
+  EXPECT_FALSE(web_transport->closed(scope.GetScriptState()).IsEmpty());
 }
 
 TEST_F(WebTransportTest, OnClosedWithNull) {

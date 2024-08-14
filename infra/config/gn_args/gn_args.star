@@ -236,6 +236,13 @@ gn_args.config(
 )
 
 gn_args.config(
+    name = "cast_os",
+    args = {
+        "is_castos": True,
+    },
+)
+
+gn_args.config(
     name = "cast_receiver",
     args = {
         "enable_cast_receiver": True,
@@ -814,6 +821,13 @@ gn_args.config(
         "ozone_platform_wayland": True,
         "ozone_platform": "wayland",
         "use_bundled_weston": True,
+    },
+)
+
+gn_args.config(
+    name = "lld",
+    args = {
+        "use_lld": True,
     },
 )
 

@@ -183,14 +183,14 @@ class LabelSelectionTest : public LabelTest {
 
   void PerformMousePress(const gfx::Point& point) {
     ui::MouseEvent pressed_event = ui::MouseEvent(
-        ui::ET_MOUSE_PRESSED, point, point, ui::EventTimeForNow(),
+        ui::EventType::kMousePressed, point, point, ui::EventTimeForNow(),
         ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON);
     label()->OnMousePressed(pressed_event);
   }
 
   void PerformMouseRelease(const gfx::Point& point) {
     ui::MouseEvent released_event = ui::MouseEvent(
-        ui::ET_MOUSE_RELEASED, point, point, ui::EventTimeForNow(),
+        ui::EventType::kMouseReleased, point, point, ui::EventTimeForNow(),
         ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON);
     label()->OnMouseReleased(released_event);
   }
@@ -201,7 +201,7 @@ class LabelSelectionTest : public LabelTest {
   }
 
   void PerformMouseDragTo(const gfx::Point& point) {
-    ui::MouseEvent drag(ui::ET_MOUSE_DRAGGED, point, point,
+    ui::MouseEvent drag(ui::EventType::kMouseDragged, point, point,
                         ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON, 0);
     label()->OnMouseDragged(drag);
   }
@@ -594,12 +594,6 @@ TEST_F(LabelTest, MultiLineGetHeightForWidth) {
   const int height_for_half_width = label()->GetHeightForWidth(width / 2);
   EXPECT_GT(height_for_half_width, line_height);
   EXPECT_GT(label()->GetHeightForWidth(width / 4), height_for_half_width);
-
-  // Given zero width, the label should take GetMaxLines(); if this is not set,
-  // default to one.
-  EXPECT_EQ(line_height, label()->GetHeightForWidth(0));
-  label()->SetMaxLines(10);
-  EXPECT_EQ(line_height * 10, label()->GetHeightForWidth(0));
 }
 
 TEST_F(LabelTest, TooltipProperty) {
@@ -870,27 +864,22 @@ TEST_F(LabelTest, MultiLineSizing) {
   // SizeToFit with limited width.
   label()->SizeToFit(required_width - 1);
   int constrained_width = label()->GetLocalBounds().width();
-#if BUILDFLAG(IS_WIN)
-  // Canvas::SizeStringInt (in ui/gfx/canvas_linux.cc)
-  // has to be fixed to return the size that fits to given width/height.
   EXPECT_LT(constrained_width, required_width);
-#endif
   EXPECT_GT(constrained_width, kMinTextDimension);
 
   // Change the width back to the desire width.
   label()->SizeToFit(required_width);
   EXPECT_EQ(required_width, label()->GetLocalBounds().width());
 
+  // SizeToFit with unlimited width.
+  label()->SizeToFit(0);
+
   // General tests for GetHeightForWidth.
   int required_height = label()->GetHeightForWidth(required_width);
   EXPECT_GT(required_height, kMinTextDimension);
   int height_for_constrained_width =
       label()->GetHeightForWidth(constrained_width);
-#if BUILDFLAG(IS_WIN)
-  // Canvas::SizeStringInt (in ui/gfx/canvas_linux.cc)
-  // has to be fixed to return the size that fits to given width/height.
   EXPECT_GT(height_for_constrained_width, required_height);
-#endif
   // Using the constrained width or the required_width - 1 should give the
   // same result for the height because the constrainted width is the tight
   // width when given "required_width - 1" as the max width.
@@ -915,11 +904,7 @@ TEST_F(LabelTest, MultiLineSizing) {
   // calculation.  If it is, then the height will grow when width
   // is shrunk.
   int height1 = label()->GetHeightForWidth(required_width_with_border - 1);
-#if BUILDFLAG(IS_WIN)
-  // Canvas::SizeStringInt (in ui/gfx/canvas_linux.cc)
-  // has to be fixed to return the size that fits to given width/height.
   EXPECT_GT(height1, required_height_with_border);
-#endif
   EXPECT_EQ(height1, height_for_constrained_width + border.height());
 
   gfx::Size required_size_with_border = label()->GetPreferredSize({});

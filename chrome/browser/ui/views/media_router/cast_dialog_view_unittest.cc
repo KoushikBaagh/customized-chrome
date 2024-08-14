@@ -101,7 +101,7 @@ CastDialogModel CreateModelWithSinks(std::vector<UIMediaSink> sinks) {
 }
 
 ui::MouseEvent CreateMouseEvent() {
-  return ui::MouseEvent(ui::ET_MOUSE_PRESSED, gfx::Point(0, 0),
+  return ui::MouseEvent(ui::EventType::kMousePressed, gfx::Point(0, 0),
                         gfx::Point(0, 0), ui::EventTimeForNow(), 0, 0);
 }
 
@@ -173,7 +173,7 @@ class CastDialogViewTest : public ChromeViewsTestBase {
   }
 
   void NotifyButtonOfClick(views::Button* button) {
-    ui::MouseEvent mouse_event(ui::ET_MOUSE_PRESSED, gfx::Point(0, 0),
+    ui::MouseEvent mouse_event(ui::EventType::kMousePressed, gfx::Point(0, 0),
                                gfx::Point(0, 0), ui::EventTimeForNow(), 0, 0);
     views::test::ButtonTestApi(button).NotifyClick(mouse_event);
     // The request to cast/stop is sent asynchronously, so we must call
@@ -189,6 +189,10 @@ class CastDialogViewTest : public ChromeViewsTestBase {
   views::ScrollView* scroll_view() { return dialog_->scroll_view_for_test(); }
 
   views::View* no_sinks_view() { return dialog_->no_sinks_view_for_test(); }
+
+  views::View* permission_rejected_view() {
+    return dialog_->permission_rejected_view_for_test();
+  }
 
   views::Button* sources_button() { return dialog_->sources_button_for_test(); }
 
@@ -304,8 +308,8 @@ TEST_F(CastDialogViewTest, FreezeNoRoute) {
 
 TEST_F(CastDialogViewTest, ClearIssue) {
   std::vector<UIMediaSink> media_sinks = {CreateAvailableSink()};
-  media_sinks[0].issue =
-      Issue(IssueInfo("title", IssueInfo::Severity::WARNING, "sinkId1"));
+  media_sinks[0].issue = Issue::CreateIssueWithIssueInfo(
+      IssueInfo("title", IssueInfo::Severity::WARNING, "sinkId1"));
   CastDialogModel model = CreateModelWithSinks(std::move(media_sinks));
   InitializeDialogWithModel(model);
   // When there is an issue, clicking on an available sink should clear the
@@ -408,6 +412,27 @@ TEST_F(CastDialogViewTest, SwitchToNoDeviceView) {
   dialog_->OnModelUpdated(model);
   EXPECT_TRUE(no_sinks_view()->GetVisible());
   EXPECT_FALSE(scroll_view());
+}
+
+TEST_F(CastDialogViewTest, ShowPermissionRejectedView) {
+  base::test::ScopedFeatureList scoped_feature_list;
+  scoped_feature_list.InitAndEnableFeature(
+      media_router::kShowCastPermissionRejectedError);
+
+  // No sink, permission pending/granted.
+  CastDialogModel model;
+  InitializeDialogWithModel(model);
+  EXPECT_TRUE(no_sinks_view());
+  EXPECT_FALSE(scroll_view());
+  EXPECT_FALSE(permission_rejected_view());
+
+  // No sink, permission rejected.
+  model.set_is_permission_rejected(true);
+  InitializeDialogWithModel(model);
+  EXPECT_FALSE(no_sinks_view());
+  EXPECT_FALSE(scroll_view());
+  EXPECT_TRUE(permission_rejected_view() &&
+              permission_rejected_view()->GetVisible());
 }
 
 TEST_F(CastDialogViewTest, ShowAccessCodeCastButtonDisabled) {

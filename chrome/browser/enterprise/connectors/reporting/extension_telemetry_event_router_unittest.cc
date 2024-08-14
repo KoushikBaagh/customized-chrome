@@ -14,7 +14,8 @@
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile.h"
 #include "chrome/test/base/testing_profile_manager.h"
-#include "components/enterprise/connectors/reporting/reporting_service_settings.h"
+#include "components/enterprise/connectors/core/reporting_constants.h"
+#include "components/enterprise/connectors/core/reporting_service_settings.h"
 #include "components/policy/core/common/cloud/mock_cloud_policy_client.h"
 #include "components/safe_browsing/core/common/features.h"
 #include "content/public/test/browser_task_environment.h"
@@ -104,9 +105,9 @@ class ExtensionTelemetryEventRouterTest : public testing::Test {
 
     test::SetOnSecurityEventReporting(
         profile_->GetPrefs(), /*enabled=*/true,
-        /*enabled_event_names=*/std::set<std::string>(),
+        /*enabled_event_names=*/{},
         /*enabled_opt_in_events=*/
-        std::map<std::string, std::vector<std::string>>());
+        {{enterprise_connectors::kExtensionTelemetryEvent, {"*"}}});
     // Set a mock cloud policy client in the router.
     client_ = std::make_unique<policy::MockCloudPolicyClient>();
     client_->SetDMToken("fake-token");
@@ -136,6 +137,9 @@ class ExtensionTelemetryEventRouterTest : public testing::Test {
     extension_info->set_name(kFakeExtensionName);
     extension_info->set_version(kFakeExtensionVersion);
     extension_info->set_install_location(install_location);
+    if (install_location == ExtensionInfo::UNPACKED) {
+      extension_info->add_file_infos();
+    }
 
     // Cookies get all signal
     safe_browsing::ExtensionTelemetryReportRequest_SignalInfo*
@@ -205,7 +209,7 @@ class ExtensionTelemetryEventInstallLocationTest
  public:
   ExtensionTelemetryEventInstallLocationTest() {
     scoped_feature_list_.InitAndEnableFeature(
-        safe_browsing::kExtensionTelemetryForEnteprise);
+        safe_browsing::kExtensionTelemetryForEnterprise);
   }
 
  protected:
@@ -216,53 +220,64 @@ TEST_P(ExtensionTelemetryEventInstallLocationTest,
        CheckTelemetryEventReported) {
   const std::string event_json = base::StringPrintf(
       R"({
-    "creation_timestamp_msec": "1718811019088",
-    "reports": [{
-      "cookies_get_all_info": {
-        "get_all_args_info": [ {
-          "count": 1,
-          "secure": true,
-          "is_session": true,
-          "name": "cookie-1",
-          "path": "/path1",
-          "store_id": "store-1",
-          "domain": "example-domain",
-          "url": "www.example1.com/"
-        }]
-      },
-      "cookies_get_info": {
-        "get_args_info": [{
-          "count": 2,
-          "name": "cookie-1",
-          "store_id": "store-1",
-          "url": "www.example1.com/"
-        }]
-      },
-      "extension": {
-        "id": "fake-extension-id",
-        "name": "Foo extension",
-        "install_location": "%s",
-        "is_from_store": false,
-        "version": "1"
-      },
-      "remote_host_contacted_info": {
-         "remote_host": [ {
-            "connection_protocol": "HTTP_HTTPS",
-            "contact_count": 3,
-            "contacted_by": "CONTENT_SCRIPT",
-            "url": "www.youtube.com/"
-         } ]
-      },
-      "tabs_api_info": {
-         "call_details": [ {
-            "count": 4,
-            "new_url": "www.gogle.com/",
-            "current_url": "www.google.com/",
-            "method": "UPDATE"
-         } ]
-      }
-    }]
+    "extension_telemetry_report": {
+      "creation_timestamp_msec": "1718811019088",
+      "reports": [{
+        "extension": {%s
+          "id": "fake-extension-id",
+          "name": "Foo extension",
+          "install_location": "%s",
+          "is_from_store": false,
+          "version": "1"
+        },
+        "signals": {
+          "cookies_get_all_info": {
+            "get_all_args_info": [ {
+              "count": 1,
+              "secure": true,
+              "is_session": true,
+              "name": "cookie-1",
+              "path": "/path1",
+              "store_id": "store-1",
+              "domain": "example-domain",
+              "url": "www.example1.com/"
+            }]
+          },
+          "cookies_get_info": {
+            "get_args_info": [{
+              "count": 2,
+              "name": "cookie-1",
+              "store_id": "store-1",
+              "url": "www.example1.com/"
+            }]
+          },
+          "remote_host_contacted_info": {
+            "remote_host": [ {
+                "connection_protocol": "HTTP_HTTPS",
+                "contact_count": 3,
+                "contacted_by": "CONTENT_SCRIPT",
+                "url": "www.youtube.com/"
+            } ]
+          },
+          "tabs_api_info": {
+            "call_details": [ {
+                "count": 4,
+                "new_url": "www.gogle.com/",
+                "current_url": "www.google.com/",
+                "method": "UPDATE"
+            } ]
+          }
+        }
+      }]
+    }
   })",
+      install_location_ == ExtensionInfo::UNPACKED ? R"(
+        "file_info": [ {
+          "hash": "",
+          "name": ""
+        } ],
+      )"
+                                                   : "",
       ExtensionInfo::InstallLocation_Name(install_location_).c_str());
   base::Value::Dict expected_event = base::test::ParseJsonDict(event_json);
 
@@ -299,13 +314,17 @@ TEST_F(ExtensionTelemetryEventRouterTest, CheckIsPolicyEnabled) {
 
   // Enable feature.
   scoped_feature_list_.InitAndEnableFeature(
-      safe_browsing::kExtensionTelemetryForEnteprise);
+      safe_browsing::kExtensionTelemetryForEnterprise);
 
   // Expect policy still disabled due to reporting disabled.
   EXPECT_FALSE(extension_telemetry_event_router_->IsPolicyEnabled());
 
   // Enable reporting.
-  test::SetOnSecurityEventReporting(profile_->GetPrefs(), /*enabled=*/true);
+  test::SetOnSecurityEventReporting(
+      profile_->GetPrefs(), /*enabled=*/true,
+      /*enabled_event_names=*/{},
+      /*enabled_opt_in_events=*/
+      {{enterprise_connectors::kExtensionTelemetryEvent, {"*"}}});
 
   EXPECT_TRUE(extension_telemetry_event_router_->IsPolicyEnabled());
 }

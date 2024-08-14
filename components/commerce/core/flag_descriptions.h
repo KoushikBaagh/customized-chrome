@@ -24,6 +24,9 @@ extern const char kPriceTrackingIconColorsDescription[];
 extern const char kProductSpecificationsName[];
 extern const char kProductSpecificationsDescription[];
 
+extern const char kProductSpecificationsMultiSpecificsName[];
+extern const char kProductSpecificationsMultiSpecificsDescription[];
+
 extern const char kShoppingIconColorVariantName[];
 extern const char kShoppingIconColorVariantDescription[];
 
@@ -38,6 +41,9 @@ extern const char kParcelTrackingTestDataDescription[];
 
 extern const char kPriceInsightsName[];
 extern const char kPriceInsightsDescription[];
+
+extern const char kDiscountOnShoppyPageName[];
+extern const char kDiscountOnShoppyPageDescription[];
 
 #if BUILDFLAG(IS_IOS)
 extern const char kPriceInsightsIosName[];

@@ -30,11 +30,6 @@ class SessionAccessor::Canceler : public base::RefCountedThreadSafe<Canceler> {
 };
 
 // static
-SessionAccessor::Ptr SessionAccessor::Empty() {
-  return SessionAccessor::Ptr(nullptr, base::OnTaskRunnerDeleter(nullptr));
-}
-
-// static
 SessionAccessor::Ptr SessionAccessor::Create(
     scoped_refptr<base::SequencedTaskRunner> task_runner,
     ChromeMLModel model,
@@ -133,7 +128,6 @@ void SessionAccessor::ExecuteInternal(
       .max_tokens = input->max_tokens.value_or(0),
       .token_offset = input->token_offset.value_or(0),
       .max_output_tokens = input->max_output_tokens.value_or(0),
-      .score_ts_interval = -1,
       .context_saved_fn = &context_saved_fn,
       .top_k = input->top_k.value_or(1),
       .temperature = input->temperature.value_or(0),

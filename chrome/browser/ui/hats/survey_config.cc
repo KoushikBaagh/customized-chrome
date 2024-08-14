@@ -73,7 +73,6 @@ constexpr char kHatsSurveyTriggerRedWarning[] = "red-warning";
 constexpr char kHatsSurveyTriggerSettings[] = "settings";
 constexpr char kHatsSurveyTriggerSettingsPrivacy[] = "settings-privacy";
 constexpr char kHatsSurveyTriggerSettingsSecurity[] = "settings-security";
-constexpr char kHatsSurveyTriggerExtensions[] = "extensions";
 constexpr char kHatsSurveyTriggerSuggestedPasswordsExperiment[] =
     "suggested-passwords-experiment";
 constexpr char kHatsSurveyTriggerTrustSafetyPrivacySandbox4ConsentAccept[] =
@@ -90,6 +89,7 @@ constexpr char kHatsSurveyTriggerTrustSafetyTrustedSurface[] =
     "ts-trusted-surface";
 constexpr char kHatsSurveyTriggerTrustSafetyTransactions[] = "ts-transactions";
 constexpr char kHatsSurveyTriggerWhatsNew[] = "whats-new";
+constexpr char kHatsSurveyTriggerWhatsNewV2[] = "whats-new-v2";
 constexpr char kHatsSurveyTriggerTrustSafetyV2BrowsingData[] =
     "ts-v2-browsing-data";
 constexpr char kHatsSurveyTriggerTrustSafetyV2ControlGroup[] =
@@ -397,18 +397,6 @@ std::vector<hats::SurveyConfig> GetAllSurveyConfigs() {
           "User proceeded past interstitial", "Enhanced protection enabled",
           "Threat is phishing", "Threat is malware",
           "Threat is unwanted software", "Threat is billing"});
-  survey_configs.emplace_back(
-      &features::kHappinessTrackingSurveysExtensionsSafetyHub,
-      kHatsSurveyTriggerExtensions,
-      features::kHappinessTrackingSurveysExtensionsSafetyHubTriggerId.Get(),
-      std::vector<std::string>{},
-      std::vector<std::string>{
-          "Average extension age in days", "Age of profile in days",
-          "Time since last extension was installed in days",
-          "Number of extensions installed", "Time on extension page in seconds",
-          "Extension review panel shown", "Number of extensions removed",
-          "Number of extensions kept",
-          "Number of non-trigger extensions removed", "Client Channel"});
 
   // Autofill surveys.
   survey_configs.emplace_back(
@@ -457,6 +445,10 @@ std::vector<hats::SurveyConfig> GetAllSurveyConfigs() {
   survey_configs.emplace_back(
       &features::kHappinessTrackingSurveysForDesktopWhatsNew,
       kHatsSurveyTriggerWhatsNew, "SYLcvnoRH0ugnJ3q1cK0RAHYFycs");
+  // What's New survey for v2
+  survey_configs.emplace_back(
+      &features::kHappinessTrackingSurveysForDesktopWhatsNewV2,
+      kHatsSurveyTriggerWhatsNewV2);
 
   // Performance Controls surveys.
   survey_configs.emplace_back(
@@ -553,9 +545,9 @@ std::vector<hats::SurveyConfig> GetAllSurveyConfigs() {
                               kHatsSurveyTriggerAndroidStartupSurvey);
 
   survey_configs.emplace_back(
-      &chrome::android::kQuickDeleteAndroidFollowup,
+      &chrome::android::kQuickDeleteAndroidSurvey,
       kHatsSurveyTriggerQuickDelete,
-      chrome::android::kQuickDeleteAndroidFollowupTriggerId.Get());
+      chrome::android::kQuickDeleteAndroidSurveyTriggerId.Get());
 
 #endif  // #if !BUILDFLAG(IS_ANDROID)
 

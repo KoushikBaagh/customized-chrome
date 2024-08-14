@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "third_party/blink/renderer/core/css/style_engine.h"
+#include "third_party/blink/renderer/core/dom/scroll_marker_group_pseudo_element.h"
 #include "third_party/blink/renderer/core/frame/local_frame_view.h"
 #include "third_party/blink/renderer/core/frame/web_feature.h"
 #include "third_party/blink/renderer/core/html/forms/html_input_element.h"
@@ -48,6 +49,7 @@
 #include "third_party/blink/renderer/core/layout/length_utils.h"
 #include "third_party/blink/renderer/core/layout/list/layout_list_item.h"
 #include "third_party/blink/renderer/core/layout/logical_box_fragment.h"
+#include "third_party/blink/renderer/core/layout/masonry/masonry_layout_algorithm.h"
 #include "third_party/blink/renderer/core/layout/mathml/math_fraction_layout_algorithm.h"
 #include "third_party/blink/renderer/core/layout/mathml/math_layout_utils.h"
 #include "third_party/blink/renderer/core/layout/mathml/math_operator_layout_algorithm.h"
@@ -181,6 +183,8 @@ NOINLINE void DetermineAlgorithmAndRun(const LayoutAlgorithmParams& params,
     DetermineMathMLAlgorithmAndRun(box, params, callback);
   } else if (box.IsLayoutGrid()) {
     CreateAlgorithmAndRun<GridLayoutAlgorithm>(params, callback);
+  } else if (box.IsLayoutMasonry()) {
+    CreateAlgorithmAndRun<MasonryLayoutAlgorithm>(params, callback);
   } else if (box.IsLayoutReplaced()) {
     CreateAlgorithmAndRun<ReplacedLayoutAlgorithm>(params, callback);
   } else if (box.IsFieldset()) {
@@ -194,7 +198,7 @@ NOINLINE void DetermineAlgorithmAndRun(const LayoutAlgorithmParams& params,
   // the flow thread.
   else if (GetFlowThread(box) && style.SpecifiesColumns()) {
     CreateAlgorithmAndRun<ColumnLayoutAlgorithm>(params, callback);
-  } else if (UNLIKELY(!box.Parent() && params.node.IsPaginatedRoot())) {
+  } else if (!box.Parent() && params.node.IsPaginatedRoot()) [[unlikely]] {
     CreateAlgorithmAndRun<PaginatedRootLayoutAlgorithm>(params, callback);
   } else {
     CreateAlgorithmAndRun<BlockLayoutAlgorithm>(params, callback);
@@ -435,16 +439,29 @@ const LayoutResult* BlockNode::Layout(
         CalculateInitialFragmentGeometry(constraint_space, *this, break_token);
   }
 
-  if (
-      // Only consider the size of the first container fragment.
-      !IsBreakInside(break_token) && CanMatchSizeContainerQueries()) {
+  // Only consider the size of the first container fragment.
+  if (!IsBreakInside(break_token) && CanMatchSizeContainerQueries()) {
     if (auto* element = DynamicTo<Element>(GetDOMNode())) {
-      LogicalSize available_size = CalculateChildAvailableSize(
+      // Consider scrollbars if they are stable (reset any auto scrollbars).
+      BoxStrut scrollbar = fragment_geometry->scrollbar;
+      {
+        const auto& style = Style();
+        if (style.IsScrollbarGutterAuto() &&
+            style.OverflowBlockDirection() == EOverflow::kAuto) {
+          scrollbar.inline_start = LayoutUnit();
+          scrollbar.inline_end = LayoutUnit();
+        }
+        if (style.OverflowInlineDirection() == EOverflow::kAuto) {
+          scrollbar.block_start = LayoutUnit();
+          scrollbar.block_end = LayoutUnit();
+        }
+      }
+
+      const LogicalSize available_size = CalculateChildAvailableSize(
           constraint_space, *this, fragment_geometry->border_box_size,
-          fragment_geometry->border + fragment_geometry->padding);
-      LogicalAxes contained_axes = ContainedAxes();
+          fragment_geometry->border + scrollbar + fragment_geometry->padding);
       GetDocument().GetStyleEngine().UpdateStyleAndLayoutTreeForContainer(
-          *element, available_size, contained_axes);
+          *element, available_size, ContainedAxes());
 
       // Try the cache again. Container query matching may have affected
       // elements in the subtree, so that we need full layout instead of
@@ -880,7 +897,7 @@ void BlockNode::StoreResultInLayoutBox(const LayoutResult* result,
 
 MinMaxSizesResult BlockNode::ComputeMinMaxSizes(
     WritingMode container_writing_mode,
-    const MinMaxSizesType type,
+    const SizeType type,
     const ConstraintSpace& constraint_space,
     const MinMaxSizesFloatInput float_input) const {
   // TODO(layoutng) Can UpdateMarkerTextIfNeeded call be moved
@@ -968,7 +985,7 @@ MinMaxSizesResult BlockNode::ComputeMinMaxSizes(
   }
 
   const bool has_aspect_ratio = !Style().AspectRatio().IsAuto();
-  if (has_aspect_ratio && type == MinMaxSizesType::kContent) {
+  if (has_aspect_ratio && type == SizeType::kContent) {
     const FragmentGeometry& fragment_geometry = IntrinsicFragmentGeometry();
     const BoxStrut border_padding =
         fragment_geometry.border + fragment_geometry.padding;
@@ -978,7 +995,8 @@ MinMaxSizesResult BlockNode::ComputeMinMaxSizes(
           Style().BoxSizingForAspectRatio(),
           fragment_geometry.border_box_size.block_size);
       return MinMaxSizesResult({inline_size_from_ar, inline_size_from_ar},
-                               DependsOnBlockConstraints());
+                               DependsOnBlockConstraints(),
+                               /* applied_aspect_ratio */ true);
     }
   }
 
@@ -1038,7 +1056,7 @@ MinMaxSizesResult BlockNode::ComputeMinMaxSizes(
       const BoxStrut border_padding =
           fragment_geometry.border + fragment_geometry.padding;
       const MinMaxSizes min_max = ComputeMinMaxInlineSizesFromAspectRatio(
-          constraint_space, Style(), border_padding);
+          constraint_space, *this, border_padding);
       result->sizes.min_size =
           min_max.ClampSizeToMinAndMax(result->sizes.min_size);
       result->sizes.max_size =
@@ -1089,8 +1107,9 @@ LayoutInputNode BlockNode::FirstChild() const {
     return nullptr;
   }
   auto* block = DynamicTo<LayoutBlock>(box_.Get());
-  if (UNLIKELY(!block))
+  if (!block) [[unlikely]] {
     return BlockNode(box_->FirstChildBox());
+  }
   auto* child = GetLayoutObjectForFirstChildNode(block);
   if (!child)
     return nullptr;
@@ -1170,7 +1189,7 @@ void BlockNode::CopyFragmentDataToLayoutBox(
   // Position the children inside the box. We skip this if display-lock prevents
   // child layout.
   if (!ChildLayoutBlockedByDisplayLock()) {
-    if (UNLIKELY(flow_thread)) {
+    if (flow_thread) [[unlikely]] {
       // Hold off writing legacy data for the entire multicol container until
       // done with the last fragment (we may have multiple if nested within
       // another fragmentation context). This way we'll get everything in order.
@@ -1193,15 +1212,16 @@ void BlockNode::CopyFragmentDataToLayoutBox(
     }
   }
 
-  if (UNLIKELY(!is_last_fragment))
+  if (!is_last_fragment) [[unlikely]] {
     return;
+  }
 
   box_->SetNeedsOverflowRecalc(
       LayoutObject::OverflowRecalcType::kOnlyVisualOverflowRecalc);
   box_->SetScrollableOverflowFromLayoutResults();
   box_->UpdateAfterLayout();
 
-  if (UNLIKELY(flow_thread && Style().HasColumnRule())) {
+  if (flow_thread && Style().HasColumnRule()) [[unlikely]] {
     // Issue full invalidation, in case the number of column rules have changed.
     box_->ClearNeedsLayoutWithFullPaintInvalidation();
   } else {
@@ -1233,9 +1253,10 @@ void BlockNode::PlaceChildrenInLayoutBox(
     // The offset for an OOF positioned node that is added as a child of a
     // fragmentainer box is handled by
     // OutOfFlowLayoutPart::AddOOFToFragmentainer().
-    if (UNLIKELY(physical_fragment.IsFragmentainerBox() &&
-                 child_fragment->IsOutOfFlowPositioned()))
+    if (physical_fragment.IsFragmentainerBox() &&
+        child_fragment->IsOutOfFlowPositioned()) [[unlikely]] {
       continue;
+    }
 
     CopyChildFragmentPosition(box_fragment, child_fragment.offset,
                               physical_fragment, previous_break_token,
@@ -1416,8 +1437,9 @@ void BlockNode::CopyFragmentItemsToLayoutBox(
         else
           maybe_flipped_offset.left += previously_consumed_block_size;
         layout_box->SetLocation(maybe_flipped_offset.ToLayoutPoint());
-        if (UNLIKELY(layout_box->HasSelfPaintingLayer()))
+        if (layout_box->HasSelfPaintingLayer()) [[unlikely]] {
           layout_box->Layer()->SetNeedsVisualOverflowRecalc();
+        }
 #if DCHECK_IS_ON()
         layout_box->InvalidateVisualOverflowForDCheck();
 #endif
@@ -1427,7 +1449,7 @@ void BlockNode::CopyFragmentItemsToLayoutBox(
       // Legacy compatibility. This flag is used in paint layer for
       // invalidation.
       if (auto* layout_inline = DynamicTo<LayoutInline>(layout_object)) {
-        if (UNLIKELY(layout_inline->HasSelfPaintingLayer())) {
+        if (layout_inline->HasSelfPaintingLayer()) [[unlikely]] {
           layout_inline->Layer()->SetNeedsVisualOverflowRecalc();
         }
       }
@@ -1575,6 +1597,8 @@ void BlockNode::HandleScrollMarkerGroup() const {
   context.parent = group_node.GetLayoutBox();
   DCHECK(context.parent);
 
+  To<ScrollMarkerGroupPseudoElement>(group_node.GetLayoutBox()->GetNode())
+      ->ClearFocusGroup();
   AttachScrollMarkers(*box_, context);
 
   DCHECK(GetDocument().GetStyleEngine().InScrollMarkersAttachment());
@@ -1689,7 +1713,7 @@ void BlockNode::UpdateMarginPaddingInfoIfNeeded(
     // is able to return the correct value. This isn't ideal, but eventually
     // we'll answer these queries from the fragment.
     const auto* containing_block = box_->ContainingBlock();
-    if (UNLIKELY(containing_block && containing_block->IsLayoutGrid())) {
+    if (containing_block && containing_block->IsLayoutGrid()) [[unlikely]] {
       box_->SetOverrideContainingBlockContentLogicalWidth(
           space.MarginPaddingPercentageResolutionSize().inline_size);
     }

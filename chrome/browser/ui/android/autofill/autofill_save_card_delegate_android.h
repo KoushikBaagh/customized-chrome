@@ -23,8 +23,9 @@ class AutofillSaveCardDelegateAndroid : public AutofillSaveCardDelegate {
   AutofillSaveCardDelegateAndroid(
       absl::variant<
           payments::PaymentsAutofillClient::LocalSaveCardPromptCallback,
-          AutofillClient::UploadSaveCardPromptCallback> callback,
-      AutofillClient::SaveCreditCardOptions options,
+          payments::PaymentsAutofillClient::UploadSaveCardPromptCallback>
+          callback,
+      payments::PaymentsAutofillClient::SaveCreditCardOptions options,
       content::WebContents* web_contents);
 
   void SetDeviceLockBridgeForTesting(

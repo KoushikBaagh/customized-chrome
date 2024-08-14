@@ -53,6 +53,10 @@ inline constexpr char kAdvancedProtectionDownloadLearnMoreURL[] =
 inline constexpr char kAppNotificationsBrowserSettingsURL[] =
     "chrome://settings/content/notifications";
 
+// "Chrome Settings" URL for the appearance page.
+inline constexpr char kBrowserSettingsSearchEngineURL[] =
+    "chrome://settings/search";
+
 // "Learn more" URL for App Parental Controls.
 // char16_t is used here because this constant may be used to set the src
 // attribute of iframe elements.
@@ -269,8 +273,8 @@ inline constexpr char16_t kFamilyGroupCreateURL[] =
 inline constexpr char16_t kFamilyGroupViewURL[] =
     u"https://myaccount.google.com/family/details?utm_source=cpwd";
 
-// "Learn more" URL for first party sets.
-inline constexpr char kFirstPartySetsLearnMoreURL[] =
+// "Learn more" URL for related website sets.
+inline constexpr char kRelatedWebsiteSetsLearnMoreURL[] =
     "https://support.google.com/chrome?p=cpn_cookies"
     "#zippy=%2Callow-related-sites-to-access-your-activity";
 
@@ -306,6 +310,10 @@ inline constexpr char kGoogleAccountChooserURL[] =
 // URL of the Google Account page showing the known user devices.
 inline constexpr char kGoogleAccountDeviceActivityURL[] =
     "https://myaccount.google.com/device-activity?utm_source=chrome";
+
+// URL of the two factor authentication setup required intersitial.
+inline constexpr char kGoogleTwoFactorIntersitialURL[] =
+    "https://myaccount.google.com/interstitials/twosvrequired";
 
 // URL of the Google Password Manager.
 inline constexpr char kGooglePasswordManagerURL[] =

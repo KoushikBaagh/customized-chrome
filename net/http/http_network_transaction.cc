@@ -61,6 +61,7 @@
 #include "net/http/http_status_code.h"
 #include "net/http/http_stream.h"
 #include "net/http/http_stream_factory.h"
+#include "net/http/http_stream_pool.h"
 #include "net/http/http_util.h"
 #include "net/http/transport_security_state.h"
 #include "net/http/url_security_manager.h"
@@ -217,10 +218,16 @@ int HttpNetworkTransaction::Start(const HttpRequestInfo* request_info,
 #if BUILDFLAG(ENABLE_REPORTING)
   // Store values for later use in NEL report generation.
   request_method_ = request_->method;
-  request_->extra_headers.GetHeader(HttpRequestHeaders::kReferer,
-                                    &request_referrer_);
-  request_->extra_headers.GetHeader(HttpRequestHeaders::kUserAgent,
-                                    &request_user_agent_);
+  if (std::optional<std::string> header =
+          request_->extra_headers.GetHeader(HttpRequestHeaders::kReferer);
+      header) {
+    request_referrer_.swap(header.value());
+  }
+  if (std::optional<std::string> header =
+          request_->extra_headers.GetHeader(HttpRequestHeaders::kUserAgent);
+      header) {
+    request_user_agent_.swap(header.value());
+  }
   request_reporting_upload_depth_ = request_->reporting_upload_depth;
   start_timeticks_ = base::TimeTicks::Now();
 #endif  // BUILDFLAG(ENABLE_REPORTING)
@@ -235,7 +242,7 @@ int HttpNetworkTransaction::Start(const HttpRequestInfo* request_info,
     response_.unused_since_prefetch = true;
   }
 
-  if (request_->load_flags & LOAD_RESTRICTED_PREFETCH) {
+  if (request_->load_flags & LOAD_RESTRICTED_PREFETCH_FOR_MAIN_FRAME) {
     DCHECK(response_.unused_since_prefetch);
     response_.restricted_prefetch = true;
   }
@@ -750,6 +757,21 @@ void HttpNetworkTransaction::OnNeedsClientAuth(SSLCertRequestInfo* cert_info) {
 
 void HttpNetworkTransaction::OnQuicBroken() {
   net_error_details_.quic_broken = true;
+}
+
+void HttpNetworkTransaction::OnSwitchesToHttpStreamPool(
+    HttpStreamKey stream_key,
+    quic::ParsedQuicVersion quic_version) {
+  CHECK_EQ(STATE_CREATE_STREAM_COMPLETE, next_state_);
+  CHECK(stream_request_);
+  stream_request_.reset();
+
+  stream_request_ = session_->http_stream_pool()->RequestStream(
+      this, stream_key, priority_,
+      /*allowed_bad_certs=*/observed_bad_certs_, enable_ip_based_pooling_,
+      enable_alternative_services_, quic_version, net_log_);
+  CHECK(!stream_request_->completed());
+  // No IO completion yet.
 }
 
 ConnectionAttempts HttpNetworkTransaction::GetConnectionAttempts() const {
@@ -2054,12 +2076,13 @@ bool HttpNetworkTransaction::ContentEncodingsValid() const {
   HttpResponseHeaders* headers = GetResponseHeaders();
   DCHECK(headers);
 
-  std::string accept_encoding;
-  request_headers_.GetHeader(HttpRequestHeaders::kAcceptEncoding,
-                             &accept_encoding);
   std::set<std::string> allowed_encodings;
-  if (!HttpUtil::ParseAcceptEncoding(accept_encoding, &allowed_encodings))
+  if (!HttpUtil::ParseAcceptEncoding(
+          request_headers_.GetHeader(HttpRequestHeaders::kAcceptEncoding)
+              .value_or(std::string()),
+          &allowed_encodings)) {
     return false;
+  }
 
   std::string content_encoding;
   headers->GetNormalizedHeader("Content-Encoding", &content_encoding);

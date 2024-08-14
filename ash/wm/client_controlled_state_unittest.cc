@@ -28,6 +28,7 @@
 #include "ash/wm/screen_pinning_controller.h"
 #include "ash/wm/snap_group/snap_group.h"
 #include "ash/wm/snap_group/snap_group_controller.h"
+#include "ash/wm/snap_group/snap_group_test_util.h"
 #include "ash/wm/splitview/split_view_constants.h"
 #include "ash/wm/splitview/split_view_controller.h"
 #include "ash/wm/splitview/split_view_divider.h"
@@ -2149,7 +2150,7 @@ TEST_F(ClientControlledStateTest, FlingFloatedWindowInTabletMode) {
       start, start + offset, base::Milliseconds(10), /*steps=*/2,
       base::BindLambdaForTesting(
           [&](ui::EventType event_type, const gfx::Vector2dF& delta) {
-            if (event_type != ui::ET_GESTURE_SCROLL_UPDATE) {
+            if (event_type != ui::EventType::kGestureScrollUpdate) {
               return;
             }
             EXPECT_TRUE(window_state_delegate()->drag_in_progress());

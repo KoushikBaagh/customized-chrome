@@ -105,6 +105,7 @@
 #include "services/network/http_server_properties_pref_delegate.h"
 #include "services/network/ignore_errors_cert_verifier.h"
 #include "services/network/ip_protection/ip_protection_config_cache_impl.h"
+#include "services/network/ip_protection/ip_protection_config_getter_mojo_impl.h"
 #include "services/network/ip_protection/ip_protection_proxy_delegate.h"
 #include "services/network/ip_protection/ip_protection_token_cache_manager_impl.h"
 #include "services/network/is_browser_initiated.h"
@@ -1090,6 +1091,25 @@ void NetworkContext::GetStoredTrustTokenCounts(
   }
 }
 
+void NetworkContext::GetPrivateStateTokenRedemptionRecords(
+    GetPrivateStateTokenRedemptionRecordsCallback callback) {
+  // The Trust Tokens feature is disabled, return immediately with an empty
+  // map.
+  if (!trust_token_store_) {
+    base::flat_map<url::Origin, std::vector<mojom::ToplevelRedemptionRecordPtr>>
+        empty_result;
+    std::move(callback).Run(std::move(empty_result));
+    return;
+  }
+  auto get_redemption_records_from_store =
+      [](NetworkContext::GetPrivateStateTokenRedemptionRecordsCallback callback,
+         TrustTokenStore* trust_token_store) {
+        std::move(callback).Run(trust_token_store->GetRedemptionRecords());
+      };
+  trust_token_store_->ExecuteOrEnqueue(
+      base::BindOnce(get_redemption_records_from_store, std::move(callback)));
+}
+
 void NetworkContext::DeleteStoredTrustTokens(
     const url::Origin& issuer,
     DeleteStoredTrustTokensCallback callback) {
@@ -1385,6 +1405,15 @@ void NetworkContext::SetDocumentReportingEndpoints(
 #endif  // BUILDFLAG(ENABLE_REPORTING)
 }
 
+void NetworkContext::SetEnterpriseReportingEndpoints(
+    const base::flat_map<std::string, GURL>& endpoints) {
+#if BUILDFLAG(ENABLE_REPORTING)
+  if (auto* reporting_service = url_request_context()->reporting_service()) {
+    reporting_service->SetEnterpriseReportingEndpoints(endpoints);
+  }
+#endif  // BUILDFLAG(ENABLE_REPORTING)
+}
+
 void NetworkContext::SendReportsAndRemoveSource(
     const base::UnguessableToken& reporting_source) {
 #if BUILDFLAG(ENABLE_REPORTING)
@@ -1402,23 +1431,21 @@ void NetworkContext::QueueReport(
     const GURL& url,
     const std::optional<base::UnguessableToken>& reporting_source,
     const net::NetworkAnonymizationKey& network_anonymization_key,
-    const std::optional<std::string>& user_agent,
     base::Value::Dict body) {
   QueueReportInternal(type, group, url, reporting_source,
-                      network_anonymization_key, user_agent, std::move(body),
+                      network_anonymization_key, std::move(body),
                       net::ReportingTargetType::kDeveloper);
 }
 
-void NetworkContext::QueueEnterpriseReport(
-    const std::string& type,
-    const std::string& group,
-    const GURL& url,
-    const std::optional<base::UnguessableToken>& reporting_source,
-    const net::NetworkAnonymizationKey& network_anonymization_key,
-    const std::optional<std::string>& user_agent,
-    base::Value::Dict body) {
-  QueueReportInternal(type, group, url, reporting_source,
-                      network_anonymization_key, user_agent, std::move(body),
+void NetworkContext::QueueEnterpriseReport(const std::string& type,
+                                           const std::string& group,
+                                           const GURL& url,
+                                           base::Value::Dict body) {
+  // Enterprise reports don't use a |reporting_source| or
+  // |network_anonymization_key|. Enterprise endpoints are profile-bound and not
+  // document-bound like web developer endpoints.
+  QueueReportInternal(type, group, url, /*reporting_source=*/std::nullopt,
+                      net::NetworkAnonymizationKey(), std::move(body),
                       net::ReportingTargetType::kEnterprise);
 }
 
@@ -1428,13 +1455,14 @@ void NetworkContext::QueueReportInternal(
     const GURL& url,
     const std::optional<base::UnguessableToken>& reporting_source,
     const net::NetworkAnonymizationKey& network_anonymization_key,
-    const std::optional<std::string>& user_agent,
     base::Value::Dict body,
     net::ReportingTargetType target_type) {
 #if BUILDFLAG(ENABLE_REPORTING)
   // If |reporting_source| is provided, it must not be empty.
   DCHECK(!(reporting_source.has_value() && reporting_source->is_empty()));
-  if (require_network_anonymization_key_) {
+  // Enterprise reports have an empty |network_anonymization_key|.
+  if (target_type == net::ReportingTargetType::kDeveloper &&
+      require_network_anonymization_key_) {
     DCHECK(!network_anonymization_key.IsEmpty());
   }
 
@@ -1447,9 +1475,8 @@ void NetworkContext::QueueReportInternal(
     return;
   }
 
-  std::string reported_user_agent = user_agent.value_or("");
-  if (reported_user_agent.empty() &&
-      request_context->http_user_agent_settings() != nullptr) {
+  std::string reported_user_agent = "";
+  if (request_context->http_user_agent_settings() != nullptr) {
     reported_user_agent =
         request_context->http_user_agent_settings()->GetUserAgent();
   }
@@ -1871,6 +1898,21 @@ void NetworkContext::ResolveHost(
     const net::NetworkAnonymizationKey& network_anonymization_key,
     mojom::ResolveHostParametersPtr optional_parameters,
     mojo::PendingRemote<mojom::ResolveHostClient> response_client) {
+  // Dns request is disallowed if network access is disabled for the nonce.
+  if (network_anonymization_key.GetNonce().has_value() &&
+      !IsNetworkForNonceAndUrlAllowed(
+          network_anonymization_key.GetNonce().value(),
+          host->get_scheme_host_port().GetURL())) {
+    mojo::Remote<mojom::ResolveHostClient> remote_response_client(
+        std::move(response_client));
+    remote_response_client->OnComplete(
+        net::ERR_NETWORK_ACCESS_REVOKED,
+        net::ResolveErrorInfo(net::ERR_NETWORK_ACCESS_REVOKED),
+        /*resolved_addresses=*/std::nullopt,
+        /*endpoint_results_with_metadata=*/std::nullopt);
+    return;
+  }
+
   if (!internal_host_resolver_) {
     internal_host_resolver_ = std::make_unique<HostResolver>(
         url_request_context_->host_resolver(), url_request_context_->net_log());
@@ -2131,6 +2173,13 @@ void NetworkContext::PreconnectSockets(
   // guaranteed to validate them.
   if (num_streams == 0)
     return;
+
+  // Preconnect is disallowed if network access is disabled for the nonce.
+  if (network_anonymization_key.GetNonce().has_value() &&
+      !IsNetworkForNonceAndUrlAllowed(
+          network_anonymization_key.GetNonce().value(), url)) {
+    return;
+  }
 
   std::string user_agent;
   if (url_request_context_->http_user_agent_settings()) {
@@ -2485,10 +2534,11 @@ URLRequestContextOwner NetworkContext::MakeURLRequestContext(
   // `params_->ip_protection_config_getter` is set (to avoid creating proxy
   // delegates for network contexts that don't participate in IP Protection, or
   // for any network context when the IP Protection feature is disabled).
-  auto* nspal = network_service_->network_service_proxy_allow_list();
+  auto* nspal = network_service_->masked_domain_list_manager();
   if (!params_->initial_custom_proxy_config && nspal->IsEnabled()) {
     auto ipp_config_cache = std::make_unique<IpProtectionConfigCacheImpl>(
-        std::move(params_->ip_protection_config_getter));
+        std::make_unique<IpProtectionConfigGetterMojoImpl>(
+            std::move(params_->ip_protection_config_getter)));
     std::unique_ptr<IpProtectionProxyDelegate> proxy_delegate =
         std::make_unique<IpProtectionProxyDelegate>(
             nspal, std::move(ipp_config_cache), params_->enable_ip_protection);
@@ -2725,6 +2775,10 @@ URLRequestContextOwner NetworkContext::MakeURLRequestContext(
     builder.set_persistent_reporting_and_nel_store(nullptr);
   }
 
+  if (params_->enterprise_reporting_endpoints.has_value()) {
+    builder.set_enterprise_reporting_endpoints(
+        params_->enterprise_reporting_endpoints.value());
+  }
 #endif  // BUILDFLAG(ENABLE_REPORTING)
 
   net::HttpNetworkSessionParams session_params;

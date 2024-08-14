@@ -4,11 +4,10 @@
 
 package org.chromium.chrome.test.transit.page;
 
-import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.action.ViewActions.longClick;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
 
-import static org.chromium.base.test.transit.ViewElement.unscopedViewElement;
+import static org.chromium.base.test.transit.ViewSpec.viewSpec;
 
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.supplier.Supplier;
@@ -19,18 +18,18 @@ import org.chromium.base.test.transit.ConditionStatus;
 import org.chromium.base.test.transit.ConditionStatusWithResult;
 import org.chromium.base.test.transit.ConditionWithResult;
 import org.chromium.base.test.transit.Elements;
+import org.chromium.base.test.transit.Facility;
 import org.chromium.base.test.transit.Station;
 import org.chromium.base.test.transit.Transition;
 import org.chromium.base.test.transit.ViewElement;
+import org.chromium.base.test.transit.ViewSpec;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
-import org.chromium.chrome.browser.hub.PaneId;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelObserver;
-import org.chromium.chrome.browser.tabmodel.TabModelSelector;
-import org.chromium.chrome.test.transit.hub.HubBaseStation;
-import org.chromium.chrome.test.transit.hub.HubStationUtils;
+import org.chromium.chrome.test.transit.hub.IncognitoTabSwitcherStation;
+import org.chromium.chrome.test.transit.hub.RegularTabSwitcherStation;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.ui.base.PageTransition;
 
@@ -52,13 +51,14 @@ public class PageStation extends Station {
      */
     public static class Builder<T extends PageStation> {
         private final Function<Builder<T>, T> mFactoryMethod;
-        private boolean mIncognito;
         private boolean mIsEntryPoint;
+        private Boolean mIncognito;
         private Integer mNumTabsBeingOpened;
         private Integer mNumTabsBeingSelected;
         private Tab mTabAlreadySelected;
-        private String mPath;
-        private String mTitle;
+        private String mExpectedUrlSubstring;
+        private String mExpectedTitle;
+        private List<Facility<T>> mFacilities;
 
         public Builder(Function<Builder<T>, T> factoryMethod) {
             mFactoryMethod = factoryMethod;
@@ -85,6 +85,8 @@ public class PageStation extends Station {
             assert numTabsBeingSelected > 0
                     : "Use withIsSelectingTab() if the PageStation is still in the current tab";
             mNumTabsBeingSelected = numTabsBeingSelected;
+            // Commonly already set via initFrom().
+            mTabAlreadySelected = null;
             return this;
         }
 
@@ -95,18 +97,39 @@ public class PageStation extends Station {
             return this;
         }
 
-        public Builder<T> withPath(String path) {
-            mPath = path;
+        public Builder<T> withExpectedUrlSubstring(String value) {
+            mExpectedUrlSubstring = value;
             return this;
         }
 
-        public Builder<T> withTitle(String title) {
-            mTitle = title;
+        public Builder<T> withExpectedTitle(String title) {
+            mExpectedTitle = title;
+            return this;
+        }
+
+        public Builder<T> withFacility(Facility<T> facility) {
+            if (mFacilities == null) {
+                mFacilities = new ArrayList<>();
+            }
+            mFacilities.add(facility);
             return this;
         }
 
         public Builder<T> initFrom(PageStation previousStation) {
-            mIncognito = previousStation.isIncognito();
+            if (mIncognito == null) {
+                mIncognito = previousStation.mIncognito;
+            }
+            if (mNumTabsBeingOpened == null) {
+                mNumTabsBeingOpened = 0;
+            }
+            if (mNumTabsBeingSelected == null) {
+                mNumTabsBeingSelected = 0;
+            }
+            if (mTabAlreadySelected == null && mNumTabsBeingSelected == 0) {
+                mTabAlreadySelected = previousStation.getLoadedTab();
+            }
+            // Cannot copy over facilities because we have no way to clone them. It's also not
+            // obvious that we should...
             return this;
         }
 
@@ -120,16 +143,12 @@ public class PageStation extends Station {
     protected final int mNumTabsBeingOpened;
     protected final int mNumTabsBeingSelected;
     protected final Tab mTabAlreadySelected;
-    protected final String mPath;
-    protected final String mTitle;
+    protected final String mExpectedUrlSubstring;
+    protected final String mExpectedTitle;
 
-    // TODO(crbug.com/41497463): These should be shared, not unscoped, but for now they need to be
-    // unscoped since they unintentionally still exist in the non-Hub tab switcher. They are mostly
-    // occluded by the tab switcher toolbar, but at least the tab_switcher_button is still visible.
-    public static final ViewElement HOME_BUTTON = unscopedViewElement(withId(R.id.home_button));
-    public static final ViewElement TAB_SWITCHER_BUTTON =
-            unscopedViewElement(withId(R.id.tab_switcher_button));
-    public static final ViewElement MENU_BUTTON = unscopedViewElement(withId(R.id.menu_button));
+    public static final ViewSpec HOME_BUTTON = viewSpec(withId(R.id.home_button));
+    public static final ViewSpec TAB_SWITCHER_BUTTON = viewSpec(withId(R.id.tab_switcher_button));
+    public static final ViewSpec MENU_BUTTON = viewSpec(withId(R.id.menu_button));
 
     protected ActivityElement<ChromeTabbedActivity> mActivityElement;
     protected Supplier<Tab> mActivityTabSupplier;
@@ -138,9 +157,8 @@ public class PageStation extends Station {
 
     /** Use {@link #newPageStationBuilder()} or the PageStation's subclass |newBuilder()|. */
     protected <T extends PageStation> PageStation(Builder<T> builder) {
-
         // incognito is optional and defaults to false
-        mIncognito = builder.mIncognito;
+        mIncognito = builder.mIncognito == null ? false : builder.mIncognito;
 
         // isEntryPoint is optional and defaults to false
         mIsEntryPoint = builder.mIsEntryPoint;
@@ -160,11 +178,17 @@ public class PageStation extends Station {
                         "mTabAlreadySelected=%s mNumTabsBeingSelected=%s",
                         mTabAlreadySelected, mNumTabsBeingSelected);
 
-        // path is optional
-        mPath = builder.mPath;
+        // URL substring is optional.
+        mExpectedUrlSubstring = builder.mExpectedUrlSubstring;
 
         // title is optional
-        mTitle = builder.mTitle;
+        mExpectedTitle = builder.mExpectedTitle;
+
+        if (builder.mFacilities != null) {
+            for (Facility<T> facility : builder.mFacilities) {
+                addInitialFacility(facility);
+            }
+        }
     }
 
     /**
@@ -180,9 +204,14 @@ public class PageStation extends Station {
     @Override
     public void declareElements(Elements.Builder elements) {
         mActivityElement = elements.declareActivity(ChromeTabbedActivity.class);
-        elements.declareView(HOME_BUTTON);
-        elements.declareView(TAB_SWITCHER_BUTTON);
-        elements.declareView(MENU_BUTTON);
+
+        // TODO(crbug.com/41497463): These should be scoped, but for now they need to be unscoped
+        // since they unintentionally still exist in the non-Hub tab switcher. They are mostly
+        // occluded by the tab switcher toolbar, but at least the tab_switcher_button is still
+        // visible.
+        elements.declareView(HOME_BUTTON, ViewElement.unscopedOption());
+        elements.declareView(TAB_SWITCHER_BUTTON, ViewElement.unscopedOption());
+        elements.declareView(MENU_BUTTON, ViewElement.unscopedOption());
 
         if (mNumTabsBeingOpened > 0) {
             elements.declareEnterCondition(
@@ -217,12 +246,13 @@ public class PageStation extends Station {
 
         elements.declareEnterCondition(new PageInteractableOrHiddenCondition(mPageLoadedSupplier));
 
-        if (mTitle != null) {
-            elements.declareEnterCondition(new PageTitleCondition(mTitle, mPageLoadedSupplier));
-        }
-        if (mPath != null) {
+        if (mExpectedTitle != null) {
             elements.declareEnterCondition(
-                    new PageUrlContainsCondition(mPath, mPageLoadedSupplier));
+                    new PageTitleCondition(mExpectedTitle, mPageLoadedSupplier));
+        }
+        if (mExpectedUrlSubstring != null) {
+            elements.declareEnterCondition(
+                    new PageUrlContainsCondition(mExpectedUrlSubstring, mPageLoadedSupplier));
         }
     }
 
@@ -279,52 +309,47 @@ public class PageStation extends Station {
     /** Long presses the tab switcher button to open the action menu. */
     public TabSwitcherActionMenuFacility openTabSwitcherActionMenu() {
         recheckActiveConditions();
-
-        TabSwitcherActionMenuFacility menu = new TabSwitcherActionMenuFacility(this);
-        return enterFacilitySync(menu, () -> TAB_SWITCHER_BUTTON.perform(longClick()));
+        return enterFacilitySync(
+                new TabSwitcherActionMenuFacility(),
+                () -> TAB_SWITCHER_BUTTON.perform(longClick()));
     }
 
     /** Opens the app menu by pressing the toolbar "..." button */
     public PageAppMenuFacility<PageStation> openGenericAppMenu() {
         recheckActiveConditions();
 
-        PageAppMenuFacility<PageStation> menu = new PageAppMenuFacility<>(this);
-        return enterFacilitySync(menu, () -> MENU_BUTTON.perform(click()));
+        return enterFacilitySync(new PageAppMenuFacility<PageStation>(), MENU_BUTTON::click);
     }
 
-    /** Opens the hub by pressing the toolbar tab switcher button. */
-    public <T extends HubBaseStation> T openHub(Class<T> expectedDestination) {
-        recheckActiveConditions();
-        TabModelSelector tabModelSelector = getActivity().getTabModelSelector();
-        boolean incognitoTabsExist =
-                tabModelSelector.getModel(/* incognito= */ true).getCount() > 0;
-        boolean regularTabsExist = tabModelSelector.getModel(/* incognito= */ false).getCount() > 0;
-        T destination =
-                expectedDestination.cast(
-                        HubStationUtils.createHubStation(
-                                isIncognito() ? PaneId.INCOGNITO_TAB_SWITCHER : PaneId.TAB_SWITCHER,
-                                regularTabsExist,
-                                incognitoTabsExist));
-
-        return travelToSync(destination, () -> TAB_SWITCHER_BUTTON.perform(click()));
+    /** Opens the tab switcher by pressing the toolbar tab switcher button. */
+    public RegularTabSwitcherStation openRegularTabSwitcher() {
+        assert !mIncognito;
+        return travelToSync(
+                RegularTabSwitcherStation.from(getActivity().getTabModelSelector()),
+                TAB_SWITCHER_BUTTON::click);
     }
 
-    /** Loads a |url| in the same tab and waits to transition to the given |destination|. */
-    public <T extends PageStation> T loadPageProgramatically(
-            Builder<T> destinationBuilder, String url) {
-        T destination =
-                destinationBuilder
-                        .initFrom(this)
-                        .withIsOpeningTabs(0)
-                        .withTabAlreadySelected(getLoadedTab())
-                        .withPath(url)
-                        .build();
-
-        return loadPageProgramatically(destination, url);
+    /** Opens the incognito tab switcher by pressing the toolbar tab switcher button. */
+    public IncognitoTabSwitcherStation openIncognitoTabSwitcher() {
+        assert mIncognito;
+        return travelToSync(
+                IncognitoTabSwitcherStation.from(getActivity().getTabModelSelector()),
+                TAB_SWITCHER_BUTTON::click);
     }
 
-    /** Loads a |url| in the same tab and waits to transition to the given |destination|. */
-    public <T extends PageStation> T loadPageProgramatically(T destination, String url) {
+    /** Loads a |url| in the same tab and waits to transition. */
+    public PageStation loadPageProgrammatically(String url) {
+        return loadPageProgrammatically(url, PageStation.newPageStationBuilder());
+    }
+
+    /** Loads a |url| in the same tab and waits to transition. */
+    public <T extends PageStation> T loadPageProgrammatically(String url, Builder<T> builder) {
+        builder.initFrom(this);
+        if (builder.mExpectedUrlSubstring == null) {
+            builder.mExpectedUrlSubstring = url;
+        }
+
+        T destination = builder.build();
         Runnable r =
                 () -> {
                     @PageTransition

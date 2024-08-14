@@ -239,6 +239,7 @@ insetBlockStart
 insetInline
 insetInlineEnd
 insetInlineStart
+interpolateSize
 isolation
 item
 justifyContent
@@ -351,8 +352,9 @@ placeSelf
 pointerEvents
 position
 positionAnchor
+positionArea
 positionTry
-positionTryOptions
+positionTryFallbacks
 positionTryOrder
 positionVisibility
 prefix

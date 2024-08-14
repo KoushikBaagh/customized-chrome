@@ -491,12 +491,12 @@ class AppsGridViewTest : public AshTestBase, views::WidgetObserver {
   }
 
   void SimulateKeyPress(ui::KeyboardCode key_code, int flags) {
-    ui::KeyEvent key_event(ui::ET_KEY_PRESSED, key_code, flags);
+    ui::KeyEvent key_event(ui::EventType::kKeyPressed, key_code, flags);
     apps_grid_view_->OnKeyPressed(key_event);
   }
 
   void SimulateKeyReleased(ui::KeyboardCode key_code, int flags) {
-    ui::KeyEvent key_event(ui::ET_KEY_RELEASED, key_code, flags);
+    ui::KeyEvent key_event(ui::EventType::kKeyReleased, key_code, flags);
     apps_grid_view_->OnKeyReleased(key_event);
   }
 
@@ -528,7 +528,7 @@ class AppsGridViewTest : public AshTestBase, views::WidgetObserver {
     if (create_as_tablet_mode_) {
       ui::GestureEvent gesture_event(
           location.x(), location.y(), 0, base::TimeTicks(),
-          ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+          ui::GestureEventDetails(ui::EventType::kGestureLongPress));
       event_generator->Dispatch(&gesture_event);
       return;
     }
@@ -1471,14 +1471,15 @@ TEST_P(AppsGridViewTabletTest,
   ui::GestureEvent scroll_begin(
       apps_grid_view_origin.x(), apps_grid_view_origin.y(), 0,
       base::TimeTicks(),
-      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_BEGIN, 0, -1));
+      ui::GestureEventDetails(ui::EventType::kGestureScrollBegin, 0, -1));
   ui::GestureEvent scroll_update(
       apps_grid_view_origin.x(), apps_grid_view_origin.y(), 0,
       base::TimeTicks(),
-      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE, 0, -10));
+      ui::GestureEventDetails(ui::EventType::kGestureScrollUpdate, 0, -10));
   ui::GestureEvent scroll_end(
       apps_grid_view_origin.x(), apps_grid_view_origin.y(), 0,
-      base::TimeTicks(), ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_END));
+      base::TimeTicks(),
+      ui::GestureEventDetails(ui::EventType::kGestureScrollEnd));
 
   // Drag up on the app grid when on page 1, this should move the AppsGridView
   // but not the AppListView.
@@ -1513,9 +1514,9 @@ TEST_F(AppsGridViewTest, TapsBetweenAppsWontCloseAppList) {
 
   // Simulate a tap between the two apps.
   gfx::Point between_apps = GetItemRectOnCurrentPageAt(0, 0).right_center();
-  ui::GestureEvent gesture_event(between_apps.x(), between_apps.y(), 0,
-                                 base::TimeTicks(),
-                                 ui::GestureEventDetails(ui::ET_GESTURE_TAP));
+  ui::GestureEvent gesture_event(
+      between_apps.x(), between_apps.y(), 0, base::TimeTicks(),
+      ui::GestureEventDetails(ui::EventType::kGestureTap));
   apps_grid_view_->OnGestureEvent(&gesture_event);
 
   // App list is still visible.
@@ -1701,13 +1702,13 @@ TEST_P(AppsGridViewTabletTest, MenuAtRightPosition) {
       AppListItemView* item_view = GetItemViewInTopLevelGrid(idx);
 
       // Send a mouse event which would show a context menu.
-      ui::MouseEvent press_event(ui::ET_MOUSE_PRESSED, gfx::Point(),
+      ui::MouseEvent press_event(ui::EventType::kMousePressed, gfx::Point(),
                                  gfx::Point(), ui::EventTimeForNow(),
                                  ui::EF_RIGHT_MOUSE_BUTTON,
                                  ui::EF_RIGHT_MOUSE_BUTTON);
       static_cast<views::View*>(item_view)->OnMouseEvent(&press_event);
 
-      ui::MouseEvent release_event(ui::ET_MOUSE_RELEASED, gfx::Point(),
+      ui::MouseEvent release_event(ui::EventType::kMouseReleased, gfx::Point(),
                                    gfx::Point(), ui::EventTimeForNow(),
                                    ui::EF_RIGHT_MOUSE_BUTTON,
                                    ui::EF_RIGHT_MOUSE_BUTTON);
@@ -5365,14 +5366,15 @@ TEST_P(AppsGridViewTabletTest, Basic) {
   ui::GestureEvent scroll_begin(
       apps_grid_view_origin.x(), apps_grid_view_origin.y(), 0,
       base::TimeTicks(),
-      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_BEGIN, 0, -1));
+      ui::GestureEventDetails(ui::EventType::kGestureScrollBegin, 0, -1));
   ui::GestureEvent scroll_update(
       apps_grid_view_origin.x(), apps_grid_view_origin.y(), 0,
       base::TimeTicks(),
-      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE, 0, -10));
+      ui::GestureEventDetails(ui::EventType::kGestureScrollUpdate, 0, -10));
   ui::GestureEvent scroll_end(
       apps_grid_view_origin.x(), apps_grid_view_origin.y(), 0,
-      base::TimeTicks(), ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_END));
+      base::TimeTicks(),
+      ui::GestureEventDetails(ui::EventType::kGestureScrollEnd));
 
   // Drag up on the app grid when on page 1, this should move the AppsGridView
   // but not the AppListView.
@@ -5417,18 +5419,19 @@ TEST_P(AppsGridViewTabletTest, EnsureBlurAfterScrollingWithoutTransition) {
   ui::GestureEvent scroll_begin(
       apps_grid_view_origin.x(), apps_grid_view_origin.y(), 0,
       base::TimeTicks(),
-      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_BEGIN, 0, -1));
+      ui::GestureEventDetails(ui::EventType::kGestureScrollBegin, 0, -1));
   ui::GestureEvent scroll_update_upwards(
       apps_grid_view_origin.x(), apps_grid_view_origin.y(), 0,
       base::TimeTicks(),
-      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE, 0, -10));
+      ui::GestureEventDetails(ui::EventType::kGestureScrollUpdate, 0, -10));
   ui::GestureEvent scroll_update_downwards(
       apps_grid_view_origin.x(), apps_grid_view_origin.y(), 0,
       base::TimeTicks(),
-      ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_UPDATE, 0, 15));
+      ui::GestureEventDetails(ui::EventType::kGestureScrollUpdate, 0, 15));
   ui::GestureEvent scroll_end(
       apps_grid_view_origin.x(), apps_grid_view_origin.y(), 0,
-      base::TimeTicks(), ui::GestureEventDetails(ui::ET_GESTURE_SCROLL_END));
+      base::TimeTicks(),
+      ui::GestureEventDetails(ui::EventType::kGestureScrollEnd));
 
   AppListItemView* folder_view = GetItemViewInTopLevelGrid(0);
   ASSERT_TRUE(folder_view->is_folder());
@@ -6853,6 +6856,90 @@ TEST_F(AppsGridViewTest, PromiseIconLayers) {
   EXPECT_FALSE(installed_view->GetIconView()->layer());
   EXPECT_FALSE(HasPendingPromiseAppRemoval(promise_app_id));
   EXPECT_FALSE(installed_view->layer());
+}
+
+TEST_F(AppsGridViewTest, PromiseAppsSharePackage) {
+  AppListItem* first_item =
+      GetTestModel()->CreateAndAddPromiseItem("PromiseApp");
+  const std::string promise_app_id = first_item->GetMetadata()->id;
+  UpdateLayout();
+
+  AppListItemView* first_promise_view = apps_grid_view_->GetItemViewAt(0);
+
+  // Promise apps are created with app_status kPending.
+  EXPECT_EQ(first_promise_view->item()->progress(), -1.0f);
+  EXPECT_TRUE(first_promise_view->layer());
+
+  // Set the last status update to kInstallSuccess as if the app had finished
+  // installing.
+  first_item->UpdateAppStatusForTesting(AppStatus::kInstallSuccess);
+  EXPECT_TRUE(first_promise_view->layer());
+
+  ui::ScopedAnimationDurationScaleMode non_zero_duration_mode(
+      ui::ScopedAnimationDurationScaleMode::NON_ZERO_DURATION);
+
+  // Simulate pushing the installed app.
+  GetTestModel()->DeleteItem(first_item->id());
+  EXPECT_TRUE(HasPendingPromiseAppRemoval(promise_app_id));
+  auto* first_installed_item = GetTestModel()->CreateItem("installed_id1");
+  auto item_metadata = first_installed_item->CloneMetadata();
+  item_metadata->promise_package_id = promise_app_id;
+  first_installed_item->SetMetadata(std::move(item_metadata));
+  GetTestModel()->AddItem(std::move(first_installed_item));
+
+  // While the first item is waiting for the installed item, create a new
+  // promise app with the same package id and immediately push it.
+  EXPECT_TRUE(HasPendingPromiseAppRemoval(promise_app_id));
+  AppListItem* new_item = GetTestModel()->CreateAndAddPromiseItem("PromiseApp");
+  EXPECT_EQ(promise_app_id, new_item->id());
+  EXPECT_EQ(2u, apps_grid_view_->view_model()->view_size());
+  AppListItemView* new_promise_view = apps_grid_view_->GetItemViewAt(1);
+  EXPECT_EQ(promise_app_id, new_promise_view->item()->id());
+  GetTestModel()->DeleteItem(promise_app_id);
+  EXPECT_EQ(1u, apps_grid_view_->view_model()->view_size());
+
+  auto* new_installed_item = GetTestModel()->CreateItem("installed_id2");
+  item_metadata = new_installed_item->CloneMetadata();
+  item_metadata->promise_package_id = promise_app_id;
+  new_installed_item->SetMetadata(std::move(item_metadata));
+  GetTestModel()->AddItem(std::move(new_installed_item));
+  EXPECT_EQ(2u, apps_grid_view_->view_model()->view_size());
+
+  AppListItemView* first_installed_view = apps_grid_view_->GetItemViewAt(0);
+  EXPECT_EQ(first_installed_view->item()->id(), "installed_id1");
+  ASSERT_TRUE(first_installed_view->layer());
+  AppListItemView* new_installed_view = apps_grid_view_->GetItemViewAt(1);
+  EXPECT_EQ(new_installed_view->item()->id(), "installed_id2");
+  ASSERT_TRUE(new_installed_view->layer());
+  EXPECT_TRUE(HasPendingPromiseAppRemoval(promise_app_id));
+
+  // Verify that the layers are animating separately.
+  ASSERT_TRUE(first_installed_view->GetIconView()->layer());
+  EXPECT_TRUE(first_installed_view->GetIconView()
+                  ->layer()
+                  ->GetAnimator()
+                  ->is_animating());
+  ASSERT_TRUE(new_installed_view->GetIconView()->layer());
+  EXPECT_TRUE(new_installed_view->GetIconView()
+                  ->layer()
+                  ->GetAnimator()
+                  ->is_animating());
+
+  ui::LayerAnimationStoppedWaiter animation_waiter;
+  animation_waiter.Wait(first_installed_view->GetIconView()->layer());
+
+  // Both layer animations should end at about the same time, however, if the
+  // animation for the other view isnot over, wait for it.
+  if (new_installed_view->layer()) {
+    ui::LayerAnimationStoppedWaiter new_animation_waiter;
+    new_animation_waiter.Wait(new_installed_view->GetIconView()->layer());
+  }
+
+  EXPECT_FALSE(HasPendingPromiseAppRemoval(promise_app_id));
+  EXPECT_FALSE(first_installed_view->GetIconView()->layer());
+  EXPECT_FALSE(first_installed_view->layer());
+  EXPECT_FALSE(new_installed_view->GetIconView()->layer());
+  EXPECT_FALSE(new_installed_view->layer());
 }
 
 TEST_F(AppsGridViewTest, DragEndsDuringPromiseAppReplacement) {

@@ -111,6 +111,7 @@ def _Generate(options, native_sources, java_sources, priority_java_sources):
   dicts = []
   for jni_obj in _Flatten(jni_objs_by_path,
                           native_sources_set & java_sources_set):
+    print(jni_obj.filename + f' {len(jni_obj.called_by_natives)} |||')
     dicts.append(DictionaryGenerator(jni_obj, options).Generate())
 
   priority_java_sources = set(
@@ -185,7 +186,8 @@ def _Generate(options, native_sources, java_sources, priority_java_sources):
             data=CreateProxyJavaFromDict(options,
                                          gen_jni_class,
                                          combined_dict,
-                                         hash_val=whole_hash))
+                                         whole_hash=whole_hash,
+                                         priority_hash=priority_hash))
         # org/jni_zero/GEN_JNI.java
         common.add_to_zip_hermetic(
             srcjar,
@@ -459,7 +461,8 @@ def CreateProxyJavaFromDict(options,
                             registration_dict,
                             stub_methods='',
                             forwarding=False,
-                            hash_val=None):
+                            whole_hash=None,
+                            priority_hash=None):
   template = string.Template("""\
 // Copyright 2018 The Chromium Authors
 // Use of this source code is governed by a BSD-style license that can be
@@ -489,7 +492,8 @@ ${METHODS}
   else:
     if options.enable_jni_multiplexing:
       fields = f'''\
-    public static final long MUXING_HASH = {hash_val}L;
+    public static final long WHOLE_HASH = {whole_hash}L;
+    public static final long PRIORITY_HASH = {priority_hash}L;
 '''
     else:
       fields = ''

@@ -610,6 +610,20 @@ TEST(SpanTest, ConstructFromRange) {
     auto s = base::span(r);
     static_assert(std::same_as<decltype(s), base::span<const int>>);
     EXPECT_EQ(s, base::span({1, 2, 3}));
+
+    // Implicit from modern range with dynamic size to dynamic span.
+    base::span<const int> imp = r;
+    EXPECT_EQ(imp, base::span({1, 2, 3}));
+  }
+  {
+    Range r;
+    auto s = base::span<const int, 3u>(r);
+    EXPECT_EQ(s, base::span({1, 2, 3}));
+
+    // Explicit from modern range with dynamic size to fixed span.
+    static_assert(!std::convertible_to<decltype(r), base::span<const int, 3u>>);
+    base::span<const int, 3u> imp(r);
+    EXPECT_EQ(imp, base::span({1, 2, 3}));
   }
 
   struct LegacyRange {
@@ -625,7 +639,71 @@ TEST(SpanTest, ConstructFromRange) {
     auto s = base::span(r);
     static_assert(std::same_as<decltype(s), base::span<const int>>);
     EXPECT_EQ(s, base::span({1, 2, 3}));
+
+    // Implicit from legacy range with dynamic size to dynamic span.
+    base::span<const int> imp = r;
+    EXPECT_EQ(imp, base::span({1, 2, 3}));
   }
+  {
+    LegacyRange r;
+    auto s = base::span<const int, 3u>(r);
+    EXPECT_EQ(s, base::span({1, 2, 3}));
+
+    // Explicit from legacy range with dynamic size to fixed span.
+    static_assert(!std::convertible_to<decltype(r), base::span<const int, 3u>>);
+    base::span<const int, 3> imp(r);
+    EXPECT_EQ(imp, base::span({1, 2, 3}));
+  }
+
+  using FixedRange = const std::array<int, 3>;
+  static_assert(std::ranges::contiguous_range<FixedRange>);
+  static_assert(std::ranges::sized_range<FixedRange>);
+  {
+    FixedRange r = {1, 2, 3};
+    auto s = base::span(r);
+    static_assert(std::same_as<decltype(s), base::span<const int, 3>>);
+    EXPECT_EQ(s, base::span({1, 2, 3}));
+
+    // Implicit from fixed size to dynamic span.
+    base::span<const int> imp = r;
+    EXPECT_EQ(imp, base::span({1, 2, 3}));
+  }
+  {
+    FixedRange r = {1, 2, 3};
+    auto s = base::span<const int, 3u>(r);
+    EXPECT_EQ(s, base::span({1, 2, 3}));
+
+    // Implicit from fixed size to fixed span.
+    base::span<const int, 3u> imp = r;
+    EXPECT_EQ(imp, base::span({1, 2, 3}));
+  }
+
+  // Construction from std::vectors.
+
+  {
+    // Implicit.
+    static_assert(std::convertible_to<const std::vector<int>, span<const int>>);
+    const std::vector<int> i{1, 2, 3};
+    span<const int> s = i;
+    EXPECT_EQ(s, i);
+  }
+  {
+    // Explicit.
+    static_assert(
+        !std::convertible_to<const std::vector<int>, span<const int, 3u>>);
+    static_assert(
+        std::constructible_from<span<const int, 3u>, const std::vector<int>>);
+    const std::vector<int> i{1, 2, 3};
+    span<const int, 3u> s(i);
+    EXPECT_EQ(s, base::span(i));
+  }
+
+  // vector<bool> is special and can't be converted to a span since it does not
+  // actually hold an array of `bool`.
+  static_assert(
+      !std::constructible_from<span<const bool>, const std::vector<bool>>);
+  static_assert(
+      !std::constructible_from<span<const bool, 3u>, const std::vector<bool>>);
 }
 
 TEST(SpanTest, FromRefOfMutableStackVariable) {
@@ -1428,6 +1506,22 @@ TEST(SpanTest, Subspan) {
   }
 }
 
+TEST(SpanTest, ToFixedExtent) {
+  {
+    const int kArray[] = {1, 2, 3};
+    const span<const int> s(kArray);
+
+    auto static_span = s.to_fixed_extent<3>();
+    ASSERT_TRUE(static_span.has_value());
+    static_assert(std::same_as<typename decltype(static_span)::value_type,
+                               span<const int, 3>>);
+    EXPECT_EQ(s.data(), static_span->data());
+    EXPECT_EQ(s.size(), static_span->size());
+
+    EXPECT_EQ(std::nullopt, s.to_fixed_extent<4>());
+  }
+}
+
 TEST(SpanTest, Size) {
   {
     span<int> span;
@@ -1676,14 +1770,6 @@ TEST(SpanTest, AsByteSpan) {
     EXPECT_EQ(byte_span.size(), kVec.size() * sizeof(int));
   }
   {
-    const std::vector<int> kVec({2, 3, 5, 7, 11, 13});
-    auto byte_span = as_byte_span<6u * sizeof(int)>(kVec);
-    static_assert(std::is_same_v<decltype(byte_span),
-                                 span<const uint8_t, 6u * sizeof(int)>>);
-    EXPECT_EQ(byte_span.data(), reinterpret_cast<const uint8_t*>(kVec.data()));
-    EXPECT_EQ(byte_span.size(), kVec.size() * sizeof(int));
-  }
-  {
     int kMutArray[] = {2, 3, 5, 7};
     auto byte_span = as_byte_span(kMutArray);
     static_assert(std::is_same_v<decltype(byte_span),
@@ -1699,15 +1785,6 @@ TEST(SpanTest, AsByteSpan) {
               reinterpret_cast<const uint8_t*>(kMutVec.data()));
     EXPECT_EQ(byte_span.size(), kMutVec.size() * sizeof(int));
   }
-  {
-    std::vector<int> kMutVec({2, 3, 5, 7});
-    auto byte_span = as_byte_span<4u * sizeof(int)>(kMutVec);
-    static_assert(std::is_same_v<decltype(byte_span),
-                                 span<const uint8_t, 4u * sizeof(int)>>);
-    EXPECT_EQ(byte_span.data(),
-              reinterpret_cast<const uint8_t*>(kMutVec.data()));
-    EXPECT_EQ(byte_span.size(), kMutVec.size() * sizeof(int));
-  }
   // Rvalue input.
   {
     [](auto byte_span) {
@@ -1718,15 +1795,6 @@ TEST(SpanTest, AsByteSpan) {
       EXPECT_EQ(byte_span[0u], 2);
     }(as_byte_span({2, 3, 5, 7, 11, 13}));
   }
-}
-
-TEST(SpanDeathTest, AsByteSpan) {
-  // Constructing a fixed-size span of the wrong size will terminate.
-  const std::vector<int> kVec({2, 3, 5, 7, 11, 13});
-  EXPECT_CHECK_DEATH({
-    auto byte_span = as_byte_span<6u>(kVec);  // 6 bytes is the wrong size.
-    base::debug::Alias(&byte_span);
-  });
 }
 
 TEST(SpanTest, AsWritableByteSpan) {
@@ -1745,14 +1813,6 @@ TEST(SpanTest, AsWritableByteSpan) {
     EXPECT_EQ(byte_span.data(), reinterpret_cast<uint8_t*>(kMutVec.data()));
     EXPECT_EQ(byte_span.size(), kMutVec.size() * sizeof(int));
   }
-  {
-    std::vector<int> kMutVec({2, 3, 5, 7});
-    auto byte_span = as_writable_byte_span<4u * sizeof(int)>(kMutVec);
-    static_assert(
-        std::is_same_v<decltype(byte_span), span<uint8_t, 4u * sizeof(int)>>);
-    EXPECT_EQ(byte_span.data(), reinterpret_cast<uint8_t*>(kMutVec.data()));
-    EXPECT_EQ(byte_span.size(), kMutVec.size() * sizeof(int));
-  }
   // Rvalue input.
   {
     [](auto byte_span) {
@@ -1763,16 +1823,6 @@ TEST(SpanTest, AsWritableByteSpan) {
       EXPECT_EQ(byte_span[0u], 2);
     }(as_writable_byte_span({2, 3, 5, 7, 11, 13}));
   }
-}
-
-TEST(SpanDeathTest, AsWritableByteSpan) {
-  // Constructing a fixed-size span of the wrong size will terminate.
-  std::vector<int> kVec({2, 3, 5, 7, 11, 13});
-  EXPECT_CHECK_DEATH({
-    auto byte_span =
-        as_writable_byte_span<6u>(kVec);  // 6 bytes is the wrong size.
-    base::debug::Alias(&byte_span);
-  });
 }
 
 TEST(SpanTest, AsStringView) {

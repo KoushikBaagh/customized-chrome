@@ -64,16 +64,15 @@ class COMPONENT_EXPORT(WEBNN_SERVICE) WebNNContextProviderImpl
   // is no longer safe to access |impl|.
   void OnConnectionError(WebNNContextImpl* impl);
 
-  using WebNNContextImplSet =
-      base::flat_set<std::unique_ptr<WebNNContextImpl>,
-                     WebNNObjectImpl::Comparator<WebNNContextImpl>>;
+  using WebNNContextImplSet = base::flat_set<
+      std::unique_ptr<WebNNContextImpl>,
+      WebNNObjectImpl<blink::WebNNContextToken>::Comparator<WebNNContextImpl>>;
 
   // The test cases can override the context creating behavior by implementing
   // this class and setting its instance by SetBackendForTesting().
   class BackendForTesting {
    public:
-    virtual void CreateWebNNContext(
-        WebNNContextImplSet& context_impls,
+    virtual std::unique_ptr<WebNNContextImpl> CreateWebNNContext(
         WebNNContextProviderImpl* context_provider_impl,
         mojom::CreateContextOptionsPtr options,
         CreateWebNNContextCallback callback) = 0;

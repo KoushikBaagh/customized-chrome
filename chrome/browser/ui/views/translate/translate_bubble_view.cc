@@ -25,10 +25,13 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/translate/translate_service.h"
+#include "chrome/browser/ui/actions/chrome_action_id.h"
+#include "chrome/browser/ui/browser_actions.h"
+#include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/translate/translate_bubble_model_impl.h"
+#include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/chrome_layout_provider.h"
-#include "chrome/browser/ui/views/controls/md_text_button_with_down_arrow.h"
 #include "chrome/browser/ui/views/translate/translate_icon_view.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/grit/generated_resources.h"
@@ -61,6 +64,7 @@
 #include "ui/views/controls/button/image_button_factory.h"
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/button/md_text_button.h"
+#include "ui/views/controls/button/md_text_button_with_down_arrow.h"
 #include "ui/views/controls/button/menu_button.h"
 #include "ui/views/controls/combobox/combobox.h"
 #include "ui/views/controls/highlight_path_generator.h"
@@ -116,6 +120,9 @@ TranslateBubbleView::~TranslateBubbleView() {
   // is referred by Combobox's destructor. Before destroying the models,
   // removing the child views is needed.
   RemoveAllChildViews();
+  if (features::IsToolbarPinningEnabled() && translate_action_item_) {
+    translate_action_item_->SetIsShowingBubble(false);
+  }
 }
 
 DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(TranslateBubbleView, kIdentifier);
@@ -169,6 +176,16 @@ void TranslateBubbleView::Init() {
 
   if (GetViewState() == TranslateBubbleModel::VIEW_STATE_ERROR) {
     model_->ShowError(error_type_);
+  }
+
+  if (features::IsToolbarPinningEnabled()) {
+    Browser* browser = chrome::FindLastActive();
+    if (browser) {
+      translate_action_item_ = actions::ActionManager::Get().FindAction(
+          kActionShowTranslate, browser->browser_actions()->root_action_item());
+      CHECK(translate_action_item_);
+      translate_action_item_->SetIsShowingBubble(true);
+    }
   }
 }
 

@@ -122,6 +122,12 @@ BASE_FEATURE(kForceSafeSearchForUnauthenticatedSupervisedUsers,
              "ForceSafeSearchForUnauthenticatedSupervisedUsers",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+BASE_FEATURE(kForceSupervisedUserReauthenticationForYouTube,
+             "ForceSupervisedUserReauthenticationForYouTube",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif
+
 BASE_FEATURE(kUncredentialedFilteringFallbackForSupervisedUsers,
              "UncredentialedFilteringFallbackForSupervisedUsers",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -151,18 +157,16 @@ BASE_FEATURE(kReplaceSupervisionSystemCapabilitiesWithAccountCapabilitiesOnIOS,
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
-#if BUILDFLAG(IS_ANDROID)
-BASE_FEATURE(kReplaceProfileIsChildWithAccountCapabilitiesOnAndroid,
-             "ReplaceProfileIsChildWithAccountCapabilitiesOnAndroid",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif
-
 BASE_FEATURE(kFetchListFamilyMembersWithCapability,
              "FetchListFamilyMembersWithCapability",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kUseFamilyMemberRolePrefsForFeedback,
              "UseFamilyMemberRolePrefsForFeedback",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kClassifyUrlOnProcessResponseEvent,
+             "ClassifyUrlOnProcessResponseEvent",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 bool IsKidFriendlyContentFeedAvailable() {

@@ -18,7 +18,7 @@
 #include "net/url_request/redirect_info.h"
 #include "net/url_request/url_request.h"
 #include "services/network/attribution/request_headers_internal.h"
-#include "services/network/public/cpp/attribution_reporting_runtime_features.h"
+#include "services/network/public/cpp/attribution_utils.h"
 #include "services/network/public/cpp/features.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
@@ -72,10 +72,20 @@ void SetAttributionReportingHeaders(net::URLRequest& url_request,
     return;
   }
 
+  const bool is_attribution_reporting_support_set =
+      request.attribution_reporting_support !=
+      network::mojom::AttributionSupport::kUnset;
+
+  AttributionReportingEligibility effective_eligibility =
+      is_attribution_reporting_support_set &&
+              !HasAttributionSupport(request.attribution_reporting_support)
+          ? AttributionReportingEligibility::kEmpty
+          : request.attribution_reporting_eligibility;
+
   uint64_t grease_bits = base::RandUint64();
 
   std::string eligible_header = SerializeAttributionReportingEligibleHeader(
-      request.attribution_reporting_eligibility,
+      effective_eligibility,
       AttributionReportingHeaderGreaseOptions::FromBits(grease_bits & 0xff));
   grease_bits >>= 8;
 
@@ -83,19 +93,12 @@ void SetAttributionReportingHeaders(net::URLRequest& url_request,
                                           std::move(eligible_header),
                                           /*overwrite=*/true);
 
-  // Note that it's important that the network process check both the
-  // base::Feature (which is set from the browser, so trustworthy) and the
-  // runtime feature (which can be spoofed in a compromised renderer, so is
-  // best-effort).
-  if (request.attribution_reporting_runtime_features.Has(
-          AttributionReportingRuntimeFeature::kCrossAppWeb) &&
-      base::FeatureList::IsEnabled(
+  if (base::FeatureList::IsEnabled(
           features::kAttributionReportingCrossAppWeb)) {
     base::UmaHistogramEnumeration("Conversions.RequestSupportHeader",
                                   request.attribution_reporting_support);
 
-    if (request.attribution_reporting_support !=
-        network::mojom::AttributionSupport::kUnset) {
+    if (is_attribution_reporting_support_set) {
       url_request.SetExtraRequestHeaderByName(
           "Attribution-Reporting-Support",
           GetAttributionSupportHeader(

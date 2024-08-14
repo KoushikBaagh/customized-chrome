@@ -66,6 +66,17 @@ export interface HealthdApiMemoryResult {
   availableMemoryKib: string;
   freeMemoryKib: string;
   totalMemoryKib: string;
+  buffersKib?: string;
+  pageCacheKib?: string;
+  sharedMemoryKib?: string;
+  activeMemoryKib?: string;
+  inactiveMemoryKib?: string;
+  totalSwapMemoryKib?: string;
+  freeSwapMemoryKib?: string;
+  cachedSwapMemoryKib?: string;
+  totalSlabMemoryKib?: string;
+  reclaimableSlabMemoryKib?: string;
+  unreclaimableSlabMemoryKib?: string;
 }
 
 /**
@@ -81,7 +92,7 @@ export interface HealthdApiThermalResult {
  * `getHealthdTelemetryInfo` api result.
  */
 export interface HealthdApiTelemetryResult {
-  battery: HealthdApiBatteryResult;
+  battery?: HealthdApiBatteryResult;
   cpu: HealthdApiCpuResult;
   fans: HealthdApiFanResult[];
   memory: HealthdApiMemoryResult;

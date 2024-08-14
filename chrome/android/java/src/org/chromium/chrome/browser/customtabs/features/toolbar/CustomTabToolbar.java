@@ -1747,7 +1747,8 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
                     ThemeUtils.getTextBoxColorForToolbarBackgroundInNonNativePage(
                             getContext(),
                             background,
-                            mBrandedColorScheme == BrandedColorScheme.INCOGNITO);
+                            mBrandedColorScheme == BrandedColorScheme.INCOGNITO,
+                            /* isCustomTab= */ true);
             mOmniboxBackground.setTint(bg);
         }
 
@@ -1898,6 +1899,12 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
             lp.height =
                     getResources().getDimensionPixelSize(R.dimen.custom_tabs_url_bar_active_height);
             mUrlBar.setLayoutParams(lp);
+
+            View urlBarWrapper = findViewById(R.id.url_bar_wrapper);
+            FrameLayout.LayoutParams locationBarLayoutParams =
+                    (FrameLayout.LayoutParams) urlBarWrapper.getLayoutParams();
+            locationBarLayoutParams.gravity = Gravity.CENTER_VERTICAL;
+            urlBarWrapper.setLayoutParams(locationBarLayoutParams);
 
             mTitleUrlContainer.setPadding(
                     mTitleUrlContainer.getPaddingLeft(),

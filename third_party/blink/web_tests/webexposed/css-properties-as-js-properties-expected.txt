@@ -361,9 +361,9 @@ popoverHideDelay
 popoverShowDelay
 position
 positionAnchor
+positionArea
 positionTry
 positionTryFallbacks
-positionTryOptions
 positionTryOrder
 positionVisibility
 prefix
@@ -454,6 +454,7 @@ textAlign
 textAlignLast
 textAnchor
 textAutospace
+textBox
 textBoxEdge
 textBoxTrim
 textCombineUpright
@@ -503,6 +504,7 @@ viewTimelineAxis
 viewTimelineInset
 viewTimelineName
 viewTransitionClass
+viewTransitionGroup
 viewTransitionName
 visibility
 webkitAlignContent

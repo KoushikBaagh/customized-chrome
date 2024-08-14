@@ -5,11 +5,13 @@
 #include <memory>
 #include <vector>
 
+#include "base/functional/bind.h"
 #include "base/run_loop.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/feature_engagement/tracker_factory.h"
 #include "chrome/browser/performance_manager/public/user_tuning/performance_detection_manager.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_test_util.h"
@@ -24,6 +26,8 @@
 #include "chrome/browser/ui/views/performance_controls/tab_list_row_view.h"
 #include "chrome/browser/ui/views/performance_controls/tab_list_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+#include "chrome/grit/branded_strings.h"
+#include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/interactive_test_utils.h"
 #include "chrome/test/interaction/interaction_test_util_browser.h"
@@ -99,7 +103,8 @@ class PerformanceInterventionInteractiveTest
     set_open_about_blank_on_browser_launch(true);
     feature_list_.InitAndEnableFeatureWithParameters(
         performance_manager::features::kPerformanceInterventionUI,
-        {{"intervention_show_mixed_profile", "false"}});
+        {{"intervention_show_mixed_profile", "false"},
+         {"intervention_dialog_version", "2"}});
     InteractiveFeaturePromoTest::SetUp();
   }
 
@@ -107,6 +112,26 @@ class PerformanceInterventionInteractiveTest
     InteractiveFeaturePromoTest::SetUpOnMainThread();
     host_resolver()->AddRule("*", "127.0.0.1");
     ASSERT_TRUE(embedded_test_server()->Start());
+  }
+
+  Profile* CreateTestProfile() {
+    ProfileManager* const profile_manager =
+        g_browser_process->profile_manager();
+    const base::FilePath new_path =
+        profile_manager->GenerateNextProfileDirectoryPath();
+    Profile* const profile =
+        &profiles::testing::CreateProfileSync(profile_manager, new_path);
+    auto* const tracker =
+        feature_engagement::TrackerFactory::GetForBrowserContext(profile);
+    base::RunLoop run_loop;
+    tracker->AddOnInitializedCallback(base::BindOnce(
+        [](base::OnceClosure callback, bool success) {
+          ASSERT_TRUE(success);
+          std::move(callback).Run();
+        },
+        run_loop.QuitClosure()));
+    run_loop.Run();
+    return profile;
   }
 
   GURL GetURL(std::string_view hostname = "example.com",
@@ -144,25 +169,24 @@ class PerformanceInterventionInteractiveTest
   }
 
   auto CloseTab(int index) {
-    return Do(base::BindLambdaForTesting([=]() {
+    return Do(base::BindLambdaForTesting([=, this]() {
       browser()->tab_strip_model()->CloseWebContentsAt(
           index, TabCloseTypes::CLOSE_NONE);
     }));
   }
 
   auto CheckTabDiscardStatus(int index, bool discarded) {
-    return Check([=]() {
+    return Check([=, this]() {
       TabStripModel* const tab_strip_model = browser()->tab_strip_model();
       return tab_strip_model->GetWebContentsAt(index)->WasDiscarded() ==
              discarded;
     });
   }
 
-  auto SimulateMouseEnterTabRow(const ElementSpecifier& tab_row_id) {
+  auto SimulateFocusOnTextContainer(const ElementSpecifier& tab_row_id) {
     return WithView(tab_row_id, [](TabListRowView* tab_list_row) {
-      ui::MouseEvent e(ui::EventType::ET_MOUSE_ENTERED, gfx::Point(),
-                       gfx::Point(), ui::EventTimeForNow(), 0, 0);
-      tab_list_row->OnEvent(&e);
+      tab_list_row->GetTextContainerForTesting()->RequestFocus();
+      ASSERT_TRUE(tab_list_row->GetTextContainerForTesting()->HasFocus());
     });
   }
 
@@ -196,6 +220,35 @@ IN_PROC_BROWSER_TEST_F(PerformanceInterventionInteractiveTest,
       EnsurePresent(kToolbarPerformanceInterventionButtonElementId),
       FlushEvents(), TriggerOnActionableTabListChange({}),
       WaitForHide(kToolbarPerformanceInterventionButtonElementId));
+}
+
+IN_PROC_BROWSER_TEST_F(PerformanceInterventionInteractiveTest,
+                       BodyTextControlledByFeatureParamSingluarTab) {
+  RunTestSequence(
+      AddInstrumentedTab(kSecondTab, GetURL()),
+      TriggerOnActionableTabListChange({0}),
+      WaitForShow(
+          PerformanceInterventionBubble::kPerformanceInterventionDialogBody),
+      CheckViewProperty(
+          PerformanceInterventionBubble::kPerformanceInterventionDialogBody,
+          &views::Label::GetText,
+          l10n_util::GetStringUTF16(
+              IDS_PERFORMANCE_INTERVENTION_DIALOG_BODY_SINGULAR_V2)));
+}
+
+IN_PROC_BROWSER_TEST_F(PerformanceInterventionInteractiveTest,
+                       BodyTextControlledByFeatureParamPluralTabs) {
+  RunTestSequence(
+      AddInstrumentedTab(kSecondTab, GetURL()),
+      AddInstrumentedTab(kThirdTab, GetURL()),
+      TriggerOnActionableTabListChange({0, 1}),
+      WaitForShow(
+          PerformanceInterventionBubble::kPerformanceInterventionDialogBody),
+      CheckViewProperty(
+          PerformanceInterventionBubble::kPerformanceInterventionDialogBody,
+          &views::Label::GetText,
+          l10n_util::GetStringUTF16(
+              IDS_PERFORMANCE_INTERVENTION_DIALOG_BODY_V2)));
 }
 
 IN_PROC_BROWSER_TEST_F(PerformanceInterventionInteractiveTest,
@@ -429,7 +482,7 @@ IN_PROC_BROWSER_TEST_F(PerformanceInterventionInteractiveTest,
           [](TabListView* tab_list) {
             return views::AsViewClass<TabListRowView>(tab_list->children()[0]);
           }),
-      SimulateMouseEnterTabRow(kTabListRow), FlushEvents(),
+      SimulateFocusOnTextContainer(kTabListRow), FlushEvents(),
       CheckView(kTabListRow,
                 [](TabListRowView* tab_list_row) {
                   return tab_list_row->GetCloseButtonForTesting()->GetVisible();
@@ -439,7 +492,6 @@ IN_PROC_BROWSER_TEST_F(PerformanceInterventionInteractiveTest,
                          return tab_list_row->GetCloseButtonForTesting();
                        }),
       PressButton(kSuggestedCloseButton), WaitForHide(kSuggestedCloseButton),
-      FlushEvents(),
       PressButton(PerformanceInterventionBubble::
                       kPerformanceInterventionDialogDeactivateButton),
       Do([&]() { waiter->Wait(); }), CheckTabDiscardStatus(0, false),
@@ -541,7 +593,7 @@ IN_PROC_BROWSER_TEST_F(PerformanceInterventionInteractiveTest,
   // Dismiss the dialog.
   views::test::WidgetDestroyedWaiter widget_waiter(
       intervention_button->bubble_dialog_model_host()->GetWidget());
-  ui::MouseEvent e(ui::ET_MOUSE_PRESSED, gfx::Point(), gfx::Point(),
+  ui::MouseEvent e(ui::EventType::kMousePressed, gfx::Point(), gfx::Point(),
                    ui::EventTimeForNow(), 0, 0);
   views::test::ButtonTestApi test_api(intervention_button);
   test_api.NotifyClick(e);
@@ -583,12 +635,7 @@ IN_PROC_BROWSER_TEST_F(PerformanceInterventionInteractiveTest,
   ASSERT_TRUE(AddTabAtIndexToBrowser(first_browser, 1, GetURL("b.com"),
                                      ui::PageTransition::PAGE_TRANSITION_LINK));
 
-  ProfileManager* const profile_manager = g_browser_process->profile_manager();
-  const base::FilePath new_path =
-      profile_manager->GenerateNextProfileDirectoryPath();
-  Profile& profile =
-      profiles::testing::CreateProfileSync(profile_manager, new_path);
-  Browser* const second_browser = CreateBrowser(&profile);
+  Browser* const second_browser = CreateBrowser(CreateTestProfile());
   ASSERT_TRUE(AddTabAtIndexToBrowser(second_browser, 0, GetURL("c.com"),
                                      ui::PageTransition::PAGE_TRANSITION_LINK));
   BrowserWindow* const first_browser_window = first_browser->window();
@@ -635,7 +682,8 @@ class PerformanceInterventionNonUiMetricsTest
   void SetUp() override {
     set_open_about_blank_on_browser_launch(true);
     feature_list_.InitWithFeatures(
-        {performance_manager::features::kPerformanceIntervention}, {});
+        {performance_manager::features::kPerformanceIntervention},
+        {performance_manager::features::kPerformanceInterventionUI});
     InteractiveFeaturePromoTest::SetUp();
   }
 
@@ -643,6 +691,8 @@ class PerformanceInterventionNonUiMetricsTest
   base::test::ScopedFeatureList feature_list_;
 };
 
+// TODO(crbug.com/355466439): Fix test to work with UI after performance
+// intervention rolls out.
 IN_PROC_BROWSER_TEST_F(PerformanceInterventionNonUiMetricsTest,
                        TriggerMetricsRecorded) {
   base::HistogramTester histogram_tester;
@@ -695,8 +745,7 @@ class PerformanceInterventionMixedProfileTest
 
 // We can only have one non-off record profile open at a time on ChromeOS so
 // users will not encounter this case.
-// TODO(crbug.com/352446083): Investigate test failure on linux64-rel-ready bot
-#if !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_LINUX)
+#if !BUILDFLAG(IS_CHROMEOS)
 IN_PROC_BROWSER_TEST_F(PerformanceInterventionMixedProfileTest,
                        SuggestTabsForMultipleProfiles) {
   // Create two browser windows with tabs and ensure the second browser window
@@ -707,12 +756,7 @@ IN_PROC_BROWSER_TEST_F(PerformanceInterventionMixedProfileTest,
   ASSERT_TRUE(AddTabAtIndexToBrowser(first_browser, 1, GetURL("b.com"),
                                      ui::PageTransition::PAGE_TRANSITION_LINK));
 
-  ProfileManager* const profile_manager = g_browser_process->profile_manager();
-  const base::FilePath new_path =
-      profile_manager->GenerateNextProfileDirectoryPath();
-  Profile& profile =
-      profiles::testing::CreateProfileSync(profile_manager, new_path);
-  Browser* const second_browser = CreateBrowser(&profile);
+  Browser* const second_browser = CreateBrowser(CreateTestProfile());
   ASSERT_TRUE(AddTabAtIndexToBrowser(second_browser, 0, GetURL("c.com"),
                                      ui::PageTransition::PAGE_TRANSITION_LINK));
   BrowserWindow* const first_browser_window = first_browser->window();

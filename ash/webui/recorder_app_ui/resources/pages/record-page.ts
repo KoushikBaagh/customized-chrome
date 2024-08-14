@@ -40,34 +40,34 @@ import {
 import {ReactiveLitElement} from '../core/reactive/lit.js';
 import {computed, Dispose, effect, signal} from '../core/reactive/signal.js';
 import {RecordingCreateParams} from '../core/recording_data_manager.js';
-import {AudioSource, RecordingSession} from '../core/recording_session.js';
+import {RecordingSession} from '../core/recording_session.js';
 import {navigateTo} from '../core/state/route.js';
-import {settings, TranscriptionEnableState} from '../core/state/settings.js';
+import {
+  settings,
+  SpeakerLabelEnableState,
+  TranscriptionEnableState,
+} from '../core/state/settings.js';
 import {
   assertExhaustive,
+  assertExists,
   assertInstanceof,
-  checkEnumVariant,
 } from '../core/utils/assert.js';
 import {formatDuration} from '../core/utils/datetime.js';
 
 function getDefaultTitle(): string {
-  // TODO: b/336963138 - Handle i18n? Some other app (like screen capture /
-  // recording) seems to not having i18n for filename, but we're also using this
-  // as title.
+  // The default title is always in English and not translated, since it's also
+  // used as exported filename.
   const now = new Date();
   const year = now.getFullYear();
-  const month = now.getMonth().toString().padStart(2, '0');
-  const day = now.getDay().toString().padStart(2, '0');
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  const day = now.getDate().toString().padStart(2, '0');
   const time = new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     second: '2-digit',
     hour12: true,
   });
-  // TODO(pihsun): '.' looks very weird on title, use ':' and replace it with
-  // '.' when exporting as filename?
-  return `Audio recording ${year}-${month}-${day} ${
-    time.format(now).replaceAll(':', '.')}`;
+  return `Audio recording ${year}-${month}-${day} ${time.format(now)}`;
 }
 
 /**
@@ -301,10 +301,13 @@ export class RecordPage extends ReactiveLitElement {
   `;
 
   static override properties: PropertyDeclarations = {
-    audioSource: {type: String},
+    includeSystemAudio: {type: Boolean},
+    micId: {type: String},
   };
 
-  audioSource: string|null = null;
+  includeSystemAudio: boolean = false;
+
+  micId: string|null = null;
 
   private readonly recordingTitle: string = getDefaultTitle();
 
@@ -344,9 +347,11 @@ export class RecordPage extends ReactiveLitElement {
 
     try {
       session = await RecordingSession.create({
+        micId: assertExists(this.micId),
+        includeSystemAudio: this.includeSystemAudio,
         platformHandler: this.platformHandler,
-        source: checkEnumVariant(AudioSource, this.audioSource) ??
-          AudioSource.USER_MEDIA,
+        speakerLabelEnabled: settings.value.speakerLabelEnabled ===
+          SpeakerLabelEnableState.ENABLED,
       });
     } catch (e) {
       if (e instanceof DOMException &&
@@ -410,7 +415,7 @@ export class RecordPage extends ReactiveLitElement {
       durationMs: Math.round(session.progress.value.length * 1000),
       recordedAt: Date.now(),
       powers: session.progress.value.powers,
-      textTokens: session.progress.value.textTokens,
+      transcription: session.progress.value.transcription,
     };
     const id = await this.recordingDataManager.createRecording(
       params,
@@ -514,11 +519,11 @@ export class RecordPage extends ReactiveLitElement {
     // TODO: b/344789835 - Add state when transcription is disabled.
     // TODO: b/336963138 - Animation while opening/closing the panel.
     const session = this.recordingSession.value;
-    const {textTokens} = session.progress.value;
-    if (textTokens !== null && textTokens.length > 0) {
+    const {transcription} = session.progress.value;
+    if (transcription !== null && !transcription.isEmpty()) {
       // If there are existing transcription, it is always shown even if the
       // transcription is disabled afterwards.
-      return html`<transcription-view .textTokens=${textTokens}>
+      return html`<transcription-view .transcription=${transcription}>
       </transcription-view>`;
     }
 

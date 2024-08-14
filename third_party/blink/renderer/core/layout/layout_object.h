@@ -950,6 +950,10 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     NOT_DESTROYED();
     return false;
   }
+  virtual bool IsLayoutMasonry() const {
+    NOT_DESTROYED();
+    return false;
+  }
   virtual bool IsLayoutMultiColumnSet() const {
     NOT_DESTROYED();
     return false;
@@ -1431,8 +1435,9 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
       const PhysicalOffset& p,
       const LayoutBox* box_for_flipping = nullptr) const {
     NOT_DESTROYED();
-    if (LIKELY(!HasFlippedBlocksWritingMode()))
+    if (!HasFlippedBlocksWritingMode()) [[likely]] {
       return p.ToLayoutPoint();
+    }
     return {FlipForWritingModeInternal(p.left, LayoutUnit(), box_for_flipping),
             p.top};
   }
@@ -1571,6 +1576,11 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     return HasNonVisibleOverflow() && StyleRef().IsScrollContainer();
   }
 
+  bool IsScrollContainerWithScrollMarkerGroup() const {
+    NOT_DESTROYED();
+    return IsScrollContainer() && !Style()->ScrollMarkerGroupNone();
+  }
+
   // Not returning StyleRef().HasTransformRelatedProperty() because some objects
   // ignore the transform-related styles (e.g., LayoutInline).
   bool HasTransformRelatedProperty() const {
@@ -1666,8 +1676,9 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
   // This function is performance sensitive.
   inline bool IsRenderedLegend() const {
     NOT_DESTROYED();
-    if (LIKELY(!IsRenderedLegendCandidate()))
+    if (!IsRenderedLegendCandidate()) [[likely]] {
       return false;
+    }
 
     return IsRenderedLegendInternal();
   }
@@ -1842,7 +1853,7 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     }
 #endif
 
-    if (UNLIKELY(IsColumnSpanAll())) {
+    if (IsColumnSpanAll()) [[unlikely]] {
       return ContainerForColumnSpanAll(skip_info);
     }
 

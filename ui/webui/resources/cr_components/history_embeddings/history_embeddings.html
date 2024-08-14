@@ -118,7 +118,9 @@ a {
             as-anchor as-anchor-target="_blank" always-show-suffix>
           <span class="time" slot="suffix">[[item.relativeTime]]</span>
           <cr-icon-button slot="suffix" iron-icon="cr:more-vert"
-              on-click="onMoreActionsClick_">
+              on-click="onMoreActionsClick_"
+              aria-label="[[i18n('actionMenuDescription')]]"
+              aria-description="[[item.title]]">
           </cr-icon-button>
           <div slot="footer" class="source-passage"
               hidden$="[[!item.sourcePassage]]">
@@ -131,13 +133,7 @@ a {
     </div>
 
     <div class="footer">
-      <div id="footerText">
-        [[i18n('historyEmbeddingsFooter')]]
-        <a href="[[i18n('historyEmbeddingsHelpArticleUrl')]]" target="_blank"
-            aria-describedby="footerText">
-          [[i18n('learnMore')]]
-        </a>
-      </div>
+      <div id="footerText">[[i18n('historyEmbeddingsFooter')]]</div>
       <cr-feedback-buttons id="feedbackButtons"
           selected-option="[[feedbackState_]]"
           on-selected-option-changed="onFeedbackSelectedOptionChanged_">

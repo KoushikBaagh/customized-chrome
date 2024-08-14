@@ -34,6 +34,7 @@
 #include "components/commerce/core/subscriptions/commerce_subscription.h"
 #include "components/commerce/core/web_extractor.h"
 #include "components/history/core/browser/history_service.h"
+#include "components/history/core/browser/history_service_observer.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "components/optimization_guide/core/optimization_guide_decision.h"
 #include "components/unified_consent/consent_throttle.h"
@@ -192,7 +193,9 @@ using UrlProductIdentifierTupleCallback =
 //         browser()->profile()));
 // clang-format on
 
-class ShoppingService : public KeyedService, public base::SupportsUserData {
+class ShoppingService : public KeyedService,
+                        public base::SupportsUserData,
+                        public history::HistoryServiceObserver {
  public:
   ShoppingService(
       const std::string& country_on_startup,
@@ -426,10 +429,10 @@ class ShoppingService : public KeyedService, public base::SupportsUserData {
 
   virtual ClusterManager* GetClusterManager();
 
-  // Return whether the |discount_id| has been shown before.
-  virtual bool HasDiscountShownBefore(uint64_t discount_id);
-  // Called after showing the DiscountInfo with the |discount_id|.
-  void ShownDiscount(uint64_t discount_id);
+  // history::HistoryServiceObserver:
+  void OnHistoryDeletions(history::HistoryService* history_service,
+                          const history::DeletionInfo& deletion_info) override;
+
   // Get a weak pointer for this service instance.
   base::WeakPtr<ShoppingService> AsWeakPtr();
 
@@ -475,6 +478,10 @@ class ShoppingService : public KeyedService, public base::SupportsUserData {
   // analogous to switching tabs.
   void OnWebWrapperSwitched(WebWrapper* web);
 
+  // Called to signal that a WebWrapper is viewed. This happens when a new
+  // navigation is committed in a focused tab.
+  void OnWebWrapperViewed(WebWrapper* web);
+
   // Schedule (or reschedule) the on-page local extraction execution. Calling
   // this sequentially for the same web wrapper with the same URL will cancel
   // the pending task and schedule a new one. The script will, at most, run once
@@ -491,14 +498,6 @@ class ShoppingService : public KeyedService, public base::SupportsUserData {
       base::WeakPtr<WebWrapper> web,
       const GURL& url,
       std::optional<bool> is_shopping_page);
-
-  // Whether APIs like |GetProductInfoForURL| are enabled and allowed to be
-  // used.
-  bool IsProductInfoApiEnabled();
-
-  // Whether the PDP (product details page) state of a page is allowed to be
-  // recorded.
-  bool IsPDPMetricsRecordingEnabled();
 
   // A callback for recording metrics after page navigation and having
   // determined the page is shopping related.
@@ -624,9 +623,14 @@ class ShoppingService : public KeyedService, public base::SupportsUserData {
   void GetProductIdentifierForUrl(const GURL& url,
                                   UrlProductIdentifierTupleCallback callback);
 
+  void UpdateRecentlyViewedURL(WebWrapper* web);
+
   // Return all ProductSpecificationsSets from ProductSpecificationsService.
   virtual const std::vector<ProductSpecificationsSet>
   GetAllProductSpecificationSets();
+
+  void OnGetOnDemandProductInfo(const GURL& url,
+                                const std::optional<const ProductInfo>& info);
 
   // The two-letter country code as detected on startup.
   std::string country_on_startup_;
@@ -676,10 +680,6 @@ class ShoppingService : public KeyedService, public base::SupportsUserData {
   // The object handling discounts storage.
   std::unique_ptr<DiscountsStorage> discounts_storage_;
 
-  // This set includes the unique id of shown discounts in the current browser
-  // context. It serves as a cross-tab status tracker for the discounts UI.
-  base::flat_set<uint64_t> shown_discount_ids_;
-
   // Object for tracking parcel status.
   std::unique_ptr<ParcelsManager> parcels_manager_;
 
@@ -704,6 +704,15 @@ class ShoppingService : public KeyedService, public base::SupportsUserData {
   // the commerce info cache up to date.
   std::unique_ptr<ProductSpecificationsSet::Observer>
       prod_spec_url_ref_observer_;
+
+  // Map between URL and a list of callbacks that are waiting for product info.
+  // This is used to avoid repeated calls to get product info for the same URL.
+  std::map<GURL, std::vector<ProductInfoCallback>>
+      on_demand_product_info_callbacks_;
+
+  base::ScopedObservation<history::HistoryService,
+                          history::HistoryServiceObserver>
+      history_service_observation_{this};
 
   // Ensure certain functions are being executed on the same thread.
   SEQUENCE_CHECKER(sequence_checker_);

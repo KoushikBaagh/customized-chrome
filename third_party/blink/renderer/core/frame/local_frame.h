@@ -43,7 +43,6 @@
 #include "third_party/blink/public/common/frame/frame_ad_evidence.h"
 #include "third_party/blink/public/common/frame/frame_owner_element_type.h"
 #include "third_party/blink/public/common/frame/history_user_activation_state.h"
-#include "third_party/blink/public/common/frame/transient_allow_fullscreen.h"
 #include "third_party/blink/public/common/tokens/tokens.h"
 #include "third_party/blink/public/mojom/back_forward_cache_not_restored_reasons.mojom-blink.h"
 #include "third_party/blink/public/mojom/blob/blob_url_store.mojom-blink-forward.h"
@@ -426,9 +425,6 @@ class CORE_EXPORT LocalFrame final
   bool InViewSourceMode() const;
   void SetInViewSourceMode(bool = true);
 
-  // Layout zoom factor reflects hardware device pixel ratio, browser zoom, and
-  // for embedded frames the effect of the CSS "zoom" property applied to the
-  // embedding element (e.g. <iframe>).
   void SetLayoutZoomFactor(float);
   float LayoutZoomFactor() const { return layout_zoom_factor_; }
   void SetTextZoomFactor(float);
@@ -802,14 +798,6 @@ class CORE_EXPORT LocalFrame final
   // access).
   bool CanAccessEvent(const WebInputEventAttribution&) const;
 
-  // Return true if the frame has a transient affordance to enter fullscreen.
-  bool IsTransientAllowFullscreenActive() const;
-
-  // Activate the transient affordance to enter fullscreen.
-  void ActivateTransientAllowFullscreen() {
-    transient_allow_fullscreen_.Activate();
-  }
-
   LocalFrameToken GetLocalFrameToken() const;
 
   LoaderFreezeMode GetLoaderFreezeMode();
@@ -1087,6 +1075,8 @@ class CORE_EXPORT LocalFrame final
   // Whether this frame is known to be completely occluded by other opaque
   // OS-level windows.
   unsigned hidden_ : 1;
+  // Whether DetachImpl() has run to completion on this LocalFrame.
+  unsigned did_run_detach_impl_ : 1 = false;
 
   float layout_zoom_factor_;
   float text_zoom_factor_;
@@ -1094,12 +1084,6 @@ class CORE_EXPORT LocalFrame final
   Member<CoreProbeSink> probe_sink_;
   scoped_refptr<InspectorTaskRunner> inspector_task_runner_;
   Member<PerformanceMonitor> performance_monitor_;
-
-  // Whether `performance_monitor_` was created by this (not a reference to a
-  // `PerformanceMonitor` created by another `LocalFrame`) and not shutdown yet.
-  //
-  // TODO(crbug.com/337200890): Remove when investigation is complete.
-  bool must_shutdown_performance_monitor_ = false;
 
   Member<AdTracker> ad_tracker_;
   Member<IdlenessDetector> idleness_detector_;
@@ -1169,9 +1153,6 @@ class CORE_EXPORT LocalFrame final
   // ScrollSnapshotClients owned by elements in this frame. The clients must
   // be registered at the actual elements as the references here are weak.
   HeapHashSet<WeakMember<ScrollSnapshotClient>> scroll_snapshot_clients_;
-
-  // Manages a transient affordance for this frame to enter fullscreen.
-  TransientAllowFullscreen transient_allow_fullscreen_;
 
 #if !BUILDFLAG(IS_ANDROID)
   bool is_window_controls_overlay_visible_ = false;

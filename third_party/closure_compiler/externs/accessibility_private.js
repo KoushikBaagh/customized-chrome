@@ -207,7 +207,8 @@ chrome.accessibilityPrivate.SyntheticMouseEventButton = {
  *   x: number,
  *   y: number,
  *   touchAccessibility: (boolean|undefined),
- *   mouseButton: (!chrome.accessibilityPrivate.SyntheticMouseEventButton|undefined)
+ *   mouseButton: (!chrome.accessibilityPrivate.SyntheticMouseEventButton|undefined),
+ *   isDoubleClick: (boolean|undefined)
  * }}
  */
 chrome.accessibilityPrivate.SyntheticMouseEvent;
@@ -871,3 +872,10 @@ chrome.accessibilityPrivate.onShowChromeVoxTutorial;
  * @type {!ChromeEvent}
  */
 chrome.accessibilityPrivate.onToggleDictation;
+
+/**
+ * Fired only from the FaceGaze settings when the settings page requests to
+ * receive or stop receiving gesture detection information from FaceGaze.
+ * @type {!ChromeEvent}
+ */
+chrome.accessibilityPrivate.onToggleGestureInfoForSettings;

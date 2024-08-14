@@ -42,6 +42,8 @@
 #include "chromeos/constants/chromeos_features.h"
 #include "components/vector_icons/vector_icons.h"
 #include "third_party/abseil-cpp/absl/strings/ascii.h"
+#include "ui/accessibility/ax_enums.mojom.h"
+#include "ui/accessibility/platform/ax_platform_node.h"
 #include "ui/base/ime/composition_text.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/color/color_provider_manager.h"
@@ -62,6 +64,9 @@
 namespace {
 // kBestMatch is the second result container for productivity launcher search.
 constexpr int kBestMatchIndex = 1;
+
+// Copied from ash/app_list/views/app_list_search_view.cc
+constexpr base::TimeDelta kNotifyA11yDelay = base::Milliseconds(1500);
 
 bool IsValidSearchBoxAccessibilityHint(const std::u16string& hint) {
   SCOPED_TRACE(testing::Message() << "Hint Text: " << hint);
@@ -124,7 +129,10 @@ class KeyPressCounterView : public ContentsView {
 class SearchBoxViewTest : public views::test::WidgetTest,
                           public SearchBoxViewDelegate {
  public:
-  SearchBoxViewTest() {
+  SearchBoxViewTest()
+      : views::test::WidgetTest(std::make_unique<base::test::TaskEnvironment>(
+            base::test::TaskEnvironment::MainThreadType::UI,
+            base::test::TaskEnvironment::TimeSource::MOCK_TIME)) {
     scoped_feature_list_.InitAndEnableFeature(chromeos::features::kJelly);
   }
 
@@ -183,7 +191,7 @@ class SearchBoxViewTest : public views::test::WidgetTest,
   }
 
   void KeyPress(ui::KeyboardCode key_code, bool is_shift_down = false) {
-    ui::KeyEvent event(ui::ET_KEY_PRESSED, key_code,
+    ui::KeyEvent event(ui::EventType::kKeyPressed, key_code,
                        is_shift_down ? ui::EF_SHIFT_DOWN : ui::EF_NONE);
     view()->search_box()->OnKeyEvent(&event);
     // Emulates the input method.
@@ -229,6 +237,11 @@ class SearchBoxViewTest : public views::test::WidgetTest,
   SearchResultBaseView* GetFirstResultView() {
     return search_view_->result_container_views_for_test()[kBestMatchIndex]
         ->GetFirstResultView();
+  }
+
+  SearchResultBaseView* GetResultViewAt(size_t index) {
+    return search_view_->result_container_views_for_test()[kBestMatchIndex]
+        ->GetResultViewAt(index);
   }
 
   ResultSelectionController* GetResultSelectionController() {
@@ -301,7 +314,7 @@ TEST_F(SearchBoxViewTest, FilterButtonNotCreatedWithDisabledImageSearch) {
 // Tests that the close button is still visible after the search box is
 // activated (in zero state).
 TEST_F(SearchBoxViewTest, CloseButtonVisibleInZeroStateSearchBox) {
-  SetSearchBoxActive(true, ui::ET_MOUSE_PRESSED);
+  SetSearchBoxActive(true, ui::EventType::kMousePressed);
   EXPECT_FALSE(view()->filter_and_close_button_container()->GetVisible());
 }
 
@@ -310,7 +323,7 @@ TEST_F(SearchBoxViewTest,
        DISABLED_AccessibilityHintRemovedWhenSearchBoxActive) {
   EXPECT_TRUE(IsValidSearchBoxAccessibilityHint(
       view()->search_box()->GetViewAccessibility().GetCachedName()));
-  SetSearchBoxActive(true, ui::ET_MOUSE_PRESSED);
+  SetSearchBoxActive(true, ui::EventType::kMousePressed);
   EXPECT_TRUE(IsValidSearchBoxAccessibilityHint(
       view()->search_box()->GetViewAccessibility().GetCachedName()));
 }
@@ -318,7 +331,7 @@ TEST_F(SearchBoxViewTest,
 // Tests that the black Google icon is used for an inactive Google search.
 TEST_F(SearchBoxViewTest, SearchBoxInactiveSearchBoxGoogle) {
   SetSearchEngineIsGoogle(true);
-  SetSearchBoxActive(false, ui::ET_UNKNOWN);
+  SetSearchBoxActive(false, ui::EventType::kUnknown);
   const gfx::ImageSkia expected_icon = gfx::CreateVectorIcon(
       kGoogleBlackIcon, view()->GetSearchBoxIconSize(),
       view()->GetColorProvider()->GetColor(kColorAshButtonIconColor));
@@ -332,7 +345,7 @@ TEST_F(SearchBoxViewTest, SearchBoxInactiveSearchBoxGoogle) {
 // Tests that the colored Google icon is used for an active Google search.
 TEST_F(SearchBoxViewTest, SearchBoxActiveSearchEngineGoogle) {
   SetSearchEngineIsGoogle(true);
-  SetSearchBoxActive(true, ui::ET_MOUSE_PRESSED);
+  SetSearchBoxActive(true, ui::EventType::kMousePressed);
   const gfx::ImageSkia expected_icon = gfx::CreateVectorIcon(
       vector_icons::kGoogleColorIcon, view()->GetSearchBoxIconSize(),
       view()->GetColorProvider()->GetColor(kColorAshButtonIconColor));
@@ -346,7 +359,7 @@ TEST_F(SearchBoxViewTest, SearchBoxActiveSearchEngineGoogle) {
 // Tests that the non-Google icon is used for an inactive non-Google search.
 TEST_F(SearchBoxViewTest, SearchBoxInactiveSearchEngineNotGoogle) {
   SetSearchEngineIsGoogle(false);
-  SetSearchBoxActive(false, ui::ET_UNKNOWN);
+  SetSearchBoxActive(false, ui::EventType::kUnknown);
   const gfx::ImageSkia expected_icon = gfx::CreateVectorIcon(
       kSearchEngineNotGoogleIcon, view()->GetSearchBoxIconSize(),
       view()->GetColorProvider()->GetColor(kColorAshButtonIconColor));
@@ -360,7 +373,7 @@ TEST_F(SearchBoxViewTest, SearchBoxInactiveSearchEngineNotGoogle) {
 // Tests that the non-Google icon is used for an active non-Google search.
 TEST_F(SearchBoxViewTest, SearchBoxActiveSearchEngineNotGoogle) {
   SetSearchEngineIsGoogle(false);
-  SetSearchBoxActive(true, ui::ET_UNKNOWN);
+  SetSearchBoxActive(true, ui::EventType::kUnknown);
   const gfx::ImageSkia expected_icon = gfx::CreateVectorIcon(
       kSearchEngineNotGoogleIcon, view()->GetSearchBoxIconSize(),
       view()->GetColorProvider()->GetColor(kColorAshButtonIconColor));
@@ -629,7 +642,7 @@ TEST_F(SearchBoxViewTest, ResetSelectionAfterResettingSearchBox) {
 
   // Reset the search box.
   view()->ClearSearchAndDeactivateSearchBox();
-  SetSearchBoxActive(true, ui::ET_UNKNOWN);
+  SetSearchBoxActive(true, ui::EventType::kUnknown);
 }
 
 TEST_F(SearchBoxViewTest, NewSearchQueryActionRecordedWhenUserType) {
@@ -647,6 +660,71 @@ TEST_F(SearchBoxViewTest, NewSearchQueryActionRecordedWhenUserType) {
   KeyPress(ui::VKEY_BACK);
   KeyPress(ui::VKEY_C);
   EXPECT_EQ(2, user_action_tester.GetActionCount("AppList_SearchQueryStarted"));
+}
+
+// Tests that changing selection in the search box results updates the active
+// descendent id in the search box textfield.
+TEST_F(SearchBoxViewTest, SearchTextfieldAccessibleActiveDescendantId) {
+  ui::AXNodeData data_textfield;
+  auto* textfield = view()->search_box();
+  base::test::TaskEnvironment* task_environment_ = task_environment();
+  textfield->GetViewAccessibility().GetAccessibleNodeData(&data_textfield);
+  EXPECT_FALSE(data_textfield.HasIntAttribute(
+      ax::mojom::IntAttribute::kActivedescendantId));
+
+  SimulateQuery(u"test");
+  CreateSearchResult(ash::SearchResultDisplayType::kList, 0.7, u"tester",
+                     std::u16string(), ash::AppListSearchResultCategory::kWeb);
+  CreateSearchResult(ash::SearchResultDisplayType::kList, 0.5, u"testing",
+                     std::u16string(), ash::AppListSearchResultCategory::kWeb);
+  base::RunLoop().RunUntilIdle();  // Finish search results update.
+  task_environment_->FastForwardBy(
+      kNotifyA11yDelay);  // Advance time to trigger a11y notification.
+
+  // First result selected by default.
+  data_textfield = ui::AXNodeData();
+  textfield->GetViewAccessibility().GetAccessibleNodeData(&data_textfield);
+  EXPECT_TRUE(data_textfield.HasIntAttribute(
+      ax::mojom::IntAttribute::kActivedescendantId));
+  EXPECT_EQ(GetResultViewAt(0)->GetViewAccessibility().GetUniqueId(),
+            data_textfield.GetIntAttribute(
+                ax::mojom::IntAttribute::kActivedescendantId));
+
+  // Move down to select the second result.
+  KeyPress(ui::VKEY_DOWN);
+  base::RunLoop().RunUntilIdle();
+  task_environment_->FastForwardBy(kNotifyA11yDelay);
+  data_textfield = ui::AXNodeData();
+  textfield->GetViewAccessibility().GetAccessibleNodeData(&data_textfield);
+  EXPECT_EQ(GetResultViewAt(1)->GetViewAccessibility().GetUniqueId(),
+            data_textfield.GetIntAttribute(
+                ax::mojom::IntAttribute::kActivedescendantId));
+
+  // Removing selected result resets the selection to default.
+  results()->RemoveAt(1);
+  base::RunLoop().RunUntilIdle();
+  task_environment_->FastForwardBy(kNotifyA11yDelay);
+  data_textfield = ui::AXNodeData();
+  textfield->GetViewAccessibility().GetAccessibleNodeData(&data_textfield);
+  EXPECT_EQ(GetResultViewAt(0)->GetViewAccessibility().GetUniqueId(),
+            data_textfield.GetIntAttribute(
+                ax::mojom::IntAttribute::kActivedescendantId));
+
+  // Clear search results.
+  results()->RemoveAt(0);
+  base::RunLoop().RunUntilIdle();
+  task_environment_->FastForwardBy(kNotifyA11yDelay);
+  data_textfield = ui::AXNodeData();
+  textfield->GetViewAccessibility().GetAccessibleNodeData(&data_textfield);
+  EXPECT_FALSE(data_textfield.HasIntAttribute(
+      ax::mojom::IntAttribute::kActivedescendantId));
+}
+
+TEST_F(SearchBoxViewTest, AccessibleProperties) {
+  ui::AXNodeData data;
+
+  view()->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(ax::mojom::Role::kTextField, data.role);
 }
 
 class SearchBoxViewAssistantButtonTest : public SearchBoxViewTest {
@@ -832,8 +910,8 @@ TEST_F(SearchBoxViewAutocompleteTest, SearchBoxAutocompletesAcceptsNextChar) {
 TEST_F(SearchBoxViewAutocompleteTest, SearchBoxAcceptsAutocompleteForClick) {
   SetupAutocompleteBehaviorTest();
 
-  ui::MouseEvent mouse_event(ui::ET_MOUSE_PRESSED, gfx::Point(), gfx::Point(),
-                             ui::EventTimeForNow(), 0, 0);
+  ui::MouseEvent mouse_event(ui::EventType::kMousePressed, gfx::Point(),
+                             gfx::Point(), ui::EventTimeForNow(), 0, 0);
   // Forward |mouse_event| to HandleMouseEvent() directly because we cannot
   // test MouseEvents properly due to not having ash dependencies. Static cast
   // to TextfieldController because HandleGestureEvent() is a private method
@@ -851,8 +929,9 @@ TEST_F(SearchBoxViewAutocompleteTest, SearchBoxAcceptsAutocompleteForClick) {
 TEST_F(SearchBoxViewAutocompleteTest, SearchBoxAcceptsAutocompleteForTap) {
   SetupAutocompleteBehaviorTest();
 
-  ui::GestureEvent gesture_event(0, 0, 0, ui::EventTimeForNow(),
-                                 ui::GestureEventDetails(ui::ET_GESTURE_TAP));
+  ui::GestureEvent gesture_event(
+      0, 0, 0, ui::EventTimeForNow(),
+      ui::GestureEventDetails(ui::EventType::kGestureTap));
   // Forward |gesture_event| to HandleGestureEvent() directly because we
   // cannot test GestureEvents properly due to not having ash dependencies.
   // Static cast to TextfieldController because HandleGestureEvent() is
@@ -1102,7 +1181,7 @@ TEST_F(SearchBoxViewAnimationTest, SearchBoxImageButtonAnimations) {
   EXPECT_TRUE(search_box->assistant_button_container()->GetVisible());
 
   // Set search box to active state.
-  search_box->SetSearchBoxActive(true, ui::ET_MOUSE_PRESSED);
+  search_box->SetSearchBoxActive(true, ui::EventType::kMousePressed);
 
   // Close button should be fading in.
   EXPECT_TRUE(search_box->filter_and_close_button_container()->GetVisible());
@@ -1122,7 +1201,7 @@ TEST_F(SearchBoxViewAnimationTest, SearchBoxImageButtonAnimations) {
   EXPECT_EQ(assistant_animator->GetTargetOpacity(), 0.0f);
 
   // Set search box to inactive state, hiding the close button.
-  search_box->SetSearchBoxActive(false, ui::ET_MOUSE_PRESSED);
+  search_box->SetSearchBoxActive(false, ui::EventType::kMousePressed);
 
   // Close button should be fading out.
   EXPECT_TRUE(search_box->filter_and_close_button_container()->GetVisible());
@@ -1147,7 +1226,7 @@ TEST_F(SearchBoxViewAnimationTest, SearchBoxIconImageViewAnimation) {
   auto* old_animator = search_box->search_icon()->layer()->GetAnimator();
 
   // Set search box to active state.
-  search_box->SetSearchBoxActive(true, ui::ET_MOUSE_PRESSED);
+  search_box->SetSearchBoxActive(true, ui::EventType::kMousePressed);
 
   // Check that the old layer is fading out and the new animator is fading in.
   auto* animator = search_box->search_icon()->layer()->GetAnimator();
@@ -1159,7 +1238,7 @@ TEST_F(SearchBoxViewAnimationTest, SearchBoxIconImageViewAnimation) {
   EXPECT_EQ(old_animator->GetTargetOpacity(), 0.0f);
 
   // Set search box to inactive state.
-  search_box->SetSearchBoxActive(false, ui::ET_MOUSE_PRESSED);
+  search_box->SetSearchBoxActive(false, ui::EventType::kMousePressed);
 
   old_animator = animator;
   animator = search_box->search_icon()->layer()->GetAnimator();

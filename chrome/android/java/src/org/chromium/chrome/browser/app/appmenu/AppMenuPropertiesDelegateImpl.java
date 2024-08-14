@@ -61,7 +61,6 @@ import org.chromium.chrome.browser.share.ShareUtils;
 import org.chromium.chrome.browser.sync.settings.SyncSettingsUtils;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
-import org.chromium.chrome.browser.tinker_tank.TinkerTankDelegate;
 import org.chromium.chrome.browser.tinker_tank.TinkerTankDelegateImpl;
 import org.chromium.chrome.browser.toolbar.ToolbarManager;
 import org.chromium.chrome.browser.translate.TranslateUtils;
@@ -72,7 +71,6 @@ import org.chromium.chrome.browser.ui.appmenu.AppMenuPropertiesDelegate;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuUtil;
 import org.chromium.chrome.browser.ui.appmenu.CustomViewBinder;
 import org.chromium.chrome.browser.util.BrowserUiUtils;
-import org.chromium.chrome.browser.util.BrowserUiUtils.HostSurface;
 import org.chromium.chrome.browser.util.BrowserUiUtils.ModuleTypeOnStartAndNtp;
 import org.chromium.chrome.browser.webapps.WebappRegistry;
 import org.chromium.components.browser_ui.accessibility.PageZoomCoordinator;
@@ -669,9 +667,8 @@ public class AppMenuPropertiesDelegateImpl implements AppMenuPropertiesDelegate 
                 item.setEnabled(isQuickDeleteEnabled(isIncognito));
             }
             if (item.getItemId() == R.id.tinker_tank_menu_id) {
-                TinkerTankDelegate delegate = new TinkerTankDelegateImpl();
-                item.setVisible(delegate.isEnabled());
-                item.setEnabled(delegate.isEnabled());
+                item.setVisible(TinkerTankDelegateImpl.enabled());
+                item.setEnabled(TinkerTankDelegateImpl.enabled());
             }
 
             // This needs to be done after the visibility of the item is set.
@@ -1407,8 +1404,7 @@ public class AppMenuPropertiesDelegateImpl implements AppMenuPropertiesDelegate 
         if (currentTab != null
                 && UrlUtilities.isNtpUrl(currentTab.getUrl())
                 && !currentTab.isIncognito()) {
-            BrowserUiUtils.recordModuleClickHistogram(
-                    HostSurface.NEW_TAB_PAGE, ModuleTypeOnStartAndNtp.MENU_BUTTON);
+            BrowserUiUtils.recordModuleClickHistogram(ModuleTypeOnStartAndNtp.MENU_BUTTON);
         }
     }
 }

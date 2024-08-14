@@ -78,6 +78,12 @@ BASE_DECLARE_FEATURE(kHideGuestModeForSupervisedUsers);
 // unauthenticated (e.g. signed out of the content area) account.
 BASE_DECLARE_FEATURE(kForceSafeSearchForUnauthenticatedSupervisedUsers);
 
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+// Force re-authentication when an unauthenticated supervised user tries to
+// access YouTube, so that content restrictions can be applied.
+BASE_DECLARE_FEATURE(kForceSupervisedUserReauthenticationForYouTube);
+#endif
+
 // Fallback to sending un-credentialed filtering requests for supervised users
 // if they do not have a valid access token.
 BASE_DECLARE_FEATURE(kUncredentialedFilteringFallbackForSupervisedUsers);
@@ -95,12 +101,6 @@ BASE_DECLARE_FEATURE(
     kReplaceSupervisionSystemCapabilitiesWithAccountCapabilitiesOnIOS);
 #endif
 
-#if BUILDFLAG(IS_ANDROID)
-// Updates usages of Profile.isChild() in Profile.java to use the account
-// capability to determine if account is supervised.
-BASE_DECLARE_FEATURE(kReplaceProfileIsChildWithAccountCapabilitiesOnAndroid);
-#endif
-
 // Updates the ListFamilyMembers service to fetch family account info for
 // accounts with the relevant capability rather than just for supervised
 // accounts.
@@ -109,6 +109,12 @@ BASE_DECLARE_FEATURE(kFetchListFamilyMembersWithCapability);
 // Uses `prefs::kFamilyLinkUserMemberRole` to populate the family member role
 // for feedback if it is available.
 BASE_DECLARE_FEATURE(kUseFamilyMemberRolePrefsForFeedback);
+
+// Alters the behavior of the supervised_user::SupervisedUserNavigationThrottle
+// so that the decision whether to proceed or cancel is made when the response
+// is ready to be rendered, rather than before the request (or any redirect) is
+// issued.
+BASE_DECLARE_FEATURE(kClassifyUrlOnProcessResponseEvent);
 
 // Returns whether local parent approvals on Family Link user's device are
 // enabled.

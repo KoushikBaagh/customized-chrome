@@ -24,6 +24,7 @@
 #include "ash/session/test_session_controller_client.h"
 #include "ash/shelf/shelf_layout_manager.h"
 #include "ash/shell.h"
+#include "ash/strings/grit/ash_strings.h"
 #include "ash/system/overview/overview_button_tray.h"
 #include "ash/system/status_area_widget.h"
 #include "ash/system/status_area_widget_test_helper.h"
@@ -66,6 +67,7 @@
 #include "ui/aura/test/test_window_delegate.h"
 #include "ui/aura/test/test_windows.h"
 #include "ui/base/ime/dummy_text_input_client.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/compositor/presentation_time_recorder.h"
 #include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/compositor/test/test_utils.h"
@@ -75,6 +77,7 @@
 #include "ui/events/base_event_utils.h"
 #include "ui/events/test/event_generator.h"
 #include "ui/gfx/geometry/point_conversions.h"
+#include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/widget/widget.h"
 #include "ui/wm/core/shadow_controller.h"
@@ -264,8 +267,9 @@ class SplitViewControllerTest : public AshTestBase {
   void EndSplitView() { split_view_controller()->EndSplitView(); }
 
   void LongPressOnOverviewButtonTray() {
-    ui::GestureEvent event(0, 0, 0, base::TimeTicks(),
-                           ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+    ui::GestureEvent event(
+        0, 0, 0, base::TimeTicks(),
+        ui::GestureEventDetails(ui::EventType::kGestureLongPress));
     StatusAreaWidgetTestHelper::GetStatusAreaWidget()
         ->overview_button_tray()
         ->OnGestureEvent(&event);
@@ -631,8 +635,9 @@ TEST_F(SplitViewControllerTest,
   ASSERT_TRUE(divider);
   auto* divider_view = divider->divider_view_for_testing();
   ASSERT_TRUE(divider_view);
-  ui::GestureEvent gesture_end(0, 0, 0, ui::EventTimeForNow(),
-                               ui::GestureEventDetails(ui::ET_GESTURE_END));
+  ui::GestureEvent gesture_end(
+      0, 0, 0, ui::EventTimeForNow(),
+      ui::GestureEventDetails(ui::EventType::kGestureEnd));
   divider->divider_view_for_testing()->OnGestureEvent(&gesture_end);
 
   // Trigger a second tap, using a different `touch_id` for this tap, to
@@ -4085,6 +4090,23 @@ TEST_F(SplitViewControllerTest,
 
   // Convert the device to clamshell mode. There should be no crash.
   Shell::Get()->tablet_mode_controller()->SetEnabledForTest(false);
+}
+
+TEST_F(SplitViewControllerTest, SplitViewDividerViewAccessibleProperties) {
+  UpdateDisplay("900x600");
+  std::unique_ptr<aura::Window> window(CreateWindow(gfx::Rect(0, 0, 520, 500)));
+  split_view_controller()->SnapWindow(
+      window.get(), SnapPosition::kPrimary,
+      WindowSnapActionSource::kSnapByWindowLayoutMenu,
+      /*activate_window=*/false, chromeos::kDefaultSnapRatio);
+  auto* divider_view = split_view_divider()->divider_view_for_testing();
+  ui::AXNodeData data;
+
+  ASSERT_TRUE(divider_view);
+  divider_view->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.role, ax::mojom::Role::kToolbar);
+  EXPECT_EQ(data.GetString16Attribute(ax::mojom::StringAttribute::kName),
+            l10n_util::GetStringUTF16(IDS_ASH_SNAP_GROUP_DIVIDER_A11Y_NAME));
 }
 
 // The test class that enables the feature flag of portrait mode split view

@@ -155,6 +155,11 @@ class OptimizationGuideKeyedService
   virtual bool ShouldFeatureBeCurrentlyAllowedForFeedback(
       optimization_guide::UserVisibleFeatureKey feature) const;
 
+  // Returns true if the opt-in setting should be shown for this profile for
+  // given `feature`. This should only be called by settings UX.
+  bool IsSettingVisible(
+      optimization_guide::UserVisibleFeatureKey feature) const;
+
   // Adds `observer` which can observe the change in feature settings.
   void AddModelExecutionSettingsEnabledObserver(
       optimization_guide::SettingsEnabledObserver* observer);
@@ -268,11 +273,6 @@ class OptimizationGuideKeyedService
       std::optional<optimization_guide::proto::RequestContextMetadata>
           request_context_metadata = std::nullopt) override;
 
-  // Returns true if the opt-in setting should be shown for this profile for
-  // given `feature`. This should only be called by settings UX.
-  bool IsSettingVisible(
-      optimization_guide::UserVisibleFeatureKey feature) const;
-
   // Returns whether all conditions are met to show the IPH promo for
   // experimental AI.
   bool ShouldShowExperimentalAIPromo() const;
@@ -280,6 +280,12 @@ class OptimizationGuideKeyedService
   download::BackgroundDownloadService* BackgroundDownloadServiceProvider();
 
   bool ComponentUpdatesEnabledProvider() const;
+
+  // Records synthetic field trial for `feature` with trial name appended with
+  // `feature_name`.
+  void RecordModelExecutionFeatureSyntheticFieldTrial(
+      optimization_guide::UserVisibleFeatureKey feature,
+      const std::string_view feature_name);
 
   raw_ptr<content::BrowserContext> browser_context_;
 

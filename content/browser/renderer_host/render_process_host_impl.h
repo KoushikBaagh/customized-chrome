@@ -265,9 +265,11 @@ class CONTENT_EXPORT RenderProcessHostImpl
       RenderProcessHostPriorityClient* priority_client) override;
   void RemovePriorityClient(
       RenderProcessHostPriorityClient* priority_client) override;
-  void SetPriorityOverride(bool foreground) override;
+#if !BUILDFLAG(IS_ANDROID)
+  void SetPriorityOverride(base::Process::Priority priority) override;
   bool HasPriorityOverride() override;
   void ClearPriorityOverride() override;
+#endif
 #if BUILDFLAG(IS_ANDROID)
   ChildProcessImportance GetEffectiveImportance() override;
   base::android::ChildBindingState GetEffectiveChildBindingState() override;
@@ -293,14 +295,16 @@ class CONTENT_EXPORT RenderProcessHostImpl
   std::unique_ptr<base::PersistentMemoryAllocator> TakeMetricsAllocator()
       override;
   const base::TimeTicks& GetLastInitTime() override;
-  bool IsProcessBackgrounded() override;
+  base::Process::Priority GetPriority() override;
   std::string GetKeepAliveDurations() const override;
   size_t GetShutdownDelayRefCount() const override;
   int GetRenderFrameHostCount() const override;
   void RegisterRenderFrameHost(
-      const GlobalRenderFrameHostId& render_frame_host_id) override;
+      const GlobalRenderFrameHostId& render_frame_host_id,
+      bool is_outermost_main_frame) override;
   void UnregisterRenderFrameHost(
-      const GlobalRenderFrameHostId& render_frame_host_id) override;
+      const GlobalRenderFrameHostId& render_frame_host_id,
+      bool is_outermost_main_frame) override;
   void ForEachRenderFrameHost(
       base::FunctionRef<void(RenderFrameHost*)> on_render_frame_host) override;
   void IncrementWorkerRefCount() override;
@@ -343,6 +347,12 @@ class CONTENT_EXPORT RenderProcessHostImpl
 #if BUILDFLAG(CLANG_PROFILING_INSIDE_SANDBOX)
   void DumpProfilingData(base::OnceClosure callback) override;
 #endif
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  void ReinitializeLogging(uint32_t logging_dest,
+                           base::ScopedFD log_file_descriptor) override;
+#endif
+  void SetBatterySaverMode(bool battery_saver_mode_enabled) override;
+  uint64_t GetPrivateMemoryFootprint() override;
 
   void PauseSocketManagerForRenderFrameHost(
       const GlobalRenderFrameHostId& render_frame_host_id) override;
@@ -835,21 +845,10 @@ class CONTENT_EXPORT RenderProcessHostImpl
   }
 #endif
 
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-  void ReinitializeLogging(uint32_t logging_dest,
-                           base::ScopedFD log_file_descriptor) override;
-#endif
-
-  void SetBatterySaverMode(bool battery_saver_mode_enabled) override;
-
 #if BUILDFLAG(IS_ANDROID)
   // Notifies the renderer process of memory pressure level.
   void NotifyMemoryPressureToRenderer(
       base::MemoryPressureListener::MemoryPressureLevel level);
-
-  uint64_t GetPrivateMemoryFootprint() const {
-    return private_memory_footprint_bytes_;
-  }
 #endif
 
 #if BUILDFLAG(ALLOW_OOP_VIDEO_DECODER)
@@ -869,6 +868,14 @@ class CONTENT_EXPORT RenderProcessHostImpl
 #endif  // BUILDFLAG(ALLOW_OOP_VIDEO_DECODER)
 
   void GetBoundInterfacesForTesting(std::vector<std::string>& out);
+
+  void SetPrivateMemoryFootprintForTesting(
+      uint64_t private_memory_footprint_bytes);
+
+  mojo::AssociatedReceiver<mojom::RendererHost>&
+  renderer_host_receiver_for_testing() {
+    return renderer_host_receiver_;
+  }
 
  protected:
   // A proxy for our IPC::Channel that lives on the IO thread.
@@ -1296,11 +1303,13 @@ class CONTENT_EXPORT RenderProcessHostImpl
 
   RenderProcessPriority priority_;
 
+#if !BUILDFLAG(IS_ANDROID)
   // If this is set then the built-in process priority calculation system is
-  // ignored, and an externally computed process priority is used. Set to true
-  // and the process will stay foreground priority; set to false and it will
-  // stay background priority.
-  std::optional<bool> priority_override_;
+  // ignored, and an externally computed process priority is used.
+  // TODO(pmonette): After experimentation, either remove this or rip out the
+  // existing logic entirely.
+  std::optional<base::Process::Priority> priority_override_;
+#endif
 
   // Used to allow a RenderWidgetHost to intercept various messages on the
   // IO thread.
@@ -1434,6 +1443,7 @@ class CONTENT_EXPORT RenderProcessHostImpl
 
   bool channel_connected_ = false;
   bool sent_render_process_ready_ = false;
+  bool sent_process_created_ = false;
 
   std::unique_ptr<FileSystemManagerImpl, BrowserThread::DeleteOnIOThread>
       file_system_manager_impl_;
@@ -1459,6 +1469,7 @@ class CONTENT_EXPORT RenderProcessHostImpl
   // atomically communicate the last time the hosted renderer was foregrounded.
   // This is preferable to IPC as it ensures the timing is visible immediately
   // after recovering from a jank (e.g. important for metrics).
+  // TODO(pmonette): Update this to support all process priority levels.
   base::MappedReadOnlyRegion last_foreground_time_region_;
 
   // Tracks active audio and video streams within the render process; used to
@@ -1501,9 +1512,15 @@ class CONTENT_EXPORT RenderProcessHostImpl
   scoped_refptr<PepperRendererConnection> pepper_renderer_connection_;
 #endif
 
-#if BUILDFLAG(IS_ANDROID)
-  // The private memory footprint of the render process.
+  // The memory size that the renderer has allocated. On Android
+  // this value is pushed from the renderer periodically. On other platforms
+  // this value is a cached value calculated from the last call to
+  // `GetPrivateMemoryFootprint`. Because of this caching this value should
+  // not be used directly but `GetPrivateMemoryFootprint` should be called
+  // each time.
   uint64_t private_memory_footprint_bytes_ = 0u;
+#if !BUILDFLAG(IS_ANDROID)
+  base::TimeTicks private_memory_footprint_valid_until_;
 #endif
 
   // IOThreadHostImpl owns some IO-thread state associated with this
@@ -1518,6 +1535,11 @@ class CONTENT_EXPORT RenderProcessHostImpl
   std::optional<base::SequenceBound<IOThreadHostImpl>> io_thread_host_impl_;
 
   std::unique_ptr<FileBackedBlobFactoryWorkerImpl> file_backed_blob_factory_;
+
+  // Number of current outermost frames in this process.
+  size_t outermost_main_frame_count_ = 0;
+  // Maximum number of outermost main frames this process hosted concurrently.
+  size_t max_outermost_main_frames_ = 0;
 
   // A WeakPtrFactory which is reset every time ResetIPC() or Cleanup() is run.
   // Used to vend WeakPtrs which are invalidated any time the RenderProcessHost

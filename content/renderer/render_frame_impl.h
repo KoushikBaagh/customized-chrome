@@ -704,6 +704,8 @@ class CONTENT_EXPORT RenderFrameImpl
   void DidCommitAndDrawCompositorFrame() override;
   void WasHidden() override;
   void WasShown() override;
+  void OnFrameVisibilityChanged(
+      blink::mojom::FrameVisibility render_status) override;
 
   void SetUpSharedMemoryForSmoothness(
       base::ReadOnlySharedMemoryRegion shared_memory) override;
@@ -1123,6 +1125,7 @@ class CONTENT_EXPORT RenderFrameImpl
       const blink::WebElement& plugin_element,
       const blink::WebURL& url,
       const blink::WebString& suggested_mime_type) override;
+  bool IsDomStorageDisabled() const override;
   v8::Local<v8::Object> GetScriptableObject(
       const blink::WebElement& plugin_element,
       v8::Isolate* isolate) override;

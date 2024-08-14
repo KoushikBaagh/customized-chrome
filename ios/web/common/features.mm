@@ -40,7 +40,7 @@ BASE_FEATURE(kIOSSharedHighlightingColorChange,
 
 BASE_FEATURE(kEnableMeasurements,
              "EnableMeasurementsExperience",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 const char kOneTapForMapsConsentModeParamTitle[] =
     "OneTapForMapsConsentModeParam";
@@ -112,6 +112,10 @@ BASE_FEATURE(kDisableRaccoon,
 
 BASE_FEATURE(kUserAgentBugFixVersion,
              "UserAgentBugFixVersion",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kLogJavaScriptErrors,
+             "LogJavaScriptErrors",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace features

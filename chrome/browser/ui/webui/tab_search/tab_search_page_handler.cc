@@ -24,11 +24,13 @@
 #include "chrome/browser/extensions/api/tab_groups/tab_groups_util.h"
 #include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/browser/favicon/favicon_utils.h"
+#include "chrome/browser/feedback/show_feedback_page.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
+#include "chrome/browser/signin/signin_error_controller_factory.h"
 #include "chrome/browser/signin/signin_ui_util.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
@@ -36,7 +38,6 @@
 #include "chrome/browser/ui/browser_live_tab_context.h"
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/browser_window.h"
-#include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/tabs/organization/tab_organization_request.h"
 #include "chrome/browser/ui/tabs/organization/tab_organization_service.h"
@@ -610,8 +611,13 @@ void TabSearchPageHandler::TriggerFeedback(int32_t session_id) {
 
 void TabSearchPageHandler::TriggerSignIn() {
   Profile* profile = chrome::FindLastActive()->profile();
-  signin_ui_util::ShowSigninPromptFromPromo(
-      profile, signin_metrics::AccessPoint::ACCESS_POINT_TAB_ORGANIZATION);
+  if (SigninErrorControllerFactory::GetForProfile(profile)->HasError()) {
+    signin_ui_util::ShowReauthForPrimaryAccountWithAuthError(
+        profile, signin_metrics::AccessPoint::ACCESS_POINT_TAB_ORGANIZATION);
+  } else {
+    signin_ui_util::ShowSigninPromptFromPromo(
+        profile, signin_metrics::AccessPoint::ACCESS_POINT_TAB_ORGANIZATION);
+  }
 }
 
 void TabSearchPageHandler::OpenHelpPage() {
@@ -925,7 +931,8 @@ tab_search::mojom::TabPtr TabSearchPageHandler::GetTab(
 
   tab_data->show_icon = tab_renderer_data.show_icon;
 
-  const base::TimeTicks last_active_time_ticks = contents->GetLastActiveTime();
+  const base::TimeTicks last_active_time_ticks =
+      contents->GetLastActiveTimeTicks();
   tab_data->last_active_time_ticks = last_active_time_ticks;
 
   // last_active_time_for_testing can affect pixel tests depending on when the

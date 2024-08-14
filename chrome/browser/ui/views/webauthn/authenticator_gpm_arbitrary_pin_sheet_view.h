@@ -40,10 +40,10 @@ class AuthenticatorGPMArbitraryPinSheetView
   std::unique_ptr<views::View> BuildStepSpecificHeader() override;
   std::pair<std::unique_ptr<views::View>, AutoFocus> BuildStepSpecificContent()
       override;
+  int GetSpacingBetweenTitleAndDescription() override;
 
   // AuthenticatorGPMArbitraryPinView::Delegate:
   void OnPinChanged(std::u16string pin) override;
-  void UpdateHintVisibility() override;
 };
 
 #endif  // CHROME_BROWSER_UI_VIEWS_WEBAUTHN_AUTHENTICATOR_GPM_ARBITRARY_PIN_SHEET_VIEW_H_

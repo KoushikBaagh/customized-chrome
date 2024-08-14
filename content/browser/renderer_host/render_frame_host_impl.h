@@ -114,7 +114,6 @@
 #include "ppapi/buildflags/buildflags.h"
 #include "services/device/public/mojom/vibration_manager.mojom.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"
-#include "services/network/public/cpp/attribution_reporting_runtime_features.h"
 #include "services/network/public/cpp/cross_origin_embedder_policy.h"
 #include "services/network/public/cpp/cross_origin_opener_policy.h"
 #include "services/network/public/mojom/cookie_access_observer.mojom.h"
@@ -182,8 +181,10 @@
 #include "ui/accessibility/ax_mode.h"
 #include "ui/accessibility/ax_node_id_forward.h"
 #include "ui/accessibility/mojom/ax_updates_and_events.mojom.h"
+#include "ui/accessibility/platform/ax_node_id_delegate.h"
 #include "ui/accessibility/platform/ax_platform_tree_manager.h"
 #include "ui/accessibility/platform/ax_platform_tree_manager_delegate.h"
+#include "ui/accessibility/platform/ax_unique_id.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/gfx/geometry/rect.h"
 #include "url/gurl.h"
@@ -314,6 +315,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
       public mojom::FrameHost,
       public mojom::DomAutomationControllerHost,
       public ui::AXPlatformTreeManagerDelegate,
+      public ui::AXNodeIdDelegate,
       public SiteInstanceGroup::Observer,
       public blink::mojom::AssociatedInterfaceProvider,
       public blink::mojom::BackForwardCacheControllerHost,
@@ -428,7 +430,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
   RenderWidgetHostImpl* GetRenderWidgetHost() override;
   RenderWidgetHostViewBase* GetView() override;
   RenderFrameHostImpl* GetParent() const override;
-  RenderFrameHostImpl* GetParentOrOuterDocument() const override;
+  RenderFrameHostImpl* GetParentOrOuterDocument() const final;
   RenderFrameHostImpl* GetParentOrOuterDocumentOrEmbedder() const override;
   RenderFrameHostImpl* GetMainFrame() override;
   PageImpl& GetPage() override;
@@ -715,6 +717,11 @@ class CONTENT_EXPORT RenderFrameHostImpl
   bool AccessibilityIsRootFrame() const override;
   bool ShouldSuppressAXLoadComplete() override;
   WebContentsAccessibility* AccessibilityGetWebContentsAccessibility() override;
+
+  // ui::AXNodeIdDelegate:
+  ui::AXPlatformNodeId GetOrCreateAXNodeUniqueId(
+      ui::AXNodeID ax_node_id) override;
+  void OnAXNodeDeleted(ui::AXNodeID ax_node_id) override;
 
   // SiteInstanceGroup::Observer
   void RenderProcessGone(SiteInstanceGroup* site_instance_group,
@@ -2053,8 +2060,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   // For threaded worklets we expose an interface via BrowserInterfaceBrokers to
   // bind `receiver` to a `BlobURLStore` instance, which implements the Blob URL
-  // API in the browser process. Note that this is only exposed when the
-  // kSupportPartitionedBlobUrl flag is enabled.
+  // API in the browser process.
   void BindBlobUrlStoreReceiver(
       mojo::PendingReceiver<blink::mojom::BlobURLStore> receiver);
 
@@ -2468,8 +2474,6 @@ class CONTENT_EXPORT RenderFrameHostImpl
       blink::mojom::LegacyTechEventCodeLocationPtr code_location) override;
   void SendPrivateAggregationRequestsForFencedFrameEvent(
       const std::string& event_type) override;
-  void SetAttributionReportingRuntimeFeatures(
-      network::AttributionReportingRuntimeFeatures features) override;
   void CreateFencedFrame(
       mojo::PendingAssociatedReceiver<blink::mojom::FencedFrameOwnerHost>
           pending_receiver,
@@ -2861,7 +2865,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
       const std::string& relying_party_id,
       const url::Origin& effective_origin,
       bool is_payment_credential_creation,
-      base::OnceCallback<void(blink::mojom::AuthenticatorStatus)> callback);
+      base::OnceCallback<void(blink::mojom::AuthenticatorStatus, bool)>
+          callback);
 #endif
 
   using JavaScriptResultAndTypeCallback =
@@ -3080,6 +3085,10 @@ class CONTENT_EXPORT RenderFrameHostImpl
   void GetBoundAssociatedInterfacesForTesting(std::vector<std::string>& out) {
     associated_registry_->GetInterfacesForTesting(out);
   }
+
+  // Returns the number of accessibility platform node identifiers maintained by
+  // this instance's AXNodeIdDelegate implementation.
+  size_t GetAxUniqueIdCountForTesting() const { return ax_unique_ids_.size(); }
 
  protected:
   friend class RenderFrameHostFactory;
@@ -4060,8 +4069,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   // For frames and main thread worklets we use a navigation-associated
   // interface and bind `receiver` to a `BlobURLStore` instance, which
-  // implements the Blob URL API in the browser process. Note that this is only
-  // exposed when the kSupportPartitionedBlobUrl flag is enabled.
+  // implements the Blob URL API in the browser process.
   void BindBlobUrlStoreAssociatedReceiver(
       mojo::PendingAssociatedReceiver<blink::mojom::BlobURLStore> receiver);
 
@@ -4158,7 +4166,9 @@ class CONTENT_EXPORT RenderFrameHostImpl
       bool is_cross_origin,
       blink::mojom::AuthenticatorStatus status);
   void OnMakeCredentialWebAuthSecurityChecksCompleted(
-      base::OnceCallback<void(blink::mojom::AuthenticatorStatus)> callback,
+      base::OnceCallback<void(blink::mojom::AuthenticatorStatus, bool)>
+          callback,
+      bool is_cross_origin,
       blink::mojom::AuthenticatorStatus status);
 #endif
 
@@ -4531,6 +4541,11 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   // The object managing the accessibility tree for this frame.
   std::unique_ptr<BrowserAccessibilityManager> browser_accessibility_manager_;
+
+  // A mapping of each AXNodeID managed by `browser_accessibility_manager_`,
+  // which is only unique within its renderer, to an AXUniqueId, which is unique
+  // within the scope of the web contents.
+  std::map<ui::AXNodeID, ui::AXUniqueId> ax_unique_ids_;
 
   // This is the value of the reset token expected for accessibility messages.
   // Any message with a different reset token will be dropped.

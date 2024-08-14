@@ -11,7 +11,6 @@
 #include "gpu/command_buffer/client/raster_interface.h"
 #include "gpu/command_buffer/client/shared_image_interface.h"
 #include "gpu/command_buffer/client/webgpu_interface.h"
-#include "gpu/command_buffer/common/gpu_memory_buffer_support.h"
 #include "gpu/command_buffer/common/shared_image_usage.h"
 
 namespace blink {
@@ -417,9 +416,7 @@ WebGPUSwapBufferProvider::SwapBuffer::SwapBuffer(
       access_finished_token(creation_token) {}
 
 WebGPUSwapBufferProvider::SwapBuffer::~SwapBuffer() {
-  if (context_provider) {
-    shared_image->UpdateDestructionSyncToken(access_finished_token);
-  }
+  shared_image->UpdateDestructionSyncToken(access_finished_token);
 }
 
 gpu::SharedImageUsageSet

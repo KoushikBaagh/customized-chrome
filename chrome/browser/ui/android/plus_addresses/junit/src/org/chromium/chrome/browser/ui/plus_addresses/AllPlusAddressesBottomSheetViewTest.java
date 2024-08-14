@@ -6,12 +6,16 @@ package org.chromium.chrome.browser.ui.plus_addresses;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import static org.chromium.chrome.browser.ui.plus_addresses.AllPlusAddressesBottomSheetProperties.PLUS_PROFILES;
 
 import android.app.Activity;
 import android.view.View.MeasureSpec;
+import android.widget.SearchView;
 import android.widget.TextView;
 
 import androidx.recyclerview.widget.RecyclerView;
@@ -27,7 +31,9 @@ import org.mockito.junit.MockitoRule;
 import org.robolectric.Robolectric;
 import org.robolectric.annotation.Config;
 
+import org.chromium.base.Callback;
 import org.chromium.base.test.BaseRobolectricTestRunner;
+import org.chromium.chrome.browser.autofill.helpers.FaviconHelper;
 import org.chromium.chrome.browser.ui.plus_addresses.AllPlusAddressesBottomSheetProperties.ItemType;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.widget.chips.ChipView;
@@ -42,10 +48,12 @@ public class AllPlusAddressesBottomSheetViewTest {
     private static final int HEIGHT = 2000;
     private static final String BOTTOMSHEET_TITLE = "Bottom sheet title";
     private static final String BOTTOMSHEET_WARNING = "Bottom sheet warning";
+    private static final String BOTTOMSHEET_QUERY_HINT = "Query hint";
     private static final PlusProfile PROFILE_1 = new PlusProfile("google.com", "example@gmail.com");
 
     @Rule public MockitoRule mMockitoRule = MockitoJUnit.rule();
 
+    @Mock private FaviconHelper mFaviconHelper;
     @Mock private BottomSheetController mBottomSheetController;
 
     private Activity mActivity;
@@ -60,6 +68,8 @@ public class AllPlusAddressesBottomSheetViewTest {
     @Test
     @SmallTest
     public void testShowAndHideBottomSheet() {
+        when(mBottomSheetController.requestShowContent(eq(mView), eq(true))).thenReturn(true);
+
         mView.setVisible(true);
         verify(mBottomSheetController).requestShowContent(mView, true);
 
@@ -85,17 +95,40 @@ public class AllPlusAddressesBottomSheetViewTest {
 
     @Test
     @SmallTest
+    public void testQueryHint() {
+        mView.setQueryHint(BOTTOMSHEET_QUERY_HINT);
+        SearchView search =
+                mView.getContentView().findViewById(R.id.all_plus_addresses_search_view);
+        assertEquals(search.getQueryHint(), BOTTOMSHEET_QUERY_HINT);
+    }
+
+    @Test
+    @SmallTest
+    public void testSetOnQueryChangedCallback() {
+        Callback<String> callback = mock(Callback.class);
+
+        mView.setOnQueryChangedCallback(callback);
+
+        SearchView searchView =
+                mView.getContentView().findViewById(R.id.all_plus_addresses_search_view);
+        searchView.setQuery("Test query", /* submit= */ true);
+        verify(callback).onResult("Test query");
+    }
+
+    @Test
+    @SmallTest
     public void testSetSheetItemListAdapter() {
+        Callback<String> callback = mock(Callback.class);
         PropertyModel model = AllPlusAddressesBottomSheetProperties.createDefaultModel();
         model.get(PLUS_PROFILES)
                 .add(
                         new ListItem(
                                 ItemType.PLUS_PROFILE,
                                 AllPlusAddressesBottomSheetProperties.PlusProfileProperties
-                                        .createPlusProfileModel(PROFILE_1)));
+                                        .createPlusProfileModel(PROFILE_1, callback)));
         mView.setSheetItemListAdapter(
                 AllPlusAddressesBottomSheetCoordinator.createSheetItemListAdapter(
-                        model.get(PLUS_PROFILES)));
+                        model.get(PLUS_PROFILES), mFaviconHelper));
 
         // Robolectric runner doesn't layout recycler views.
         layoutPlusAddressView();
@@ -107,6 +140,9 @@ public class AllPlusAddressesBottomSheetViewTest {
         ChipView plusAddress = mView.getContentView().findViewById(R.id.plus_address);
         assertNotNull(plusAddress);
         assertEquals(plusAddress.getPrimaryTextView().getText(), PROFILE_1.getPlusAddress());
+
+        plusAddress.performClick();
+        verify(callback).onResult(PROFILE_1.getPlusAddress());
     }
 
     /**

@@ -63,6 +63,15 @@ void CommonStartupMetricRecorder::RecordChromeMainEntryTime(
   DCHECK(!chrome_main_entry_ticks_.is_null());
 }
 
+void CommonStartupMetricRecorder::RecordPreReadTime(base::TimeTicks start_ticks,
+                                                    base::TimeTicks end_ticks) {
+  preread_begin_ticks_ = start_ticks;
+  preread_end_ticks_ = end_ticks;
+  // These aren't necessarily non-null after setting, because if the process in
+  // question did not PreRead (if `--no-pre-read-main-dll` was passed, for
+  // example), they will be null.
+}
+
 void CommonStartupMetricRecorder::ResetSessionForTesting() {
 #if DCHECK_IS_ON()
   GetSessionLog().clear();
@@ -82,11 +91,16 @@ base::TimeTicks CommonStartupMetricRecorder::StartupTimeToTimeTicks(
   // with this computation.
   std::optional<base::ScopedBoostPriority> scoped_boost_priority;
 
+  // Enabling this logic on OS X causes a significant performance regression.
+  // TODO(crbug.com/40464036): Remove IS_APPLE ifdef once utility processes
+  // set their desired main thread priority.
+#if !BUILDFLAG(IS_APPLE)
   static bool statics_initialized = false;
   if (!statics_initialized) {
     statics_initialized = true;
     scoped_boost_priority.emplace(base::ThreadType::kDisplayCritical);
   }
+#endif  // !BUILDFLAG(IS_APPLE)
 
   static const base::Time time_base = base::Time::Now();
   static const base::TimeTicks trace_ticks_base = base::TimeTicks::Now();

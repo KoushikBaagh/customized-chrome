@@ -7,22 +7,30 @@ package org.chromium.chrome.browser.tinker_tank;
 import android.app.Activity;
 
 import org.chromium.base.supplier.Supplier;
+import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+
+import java.util.List;
 
 /**
  * Upstream implementation of {@link TinkerTankDelegate}. Downstream targets may provide a different
  * implementation.
  */
 public class TinkerTankDelegateImpl implements TinkerTankDelegate {
-    @Override
-    public boolean isEnabled() {
+    public static boolean enabled() {
         return false;
     }
 
     @Override
     public void maybeShowBottomSheet(
             Activity activity,
+            Profile profile,
             BottomSheetController bottomSheetController,
             Supplier<TabModelSelector> tabModelSelectorSupplier) {}
+
+    @Override
+    public void maybeShowForSelectedTabs(
+            Activity activity, BottomSheetController bottomSheetController, List<Tab> tabs) {}
 }

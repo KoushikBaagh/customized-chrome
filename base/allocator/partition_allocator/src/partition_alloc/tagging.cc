@@ -182,7 +182,7 @@ void* TagRegionIncrementForMTE(void* ptr, size_t sz) {
 }
 
 void* RemaskVoidPtrForMTE(void* ptr) {
-  if (PA_LIKELY(ptr)) {
+  if (ptr) [[likely]] {
     // Can't look up the tag for a null ptr (segfaults).
     return __arm_mte_get_tag(ptr);
   }
@@ -315,5 +315,34 @@ bool PermissiveMte::HandleCrash(int signo,
   return false;
 }
 #endif  // PA_BUILDFLAG(HAS_MEMORY_TAGGING) && PA_BUILDFLAG(IS_ANDROID)
+
+SuspendTagCheckingScope::SuspendTagCheckingScope() noexcept {
+#if PA_BUILDFLAG(HAS_MEMORY_TAGGING)
+  if (internal::base::CPU::GetInstanceNoAllocation().has_mte()) [[unlikely]] {
+    asm volatile(
+        R"(
+        .arch_extension memtag
+        mrs %0, tco
+        msr tco, #1
+        )"
+        : "=r"(previous_tco_));
+  }
+#endif  // PA_BUILDFLAG(HAS_MEMORY_TAGGING)
+}
+
+SuspendTagCheckingScope::~SuspendTagCheckingScope() {
+#if PA_BUILDFLAG(HAS_MEMORY_TAGGING)
+  if (internal::base::CPU::GetInstanceNoAllocation().has_mte()) [[unlikely]] {
+    // Restore previous tco value.
+    __asm__ __volatile__(
+        R"(
+        .arch_extension memtag
+        msr tco, %0
+        )"
+        :
+        : "r"(previous_tco_));
+  }
+#endif  // PA_BUILDFLAG(HAS_MEMORY_TAGGING)
+}
 
 }  // namespace partition_alloc

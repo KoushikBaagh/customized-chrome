@@ -329,7 +329,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="History.ClearBrowsingData.ImportantDialogShown"
-    enum="BooleanShown" expires_after="2024-11-17">
+    enum="BooleanShown" expires_after="2025-01-26">
   <owner>ayui@chromium.org</owner>
   <owner>chrome-owp-storage@google.com</owner>
   <component>1456716</component>
@@ -417,7 +417,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="History.Clusters.Actions.DidMakeQuery" enum="BooleanQueried"
-    expires_after="2024-09-22">
+    expires_after="2025-02-02">
   <owner>mcrouse@chromium.org</owner>
   <owner>chrome-journeys@google.com</owner>
   <component>1457319</component>
@@ -783,7 +783,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="History.Clusters.Backend.NumVisitsBelowFold"
-    units="number visits" expires_after="2024-11-03">
+    units="number visits" expires_after="2025-02-02">
   <owner>sophiechang@chromium.org</owner>
   <owner>chrome-journeys@google.com</owner>
   <component>1457319</component>
@@ -1236,7 +1236,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="History.Clusters.KeywordCache.LoadCachesFromPrefs.Latency"
-    units="ms" expires_after="2024-10-06">
+    units="ms" expires_after="2025-01-26">
   <owner>pnoland@chromium.org</owner>
   <owner>chrome-journeys@google.com</owner>
   <component>1457319</component>
@@ -1427,7 +1427,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="History.Clusters.WebUISessionDuration" units="ms"
-    expires_after="2024-11-03">
+    expires_after="2025-02-02">
   <owner>manukh@chromium.org</owner>
   <owner>chrome-journeys@google.com</owner>
   <component>1457319</component>
@@ -1492,16 +1492,6 @@ chromium-metrics-reviews@google.com.
     that the actual metrics (History.ForeignVisits*) are only recorded if any
     such visits were actually found, so the total counts will not match this
     histogram's.
-  </summary>
-</histogram>
-
-<histogram name="History.DatabaseMonthlyHostCountTime" units="ms"
-    expires_after="2020-03-01">
-  <owner>dimich@chromium.org</owner>
-  <component>1456716</component>
-  <summary>
-    Time spent on computing the monthly count of hosts visited. Reported every
-    time computation is performed, which in turn is done approximately weekly.
   </summary>
 </histogram>
 
@@ -1775,6 +1765,17 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="History.Embeddings.DatabaseCachedPassageHitCount"
+    units="passages" expires_after="2024-12-31">
+  <owner>orinj@chromium.org</owner>
+  <owner>sophiechang@chromium.org</owner>
+  <summary>
+    Number of passages that skip the embedder because the stored data for the
+    URL was retrieved and used as a cache. This is effectively the numerator for
+    History.Embeddings.DatabaseCachedPassageRatio.
+  </summary>
+</histogram>
+
 <histogram name="History.Embeddings.DatabaseCachedPassageRatio" units="%"
     expires_after="2024-12-31">
   <owner>orinj@chromium.org</owner>
@@ -1786,6 +1787,39 @@ chromium-metrics-reviews@google.com.
     embedder this portion of work. Logged regardless of presence/absence of
     existing data for the URL, as long as the kUseDatabaseBeforeEmbedder feature
     parameter is enabled.
+  </summary>
+</histogram>
+
+<histogram name="History.Embeddings.DatabaseCachedPassageTryCount"
+    units="passages" expires_after="2024-12-31">
+  <owner>orinj@chromium.org</owner>
+  <owner>sophiechang@chromium.org</owner>
+  <summary>
+    Number of passages that attempted to bypass the embedder by using the
+    database as an embeddings cache. This is effectively the denominator for
+    History.Embeddings.DatabaseCachedPassageRatio.
+  </summary>
+</histogram>
+
+<histogram name="History.Embeddings.DatabaseCacheHit" enum="Boolean"
+    expires_after="2024-12-31">
+  <owner>orinj@chromium.org</owner>
+  <owner>sophiechang@chromium.org</owner>
+  <summary>
+    Whether one passage attempting to bypass the embedder actually bypassed the
+    embedder due to having its embedding already available in the database.
+    Logged History.Embeddings.DatabaseCachedPassageTryCount times when a set of
+    passages are checked against available passages/embeddings in the database.
+  </summary>
+</histogram>
+
+<histogram name="History.Embeddings.DatabaseInitialized" enum="Boolean"
+    expires_after="2024-12-31">
+  <owner>orinj@chromium.org</owner>
+  <owner>sophiechang@chromium.org</owner>
+  <summary>
+    When the HistoryEmbeddings database is opened, this histogram is logged to
+    indicate whether initialization succeeded.
   </summary>
 </histogram>
 
@@ -1996,6 +2030,7 @@ chromium-metrics-reviews@google.com.
     expires_after="2024-12-31">
   <owner>sophiechang@chromium.org</owner>
   <owner>zekunjiang@google.com</owner>
+  <owner>src/components/history_embeddings/OWNERS</owner>
   <summary>
     Number of URLs that matched the query. Logged each time a query leveraging
     history embeddings is performed.
@@ -2005,6 +2040,7 @@ chromium-metrics-reviews@google.com.
 <histogram name="History.Embeddings.Passages.ExtractionTime" units="ms"
     expires_after="2024-12-31">
   <owner>orinj@chromium.org</owner>
+  <owner>src/components/history_embeddings/OWNERS</owner>
   <summary>
     Round trip request and response time for a single passage extraction. The
     clock starts just before the browser requests passages from a renderer, and
@@ -2016,6 +2052,7 @@ chromium-metrics-reviews@google.com.
 <histogram name="History.Embeddings.Passages.PassageCount" units="passages"
     expires_after="2024-12-31">
   <owner>orinj@chromium.org</owner>
+  <owner>src/components/history_embeddings/OWNERS</owner>
   <summary>
     Number of passages retrieved from a single page passage extraction. Logged
     each time passages are retrieved from a RenderFrameHost.
@@ -2025,6 +2062,7 @@ chromium-metrics-reviews@google.com.
 <histogram name="History.Embeddings.Passages.TotalTextSize" units="bytes"
     expires_after="2024-12-31">
   <owner>orinj@chromium.org</owner>
+  <owner>src/components/history_embeddings/OWNERS</owner>
   <summary>
     The sum of passage text sizes for all passages retrieved from an extraction.
     Logged each time passages are retrieved from a RenderFrameHost.
@@ -2051,9 +2089,19 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="History.Embeddings.QueryFiltered"
+    enum="EmbeddingsQueryFiltered" expires_after="2024-12-31">
+  <owner>orinj@chromium.org</owner>
+  <owner>robertogden@chromium.org</owner>
+  <summary>
+    Indicates query filter status every time a query is checked for filtering.
+  </summary>
+</histogram>
+
 <histogram name="History.Embeddings.Search.Completed" enum="Boolean"
     expires_after="2024-12-31">
   <owner>orinj@chromium.org</owner>
+  <owner>src/components/history_embeddings/OWNERS</owner>
   <summary>
     Whether the search completed without interruption. Logged each time a vector
     database search is performed.
@@ -2063,6 +2111,7 @@ chromium-metrics-reviews@google.com.
 <histogram name="History.Embeddings.Search.Duration" units="ms"
     expires_after="2024-12-31">
   <owner>orinj@chromium.org</owner>
+  <owner>src/components/history_embeddings/OWNERS</owner>
   <summary>
     The number of milliseconds spent searching. Logged each time a vector
     database search is performed.
@@ -2072,15 +2121,28 @@ chromium-metrics-reviews@google.com.
 <histogram name="History.Embeddings.Search.EmbeddingCount" units="embeddings"
     expires_after="2024-12-31">
   <owner>orinj@chromium.org</owner>
+  <owner>src/components/history_embeddings/OWNERS</owner>
   <summary>
     The number of embeddings searched. Logged each time a vector database search
     is performed.
   </summary>
 </histogram>
 
+<histogram name="History.Embeddings.Search.SkippedNonAsciiPassageCount"
+    units="passages" expires_after="2024-12-31">
+  <owner>orinj@chromium.org</owner>
+  <owner>src/components/history_embeddings/OWNERS</owner>
+  <summary>
+    The number of passages that had their embeddings scored zero during search
+    due to the source passage containing non-ASCII characters. Logged each time
+    a vector database search is performed.
+  </summary>
+</histogram>
+
 <histogram name="History.Embeddings.Search.UrlCount" units="urls"
     expires_after="2024-12-31">
   <owner>orinj@chromium.org</owner>
+  <owner>src/components/history_embeddings/OWNERS</owner>
   <summary>
     The number of URLs searched. Logged each time a vector database search is
     performed.
@@ -2090,6 +2152,7 @@ chromium-metrics-reviews@google.com.
 <histogram name="History.Embeddings.UserActions" enum="EmbeddingsUserActions"
     expires_after="2025-04-15">
   <owner>orinj@chromium.org</owner>
+  <owner>src/components/history_embeddings/OWNERS</owner>
   <summary>
     Tracks user actions related to History Embeddings in various bins within a
     single histogram.
@@ -2213,7 +2276,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="History.InMemoryDBItemCount" units="typed URLs"
-    expires_after="2024-11-17">
+    expires_after="2025-01-26">
   <owner>sky@chromium.org</owner>
   <owner>mpearson@chromium.org</owner>
   <component>1456716</component>
@@ -2352,7 +2415,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="History.TopSites.QueryFromHistoryTime" units="ms"
-    expires_after="2024-11-17">
+    expires_after="2025-01-26">
   <owner>mahmadi@chromium.org</owner>
   <owner>chrome-omnibox-team@google.com</owner>
   <summary>
@@ -2375,7 +2438,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="History.VisitedLinks.HashTableLengthOnReaderInit"
-    units="entries" expires_after="2024-12-08">
+    units="entries" expires_after="2025-02-09">
   <owner>kyraseevers@chromium.org</owner>
   <owner>brgoldstein@google.com</owner>
   <summary>
@@ -2386,7 +2449,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="History.VisitedLinks.HashTableSizeOnTableCreate" units="MB"
-    expires_after="2024-12-08">
+    expires_after="2025-02-09">
   <owner>kyraseevers@chromium.org</owner>
   <owner>brgoldstein@google.com</owner>
   <summary>
@@ -2396,7 +2459,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="History.VisitedLinks.HashTableUsageOnLinkAdded"
-    units="fingerprints" expires_after="2024-12-08">
+    units="fingerprints" expires_after="2025-02-09">
   <owner>kyraseevers@chromium.org</owner>
   <owner>brgoldstein@google.com</owner>
   <summary>
@@ -2501,16 +2564,6 @@ chromium-metrics-reviews@google.com.
     Unique URLs in History database urls table with last-visit times in the last
     7 days. Metrics are logged on initialization of the History DB on 0.3% of
     starts.
-  </summary>
-</histogram>
-
-<histogram name="HistoryPage.ClickPosition" units="units"
-    expires_after="2020-02-23">
-  <owner>rpop@google.com</owner>
-  <component>1456716</component>
-  <summary>
-    Number of entries that the clicked entry is older than in History page. Last
-    bucket is any entry of that value or higher.
   </summary>
 </histogram>
 

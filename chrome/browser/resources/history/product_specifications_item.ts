@@ -5,7 +5,9 @@
 import 'chrome://resources/cr_elements/cr_icons.css.js';
 import 'chrome://resources/cr_elements/cr_checkbox/cr_checkbox.js';
 import 'chrome://resources/cr_elements/cr_icon/cr_icon.js';
+import 'chrome://resources/cr_elements/cr_shared_vars.css.js';
 import './shared_icons.html.js';
+import './searched_label.js';
 
 import type {BrowserProxy} from 'chrome://resources/cr_components/commerce/browser_proxy.js';
 import {BrowserProxyImpl} from 'chrome://resources/cr_components/commerce/browser_proxy.js';
@@ -35,6 +37,7 @@ export interface ProductSpecificationsItemElement {
     'checkbox': CrCheckboxElement,
     'link': HTMLElement,
     'menu': HTMLElement,
+    'url': HTMLElement,
   };
 }
 
@@ -54,6 +57,8 @@ export class ProductSpecificationsItemElement extends PolymerElement {
       checked: Boolean,
 
       index: Number,
+
+      searchTerm: String,
     };
   }
 
@@ -64,7 +69,16 @@ export class ProductSpecificationsItemElement extends PolymerElement {
   private shoppingApi_: BrowserProxy = BrowserProxyImpl.getInstance();
 
   private onLinkClick_() {
-    this.shoppingApi_.showProductSpecificationsSetForUuid(this.item.uuid);
+    this.shoppingApi_.showProductSpecificationsSetForUuid(
+        this.item.uuid, /*inNewTab=*/ true);
+  }
+
+  private onLinkKeydown_(event: KeyboardEvent) {
+    if (event.key !== 'Enter') {
+      return;
+    }
+    this.shoppingApi_.showProductSpecificationsSetForUuid(
+        this.item.uuid, /*inNewTab=*/ true);
   }
 
   // This is necessary for shift-checkbox detection: preventing the mousedown
@@ -97,12 +111,17 @@ export class ProductSpecificationsItemElement extends PolymerElement {
 
   private getItemTitle_(): string {
     return loadTimeData.getStringF(
-        'productSpecificationsRow', this.item.name, this.item.urls.length);
+        'compareHistoryRow', this.item.name, this.item.urls.length);
   }
 
   private getMenuAriaLabel_(): string {
     return loadTimeData.getStringF(
-        'productSpecificationsMenuAriaLabel', this.item.name);
+        'compareHistoryMenuAriaLabel', this.item.name);
+  }
+
+  private getUrl_(): string {
+    // TODO: b/353981858 - consider sending url from shopping api.
+    return 'chrome://compare/?id=' + this.item.uuid.value;
   }
 
   createFocusRow(): FocusRow {

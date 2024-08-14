@@ -119,7 +119,7 @@ TabContentManager* TabContentManager::FromJavaObject(
 }
 
 TabContentManager::TabContentManager(JNIEnv* env,
-                                     const jni_zero::JavaRef<jobject>& obj,
+                                     jobject obj,
                                      jint default_cache_size,
                                      jint compression_queue_max_size,
                                      jint write_queue_max_size,
@@ -222,6 +222,7 @@ content::RenderWidgetHostView* TabContentManager::GetRwhvForTab(
 
 std::unique_ptr<thumbnail::ThumbnailCaptureTracker, base::OnTaskRunnerDeleter>
 TabContentManager::TrackCapture(thumbnail::TabId tab_id) {
+  CleanupTrackers();
   std::unique_ptr<thumbnail::ThumbnailCaptureTracker, base::OnTaskRunnerDeleter>
       tracker(new thumbnail::ThumbnailCaptureTracker(
                   base::BindOnce(&TabContentManager::OnTrackingFinished,
@@ -243,6 +244,11 @@ void TabContentManager::OnTrackingFinished(
   if (it->second.get() == tracker) {
     in_flight_captures_.erase(it);
   }
+}
+
+void TabContentManager::CleanupTrackers() {
+  base::EraseIf(in_flight_captures_,
+                [](const auto& pair) -> bool { return !pair.second; });
 }
 
 void TabContentManager::CaptureThumbnail(
@@ -330,6 +336,7 @@ void TabContentManager::NativeRemoveTabThumbnail(int tab_id) {
     readback_iter->second->SetToDropAfterReadback();
   }
   thumbnail_cache_->Remove(tab_id);
+  in_flight_captures_.erase(tab_id);
 }
 
 void TabContentManager::RemoveTabThumbnail(JNIEnv* env, jint tab_id) {
@@ -430,8 +437,9 @@ void TabContentManager::SetCaptureMinRequestTimeForTesting(JNIEnv* env,
   thumbnail_cache_->SetCaptureMinRequestTimeForTesting(timeMs);
 }
 
-jint TabContentManager::GetInFlightCapturesForTesting(JNIEnv* env) {
-  return in_flight_captures_.size();
+jboolean TabContentManager::IsTabCaptureInFlightForTesting(JNIEnv* env,
+                                                           jint tab_id) {
+  return in_flight_captures_.find(tab_id) != in_flight_captures_.end();
 }
 
 // ----------------------------------------------------------------------------

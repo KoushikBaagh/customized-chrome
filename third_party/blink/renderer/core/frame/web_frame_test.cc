@@ -307,7 +307,7 @@ void ExecuteScriptInMainWorld(
         mojom::blink::PromiseResultOption::kAwait,
     mojom::blink::UserActivationOption user_gesture =
         mojom::blink::UserActivationOption::kDoNotActivate) {
-  ExecuteScriptsInMainWorld(frame, base::make_span(&script_string, 1u),
+  ExecuteScriptsInMainWorld(frame, base::span_from_ref(script_string),
                             std::move(callback), wait_for_promise,
                             user_gesture);
 }
@@ -8167,6 +8167,7 @@ TEST_F(WebFrameTest, SameDocumentHistoryNavigationCommitType) {
       /*is_synchronously_committed=*/false, /*source_element=*/nullptr,
       mojom::blink::TriggeringEventInfo::kNotFromEvent,
       /*is_browser_initiated=*/true,
+      /*has_ua_visual_transition,=*/false,
       /*soft_navigation_heuristics_task_id=*/std::nullopt);
   EXPECT_EQ(kWebBackForwardCommit, client.LastCommitType());
 }

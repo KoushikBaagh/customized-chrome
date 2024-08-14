@@ -724,7 +724,9 @@ class AuthenticatorGpmPinSheetModelBase : public AuthenticatorSheetModelBase {
   ~AuthenticatorGpmPinSheetModelBase() override;
 
   std::u16string GetGpmAccountEmail() const;
+  std::u16string GetGpmAccountName() const;
   gfx::Image GetGpmAccountImage() const;
+  std::u16string GetAccessibleDescription() const;
 
   std::u16string pin() const { return pin_; }
   Mode mode() const { return mode_; }
@@ -732,6 +734,9 @@ class AuthenticatorGpmPinSheetModelBase : public AuthenticatorSheetModelBase {
 
   // Sets currently typed pin in the sheet.
   virtual void SetPin(std::u16string pin) = 0;
+
+  // Returns the accessibility label of the pin view based on its type and mode.
+  virtual std::u16string GetAccessibleName() const = 0;
 
  protected:
   std::u16string pin_;
@@ -764,6 +769,7 @@ class AuthenticatorGpmPinSheetModel : public AuthenticatorGpmPinSheetModelBase {
 
   // AuthenticatorGpmPinSheetModelBase:
   void SetPin(std::u16string pin) override;
+  std::u16string GetAccessibleName() const override;
 
  private:
   bool FullPinTyped() const;
@@ -791,6 +797,7 @@ class AuthenticatorGpmArbitraryPinSheetModel
 
   // AuthenticatorGpmPinSheetModelBase:
   void SetPin(std::u16string pin) override;
+  std::u16string GetAccessibleName() const override;
 
  private:
   // AuthenticatorSheetModelBase:
@@ -816,7 +823,6 @@ class AuthenticatorTrustThisComputerAssertionSheetModel
   std::u16string GetStepDescription() const override;
   bool IsCancelButtonVisible() const override;
   std::u16string GetCancelButtonLabel() const override;
-  void OnCancel() override;
   bool IsAcceptButtonVisible() const override;
   std::u16string GetAcceptButtonLabel() const override;
   bool IsOtherMechanismButtonVisible() const override;
@@ -840,7 +846,6 @@ class AuthenticatorCreateGpmPasskeySheetModel
   std::u16string GetStepDescription() const override;
   bool IsCancelButtonVisible() const override;
   std::u16string GetCancelButtonLabel() const override;
-  void OnCancel() override;
   bool IsAcceptButtonVisible() const override;
   std::u16string GetAcceptButtonLabel() const override;
   void OnAccept() override;
@@ -862,7 +867,6 @@ class AuthenticatorGpmIncognitoCreateSheetModel
   std::u16string GetStepDescription() const override;
   bool IsCancelButtonVisible() const override;
   std::u16string GetCancelButtonLabel() const override;
-  void OnCancel() override;
   bool IsAcceptButtonVisible() const override;
   std::u16string GetAcceptButtonLabel() const override;
   void OnAccept() override;

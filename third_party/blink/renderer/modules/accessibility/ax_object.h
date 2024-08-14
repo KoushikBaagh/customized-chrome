@@ -37,6 +37,7 @@
 #include "base/dcheck_is_on.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/raw_ref.h"
+#include "base/memory/stack_allocated.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/blink/public/web/web_ax_enums.h"
 #include "third_party/blink/renderer/core/accessibility/axid.h"
@@ -191,8 +192,9 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
   // Iterator for the ancestors of an |AXObject|.
   // Walks through all the unignored parents of the object up to the root.
   // Does not include the object itself in the list of ancestors.
-  class MODULES_EXPORT AncestorsIterator final
-      : public GarbageCollected<AncestorsIterator> {
+  class MODULES_EXPORT AncestorsIterator final {
+    STACK_ALLOCATED();
+
    public:
     using iterator_category = std::forward_iterator_tag;
     using value_type = AXObject;
@@ -233,8 +235,6 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
       return static_cast<AXObject*>(current_);
     }
 
-    void Trace(Visitor* visitor) const { visitor->Trace(current_); }
-
     MODULES_EXPORT friend void swap(AncestorsIterator& left,
                                     AncestorsIterator& right) {
       std::swap(left.current_, right.current_);
@@ -258,7 +258,7 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
     friend class AXObject;
     friend class AXObjectCacheImpl;
 
-    Member<AXObject> current_;
+    AXObject* current_;
   };
 
  protected:
@@ -1290,11 +1290,6 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
   // Works for all nodes.
   AXObject* ParentObjectUnignored() const;
 
-  // Get or create the first ancestor that's not accessibility ignored and also
-  // does not have a role of kGenericContainer nor kNone. Works for all nodes.
-  // Used to check for required context for certain roles.
-  AXObject* ParentObjectUnignoredNonGeneric() const;
-
   // Get or create the first ancestor that's included in the accessibility tree.
   // Works for all nodes, and may return nodes that are accessibility ignored.
   AXObject* ParentObjectIncludedInTree() const;
@@ -1354,7 +1349,13 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
   LocalFrameView* DocumentFrameView() const;
   virtual Element* AnchorElement() const { return nullptr; }
   virtual Element* ActionElement() const { return nullptr; }
-  virtual AtomicString Language() const;
+
+  // For non-root nodes, this returns the language attribute value. For the
+  // root node (kRootWebArea), this returns the first non-empty value from the
+  // following list: the language attribute in the <html> element, the language
+  // specified in the <meta> tag, the Accept-Language HTTP header, the default
+  // language of the browser's UI.
+  AtomicString Language() const;
   virtual bool HasAttribute(const QualifiedName&) const { return false; }
   virtual const AtomicString& GetAttribute(const QualifiedName&) const {
     return g_null_atom;
@@ -1447,8 +1448,6 @@ class MODULES_EXPORT AXObject : public GarbageCollected<AXObject> {
 
   // Static helper functions.
   // TODO(accessibility) Move these to a static helper util class.
-  static bool IsARIAControl(ax::mojom::blink::Role);
-  static bool IsARIAInput(ax::mojom::blink::Role);
   static bool IsFrame(const Node*);
   static bool HasARIAOwns(Element* element);
   // Should this own a child tree (e.g. an iframe).

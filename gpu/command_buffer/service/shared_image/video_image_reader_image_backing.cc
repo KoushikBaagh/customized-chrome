@@ -39,6 +39,10 @@
 #include "ui/gl/gl_utils.h"
 #include "ui/gl/scoped_restore_texture.h"
 
+#if BUILDFLAG(SKIA_USE_DAWN)
+#include "third_party/skia/include/gpu/graphite/dawn/DawnTypes.h"
+#endif
+
 namespace gpu {
 
 namespace {
@@ -121,6 +125,7 @@ VideoImageReaderImageBacking::VideoImageReaderImageBacking(
     const gfx::ColorSpace color_space,
     GrSurfaceOrigin surface_origin,
     SkAlphaType alpha_type,
+    std::string debug_label,
     scoped_refptr<StreamTextureSharedImageInterface> stream_texture_sii,
     scoped_refptr<SharedContextState> context_state,
     scoped_refptr<RefCountedLock> drdc_lock)
@@ -129,6 +134,7 @@ VideoImageReaderImageBacking::VideoImageReaderImageBacking(
                                color_space,
                                surface_origin,
                                alpha_type,
+                               std::move(debug_label),
                                !!drdc_lock),
       RefCountedLockHelperDrDc(std::move(drdc_lock)),
       stream_texture_sii_(std::move(stream_texture_sii)),
@@ -446,7 +452,7 @@ class VideoImageReaderImageBacking::SkiaGraphiteDawnImageRepresentation
         /*sampleCount=*/1, skgpu::Mipmapped::kNo, webgpu_format, webgpu_format,
         texture_descriptor.usage, wgpu::TextureAspect::All, /*slice=*/0,
         ahb_properties.yCbCrInfo);
-    return {skgpu::graphite::BackendTexture(
+    return {skgpu::graphite::BackendTextures::MakeDawn(
         SkISize::Make(ahb_desc.width, ahb_desc.height), dawn_texture_info,
         texture_.Get())};
   }

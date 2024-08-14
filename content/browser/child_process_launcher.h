@@ -6,6 +6,7 @@
 #define CONTENT_BROWSER_CHILD_PROCESS_LAUNCHER_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "base/memory/raw_ptr.h"
@@ -92,6 +93,10 @@ struct RenderProcessPriority {
                         ,
                         ChildProcessImportance importance
 #endif
+#if !BUILDFLAG(IS_ANDROID)
+                        ,
+                        std::optional<base::Process::Priority> priority_override
+#endif
                         )
       : visible(visible),
         has_media_stream(has_media_stream),
@@ -104,10 +109,15 @@ struct RenderProcessPriority {
         ,
         importance(importance)
 #endif
+#if !BUILDFLAG(IS_ANDROID)
+        ,
+        priority_override(priority_override)
+#endif
   {
   }
 
   // Returns true if the child process is backgrounded.
+  // DEPRECATED NOTICE: Use GetProcessPriority() instead.
   bool is_background() const;
 
   // Returns the process priority for this child process.
@@ -119,9 +129,8 @@ struct RenderProcessPriority {
   using TraceProto = perfetto::protos::pbzero::ChildProcessLauncherPriority;
   void WriteIntoTrace(perfetto::TracedProto<TraceProto> proto) const;
 
-  // Prefer `is_background()` or `GetProcessPriority()` to inspecting these
-  // fields individually (to ensure all logic uses the same notion of
-  // "backgrounded").
+  // Prefer `GetProcessPriority()` to inspecting these fields individually (to
+  // ensure all priority logic is consistent).
 
   // |visible| is true if the process is responsible for one or more widget(s)
   // in foreground tabs. The notion of "visible" is determined by the embedder
@@ -162,6 +171,12 @@ struct RenderProcessPriority {
 
 #if BUILDFLAG(IS_ANDROID)
   ChildProcessImportance importance;
+#endif
+
+#if !BUILDFLAG(IS_ANDROID)
+  // If this is set then the built-in process priority calculation system is
+  // ignored, and an externally computed process priority is used.
+  std::optional<base::Process::Priority> priority_override;
 #endif
 };
 

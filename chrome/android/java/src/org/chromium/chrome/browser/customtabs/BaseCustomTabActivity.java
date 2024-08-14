@@ -17,11 +17,11 @@ import android.view.KeyEvent;
 
 import androidx.annotation.AnimRes;
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.TrustedWebUtils;
 
 import org.chromium.base.IntentUtils;
+import org.chromium.base.ResettersForTesting;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.base.supplier.OneshotSupplier;
@@ -84,9 +84,9 @@ import org.chromium.components.browser_ui.widget.gesture.BackPressHandler;
 import org.chromium.components.embedder_support.delegate.WebContentsDelegateAndroid;
 
 /**
- * Contains functionality which is shared between {@link WebappActivity} and
- * {@link CustomTabActivity}. Purpose of the class is to simplify merging {@link WebappActivity}
- * and {@link CustomTabActivity}.
+ * Contains functionality which is shared between {@link WebappActivity} and {@link
+ * CustomTabActivity}. Purpose of the class is to simplify merging {@link WebappActivity} and {@link
+ * CustomTabActivity}.
  */
 public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTabActivityComponent> {
     protected static Integer sOverrideCoreCountForTesting;
@@ -144,14 +144,23 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
     // change the package name.
     protected boolean mShouldOverridePackage;
 
-    @VisibleForTesting
-    public static void setOverrideCoreCount(int coreCount) {
+    public static void setOverrideCoreCountForTesting(int coreCount) {
         sOverrideCoreCountForTesting = coreCount;
+        ResettersForTesting.register(() -> sOverrideCoreCountForTesting = null);
     }
 
     /** Builds {@link BrowserServicesIntentDataProvider} for this {@link CustomTabActivity}. */
-    protected abstract BrowserServicesIntentDataProvider buildIntentDataProvider(
-            Intent intent, @CustomTabsIntent.ColorScheme int colorScheme);
+    protected BrowserServicesIntentDataProvider buildIntentDataProvider(
+            Intent intent, @CustomTabsIntent.ColorScheme int colorScheme) {
+        if (AuthTabIntentDataProvider.isAuthTabIntent(intent)) {
+            return new AuthTabIntentDataProvider(intent, this);
+        } else if (IncognitoCustomTabIntentDataProvider.isValidIncognitoIntent(intent)) {
+            return new IncognitoCustomTabIntentDataProvider(intent, this, colorScheme);
+        } else if (EphemeralCustomTabIntentDataProvider.isValidEphemeralTabIntent(intent)) {
+            return new EphemeralCustomTabIntentDataProvider(intent, this, colorScheme);
+        }
+        return new CustomTabIntentDataProvider(intent, this, colorScheme);
+    }
 
     /**
      * @return The {@link BrowserServicesIntentDataProvider} for this {@link CustomTabActivity}.
@@ -240,7 +249,6 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
                         () -> mToolbarCoordinator,
                         () -> mNavigationController,
                         () -> mIntentDataProvider,
-                        () -> mDelegateFactory.getEphemeralTabCoordinator(),
                         mBackPressManager,
                         () -> mTabController,
                         () -> mMinimizationManagerHolder.getMinimizationManager(),
@@ -355,7 +363,9 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
 
         mMinimizationManagerHolder = component.resolveCustomTabMinimizationManagerHolder();
         mFeatureOverridesManager = component.resolveCustomTabFeatureOverridesManager();
-
+        mTabFactory.setActivityType(getActivityType());
+        mDelegateFactory.setEphemeralTabCoordinatorSupplier(
+                mRootUiCoordinator.getEphemeralTabCoordinatorSupplier());
         return component;
     }
 
@@ -556,7 +566,8 @@ public abstract class BaseCustomTabActivity extends ChromeActivity<BaseCustomTab
                 mIntentDataProvider.shouldShowStarButton(),
                 mIntentDataProvider.shouldShowDownloadButton(),
                 mIntentDataProvider.getCustomTabMode() == CustomTabProfileType.INCOGNITO,
-                mIntentDataProvider.isAuthView(),
+                mIntentDataProvider.isOffTheRecord(),
+                mIntentDataProvider.isAuthTab(),
                 isMenuIconAtStart,
                 mBaseCustomTabRootUiCoordinator.getReadAloudControllerSupplier(),
                 mIntentDataProvider.getClientPackageNameIdentitySharing() != null);

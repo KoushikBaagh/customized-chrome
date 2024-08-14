@@ -415,6 +415,7 @@ by a child template that "extends" this file.
             android:taskAffinity=""
             android:excludeFromRecents="true"
             android:launchMode="singleInstancePerTask"
+            android:windowNoDisplay="true"
             android:exported="false">
             <intent-filter>
                 <action android:name="org.chromium.chrome.browser.dragdrop.action.VIEW" />
@@ -505,7 +506,7 @@ by a child template that "extends" this file.
             {% endblock %}
             {% block chrome_activity_common %}
             android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|mcc|mnc|screenLayout|smallestScreenSize|uiMode|navigation"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|mcc|mnc|screenLayout|smallestScreenSize|uiMode|navigation|density"
             android:hardwareAccelerated="false"
             {% endblock %}
         >
@@ -578,7 +579,7 @@ by a child template that "extends" this file.
             {{ self.first_run_activity_common() }}>
         </activity>
         <activity android:name="org.chromium.chrome.browser.firstrun.FirstRunActivity"
-            android:theme="@style/Theme.Chromium.DialogWhenLarge"
+            android:theme="@style/Theme.Chromium.Activity.Fullscreen"
             android:launchMode="singleTop"
             {% block first_run_activity_common %}
             android:label="@string/fre_activity_label"
@@ -587,11 +588,6 @@ by a child template that "extends" this file.
             android:windowSoftInputMode="stateHidden|adjustPan"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|mcc|mnc|screenLayout|smallestScreenSize|uiMode"
             {% endblock %}>
-        </activity>
-        <activity android:name="org.chromium.chrome.browser.firstrun.TabbedModeFirstRunActivity"
-            android:theme="@style/Theme.Chromium.TabbedMode"
-            android:launchMode="singleTop"
-            {{ self.first_run_activity_common() }}>
         </activity>
         {% set enable_cardboard = enable_cardboard|default(0) %}
         {% if enable_cardboard == "true" %}
@@ -1024,15 +1020,6 @@ by a child template that "extends" this file.
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE"/>
 
-        <!-- Background Task Scheduler job service -->
-        <service android:name="org.chromium.components.background_task_scheduler.internal.BackgroundTaskJobService"
-            android:exported="false"
-            android:permission="android.permission.BIND_JOB_SERVICE"/>
-
-        <!-- Background Task Scheduler alarm receiver -->
-        <receiver android:name="org.chromium.components.background_task_scheduler.internal.BackgroundTaskBroadcastReceiver"
-            android:exported="false" />
-
         <!-- GcmTaskService implementation to wake Chrome on scheduled events -->
         <service android:name="org.chromium.chrome.browser.ChromeBackgroundService"
             android:permission="com.google.android.gms.permission.BIND_NETWORK_TASK_SERVICE"
@@ -1329,9 +1316,7 @@ by a child template that "extends" this file.
 
       <!-- Disables at startup init of Emoji2. See http://crbug.com/1205141 -->
       <provider
-          android:authorities="{{ manifest_package }}.androidx-startup"
           android:name="androidx.startup.InitializationProvider"
-          android:exported="false"
           tools:node="remove">
       </provider>
 

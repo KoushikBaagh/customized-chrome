@@ -31,6 +31,7 @@ AndroidVideoImageBacking::AndroidVideoImageBacking(
     const gfx::ColorSpace color_space,
     GrSurfaceOrigin surface_origin,
     SkAlphaType alpha_type,
+    std::string debug_label,
     bool is_thread_safe)
     : AndroidImageBacking(
           mailbox,
@@ -42,8 +43,11 @@ AndroidVideoImageBacking::AndroidVideoImageBacking(
           // This SI will be used to back a VideoFrame. As such, it
           // will potentially be sent to the display compositor and read by the
           // GL interface for WebGL.
-          SHARED_IMAGE_USAGE_DISPLAY_READ | SHARED_IMAGE_USAGE_GLES2_READ,
-          {},
+          // TODO: crbug.com/354856448 - add a parameter to the constructor that
+          // allows to specify whether SCANOUT is needed.
+          {SHARED_IMAGE_USAGE_DISPLAY_READ, SHARED_IMAGE_USAGE_GLES2_READ,
+           SHARED_IMAGE_USAGE_SCANOUT},
+          std::move(debug_label),
           viz::SinglePlaneFormat::kRGBA_8888.EstimatedSizeInBytes(size),
           is_thread_safe,
           base::ScopedFD()) {}
@@ -57,19 +61,21 @@ std::unique_ptr<AndroidVideoImageBacking> AndroidVideoImageBacking::Create(
     const gfx::ColorSpace color_space,
     GrSurfaceOrigin surface_origin,
     SkAlphaType alpha_type,
+    std::string debug_label,
     scoped_refptr<StreamTextureSharedImageInterface> stream_texture_sii,
     scoped_refptr<SharedContextState> context_state,
     scoped_refptr<RefCountedLock> drdc_lock) {
   if (features::IsAImageReaderEnabled()) {
     return std::make_unique<VideoImageReaderImageBacking>(
         mailbox, size, color_space, surface_origin, alpha_type,
-        std::move(stream_texture_sii), std::move(context_state),
-        std::move(drdc_lock));
+        std::move(debug_label), std::move(stream_texture_sii),
+        std::move(context_state), std::move(drdc_lock));
   } else {
     DCHECK(!drdc_lock);
     return std::make_unique<VideoSurfaceTextureImageBacking>(
         mailbox, size, color_space, surface_origin, alpha_type,
-        std::move(stream_texture_sii), std::move(context_state));
+        std::move(debug_label), std::move(stream_texture_sii),
+        std::move(context_state));
   }
 }
 

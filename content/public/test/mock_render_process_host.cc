@@ -75,7 +75,7 @@ MockRenderProcessHost::MockRenderProcessHost(
       fast_shutdown_started_(false),
       deletion_callback_called_(false),
       is_for_guests_only_(is_for_guests_only),
-      is_process_backgrounded_(false),
+      priority_(base::Process::Priority::kUserBlocking),
       is_unused_(true),
       worker_ref_count_(0),
       pending_reuse_ref_count_(0),
@@ -338,13 +338,16 @@ void MockRenderProcessHost::RemovePriorityClient(
   priority_clients_.erase(priority_client);
 }
 
-void MockRenderProcessHost::SetPriorityOverride(bool foreground) {}
+#if !BUILDFLAG(IS_ANDROID)
+void MockRenderProcessHost::SetPriorityOverride(
+    base::Process::Priority priority) {}
 
 bool MockRenderProcessHost::HasPriorityOverride() {
   return false;
 }
 
 void MockRenderProcessHost::ClearPriorityOverride() {}
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
 ChildProcessImportance MockRenderProcessHost::GetEffectiveImportance() {
@@ -405,8 +408,8 @@ const base::TimeTicks& MockRenderProcessHost::GetLastInitTime() {
   return dummy_time;
 }
 
-bool MockRenderProcessHost::IsProcessBackgrounded() {
-  return is_process_backgrounded_;
+base::Process::Priority MockRenderProcessHost::GetPriority() {
+  return priority_;
 }
 
 std::string MockRenderProcessHost::GetKeepAliveDurations() const {
@@ -422,12 +425,14 @@ int MockRenderProcessHost::GetRenderFrameHostCount() const {
 }
 
 void MockRenderProcessHost::RegisterRenderFrameHost(
-    const GlobalRenderFrameHostId& render_frame_host_id) {
+    const GlobalRenderFrameHostId& render_frame_host_id,
+    bool is_outermost_main_frame) {
   render_frame_host_id_set_.insert(render_frame_host_id);
 }
 
 void MockRenderProcessHost::UnregisterRenderFrameHost(
-    const GlobalRenderFrameHostId& render_frame_host_id) {
+    const GlobalRenderFrameHostId& render_frame_host_id,
+    bool is_outermost_main_frame) {
   render_frame_host_id_set_.erase(render_frame_host_id);
 }
 
@@ -583,6 +588,10 @@ void MockRenderProcessHost::ReinitializeLogging(
   NOTIMPLEMENTED();
 }
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+uint64_t MockRenderProcessHost::GetPrivateMemoryFootprint() {
+  return 0;
+}
 
 RenderProcessHost::FilterURLResult MockRenderProcessHost::FilterURL(
     bool empty_allowed,

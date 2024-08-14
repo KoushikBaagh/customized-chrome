@@ -87,8 +87,9 @@ class CONTENT_EXPORT PrivateAggregationHost
   static constexpr char kApiReportVersionWithoutFilteringId[] = "0.1";
   static constexpr char kApiReportVersionWithFilteringId[] = "1.0";
 
-  // The maximum number of contributions that can go in an `AggregatableReport`.
-  // Aligns with `attribution_reporting::kMaxAggregationKeysPerSource`.
+  // The maximum number of contributions that can go in an `AggregatableReport`,
+  // after merging. Aligns with
+  // `attribution_reporting::kMaxAggregationKeysPerSource`.
   static constexpr size_t kMaxNumberOfContributions = 20;
 
   static constexpr size_t kDefaultFilteringIdMaxBytes = 1;
@@ -99,6 +100,12 @@ class CONTENT_EXPORT PrivateAggregationHost
                     blink::kPrivateAggregationApiContextIdMaxLength,
                 "Maximum length of context_id should be aligned between Shared "
                 "Storage and Private Aggregation.");
+
+  // The duration of time that `SendReportOnTimeoutOrDisconnect()`
+  // unconditionally adds to the scheduled report time. Marked public for
+  // testing.
+  static constexpr base::TimeDelta kTimeForLocalProcessing =
+      base::Milliseconds(100);
 
   // `on_report_request_details_received` and `browser_context` must be
   // non-null.

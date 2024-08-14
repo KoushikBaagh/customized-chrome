@@ -3567,7 +3567,9 @@ TEST_F(URLRequestTest, PartitionedCookiesRedirect) {
     auto same_site_partitioned_cookie = CanonicalCookie::CreateForTesting(
         create_cookie_url, "samesite_partitioned=1;Secure;Partitioned",
         base::Time::Now(), std::nullopt,
-        CookiePartitionKey::FromURLForTesting(create_cookie_url));
+        CookiePartitionKey::FromURLForTesting(
+            create_cookie_url,
+            CookiePartitionKey::AncestorChainBit::kSameSite));
     ASSERT_TRUE(same_site_partitioned_cookie);
     ASSERT_TRUE(same_site_partitioned_cookie->IsPartitioned());
     base::test::TestFuture<CookieAccessResult> future;
@@ -4051,10 +4053,8 @@ class URLRequestTestHTTP : public URLRequestTest {
       EXPECT_FALSE(
           req->extra_request_headers().HasHeader(HttpRequestHeaders::kOrigin));
     } else {
-      std::string origin_header;
-      EXPECT_TRUE(req->extra_request_headers().GetHeader(
-          HttpRequestHeaders::kOrigin, &origin_header));
-      EXPECT_EQ(expected_origin_value, origin_header);
+      EXPECT_EQ(expected_origin_value, req->extra_request_headers().GetHeader(
+                                           HttpRequestHeaders::kOrigin));
     }
   }
 
@@ -5726,10 +5726,8 @@ TEST_F(URLRequestTestHTTP, RedirectWithAdditionalHeadersTest) {
   req->Start();
   d.RunUntilComplete();
 
-  std::string value;
   const HttpRequestHeaders& headers = req->extra_request_headers();
-  EXPECT_TRUE(headers.GetHeader(kExtraHeader, &value));
-  EXPECT_EQ(kExtraValue, value);
+  EXPECT_EQ(kExtraValue, headers.GetHeader(kExtraHeader));
   EXPECT_FALSE(req->is_pending());
   EXPECT_FALSE(req->is_redirecting());
   EXPECT_EQ(kExtraValue, d.data_received());
@@ -5764,9 +5762,8 @@ TEST_F(URLRequestTestHTTP, RedirectWithHeaderRemovalTest) {
   req->Start();
   d.RunUntilComplete();
 
-  std::string value;
   const HttpRequestHeaders& headers = req->extra_request_headers();
-  EXPECT_FALSE(headers.GetHeader(kExtraHeaderToRemove, &value));
+  EXPECT_FALSE(headers.GetHeader(kExtraHeaderToRemove));
   EXPECT_FALSE(req->is_pending());
   EXPECT_FALSE(req->is_redirecting());
   EXPECT_EQ("None", d.data_received());
@@ -6041,12 +6038,15 @@ namespace {
 // Adds a standard set of data to an upload for chunked upload integration
 // tests.
 void AddDataToUpload(ChunkedUploadDataStream::Writer* writer) {
-  writer->AppendData("a", 1, false);
-  writer->AppendData("bcd", 3, false);
-  writer->AppendData("this is a longer chunk than before.", 35, false);
-  writer->AppendData("\r\n\r\n", 4, false);
-  writer->AppendData("0", 1, false);
-  writer->AppendData("2323", 4, true);
+  const auto append = [writer](const std::string_view str, bool is_done) {
+    writer->AppendData(base::as_byte_span(str), is_done);
+  };
+  append("a", false);
+  append("bcd", false);
+  append("this is a longer chunk than before.", false);
+  append("\r\n\r\n", false);
+  append("0", false);
+  append("2323", true);
 }
 
 // Checks that the upload data added in AddChunksToUpload() was echoed back from
@@ -7599,6 +7599,7 @@ TEST_F(URLRequestTest, ReportCookieActivity) {
                   R"x("partition_key":")x" +
                   set_cookie_test_url.scheme() + "://" +
                   set_cookie_test_url.host() +
+                  ", same-site"
                   R"x(","path":"/","status":"INCLUDE, DO_NOT_WARN, )x"
                   R"x(NO_EXEMPTION"})x",
               SerializeNetLogValueToJson(entries[3].params));
@@ -7652,6 +7653,7 @@ TEST_F(URLRequestTest, ReportCookieActivity) {
                   R"x("partition_key":")x" +
                   set_cookie_test_url.scheme() + "://" +
                   set_cookie_test_url.host() +
+                  ", same-site"
                   R"x(","path":"/)x"
                   R"x(","status":"EXCLUDE_USER_PREFERENCES, DO_NOT_WARN, )x"
                   R"x(NO_EXEMPTION"})x",
@@ -7687,6 +7689,7 @@ TEST_F(URLRequestTest, ReportCookieActivity) {
     EXPECT_EQ(R"x({"operation":"send","partition_key":")x" +
                   set_cookie_test_url.scheme() + "://" +
                   set_cookie_test_url.host() +
+                  ", same-site"
                   R"x(","status":"EXCLUDE_USER_PREFERENCES, )x"
                   R"x(DO_NOT_WARN, NO_EXEMPTION"})x",
               SerializeNetLogValueToJson(entries[2].params));
@@ -7737,6 +7740,7 @@ TEST_F(URLRequestTest, ReportCookieActivity) {
             R"x(","name":"partitioned_cookie","operation":"send",)x"
             R"x("partition_key":")x" +
             set_cookie_test_url.scheme() + "://" + set_cookie_test_url.host() +
+            ", same-site"
             R"x(","path":"/","status":"INCLUDE, DO_NOT_WARN, NO_EXEMPTION"})x",
         SerializeNetLogValueToJson(entries[2].params));
     net_log_observer.Clear();

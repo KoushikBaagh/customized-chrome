@@ -20,9 +20,9 @@
 #include "base/numerics/safe_conversions.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/strcat.h"
-#include "components/ip_protection/blind_sign_message_android_impl.h"
-#include "components/ip_protection/ip_protection_config_provider_helper.h"
-#include "components/ip_protection/ip_protection_proxy_config_fetcher.h"
+#include "components/ip_protection/android/blind_sign_message_android_impl.h"
+#include "components/ip_protection/common/ip_protection_config_provider_helper.h"
+#include "components/ip_protection/common/ip_protection_proxy_config_fetcher.h"
 #include "components/version_info/android/channel_getter.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/storage_partition.h"
@@ -37,17 +37,6 @@
 #include "net/third_party/quiche/src/quiche/blind_sign_auth/blind_sign_auth.h"
 #include "net/third_party/quiche/src/quiche/blind_sign_auth/proto/blind_sign_auth_options.pb.h"
 #include "net/third_party/quiche/src/quiche/blind_sign_auth/proto/spend_token_data.pb.h"
-
-namespace {
-// TODO(crbug.com/40216037): Once `google_apis::GetAPIKey()` handles this
-// logic we can remove this helper.
-std::string GetAPIKey() {
-  version_info::Channel channel = version_info::android::GetChannel();
-  return channel == version_info::Channel::STABLE
-             ? google_apis::GetAPIKey()
-             : google_apis::GetNonStableAPIKey();
-}
-}  // namespace
 
 namespace android_webview {
 
@@ -71,7 +60,7 @@ void AwIpProtectionConfigProvider::SetUp() {
                 ->GetURLLoaderFactoryForBrowserProcess()
                 .get(),
             ip_protection::IpProtectionConfigProviderHelper::kWebViewIpBlinding,
-            GetAPIKey());
+            google_apis::GetAPIKey(version_info::android::GetChannel()));
   }
 
   if (!bsa_) {
@@ -113,7 +102,7 @@ void AwIpProtectionConfigProvider::GetProxyList(GetProxyListCallback callback) {
   // If IP Protection is disabled then don't attempt to get a proxy list.
   if (!IsIpProtectionEnabled()) {
     std::move(callback).Run(/*proxy_chains=*/std::nullopt,
-                            /*geo_hint=*/nullptr);
+                            /*geo_hint=*/std::nullopt);
     return;
   }
 
@@ -208,11 +197,12 @@ void AwIpProtectionConfigProvider::OnFetchBlindSignedTokenCompleted(
     return;
   }
 
-  std::vector<network::mojom::BlindSignedAuthTokenPtr> bsa_tokens;
+  std::vector<network::BlindSignedAuthToken> bsa_tokens;
   for (const quiche::BlindSignToken& token : tokens.value()) {
-    network::mojom::BlindSignedAuthTokenPtr converted_token = ip_protection::
-        IpProtectionConfigProviderHelper::CreateBlindSignedAuthToken(token);
-    if (converted_token.is_null() || converted_token->token.empty()) {
+    std::optional<network::BlindSignedAuthToken> converted_token =
+        ip_protection::IpProtectionConfigProviderHelper::
+            CreateBlindSignedAuthToken(token);
+    if (!converted_token.has_value() || converted_token->token.empty()) {
       VLOG(2) << "AwIpProtectionConfigProvider::"
                  "OnFetchBlindSignedTokenCompleted failed to convert "
                  "`quiche::BlindSignAuth` token to a "
@@ -221,8 +211,9 @@ void AwIpProtectionConfigProvider::OnFetchBlindSignedTokenCompleted(
           /*bsa_tokens=*/std::nullopt, std::move(callback),
           AwIpProtectionTryGetAuthTokensResult::kFailedBSAOther);
       return;
+    } else {
+      bsa_tokens.push_back(std::move(converted_token).value());
     }
-    bsa_tokens.push_back(std::move(converted_token));
   }
 
   const base::TimeTicks current_time = base::TimeTicks::Now();
@@ -234,8 +225,7 @@ void AwIpProtectionConfigProvider::OnFetchBlindSignedTokenCompleted(
 }
 
 void AwIpProtectionConfigProvider::TryGetAuthTokensComplete(
-    std::optional<std::vector<network::mojom::BlindSignedAuthTokenPtr>>
-        bsa_tokens,
+    std::optional<std::vector<network::BlindSignedAuthToken>> bsa_tokens,
     TryGetAuthTokensCallback callback,
     AwIpProtectionTryGetAuthTokensResult result) {
   if (result == AwIpProtectionTryGetAuthTokensResult::kSuccess) {

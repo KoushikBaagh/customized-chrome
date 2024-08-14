@@ -92,8 +92,6 @@ cc::ScrollState CreateScrollStateForGesture(const WebGestureEvent& event) {
     case WebInputEvent::Type::kGestureScrollUpdate:
       scroll_state_data.delta_x = -event.data.scroll_update.delta_x;
       scroll_state_data.delta_y = -event.data.scroll_update.delta_y;
-      scroll_state_data.velocity_x = event.data.scroll_update.velocity_x;
-      scroll_state_data.velocity_y = event.data.scroll_update.velocity_y;
       scroll_state_data.is_in_inertial_phase =
           event.data.scroll_update.inertial_phase ==
           WebGestureEvent::InertialPhaseState::kMomentum;
@@ -284,6 +282,12 @@ void InputHandlerProxy::HandleInputEventWithLatencyInfo(
                 tracing::FillFlowEvent(ctx, TrackEvent::LegacyEvent::FLOW_INOUT,
                                        trace_id);
               });
+
+  // Prevent the events to be counted into INP metrics if there is an active
+  // scroll.
+  if (handling_gesture_on_impl_thread_) {
+    event->EventPointer()->SetPreventCountingAsInteractionTrue();
+  }
 
   auto event_with_callback = std::make_unique<EventWithCallback>(
       std::move(event), std::move(callback), std::move(metrics));

@@ -11,11 +11,12 @@
 #include "base/functional/callback_helpers.h"
 #include "base/memory/weak_ptr.h"
 #include "base/task/cancelable_task_tracker.h"
-#include "chrome/browser/ash/external_metrics.h"
+#include "chrome/browser/ash/external_metrics/external_metrics.h"
 #include "chrome/browser/ash/pcie_peripheral/ash_usb_detector.h"
 #include "chrome/browser/chrome_browser_main_linux.h"
 #include "chrome/browser/memory/memory_kills_monitor.h"
 
+class AmbientClientImpl;
 class AssistantBrowserDelegateImpl;
 class AssistantStateClient;
 class ChromeKeyboardControllerClient;
@@ -84,7 +85,6 @@ class MisconfiguredUserCleaner;
 class PowerMetricsReporter;
 class RendererFreezer;
 class ReportControllerInitializer;
-class SecureDnsManager;
 class SessionTerminationManager;
 class ShortcutMappingPrefService;
 class ShutdownPolicyForwarder;
@@ -179,7 +179,6 @@ class ChromeBrowserMainPartsAsh : public ChromeBrowserMainPartsLinux {
   std::unique_ptr<FastTransitionObserver> fast_transition_observer_;
   std::unique_ptr<NetworkThrottlingObserver> network_throttling_observer_;
   std::unique_ptr<NetworkChangeManagerClient> network_change_manager_client_;
-  std::unique_ptr<SecureDnsManager> secure_dns_manager_;
   std::unique_ptr<DebugdNotificationHandler> debugd_notification_handler_;
   std::unique_ptr<HatsBluetoothRevampTriggerImpl>
       hats_bluetooth_revamp_trigger_;
@@ -216,6 +215,7 @@ class ChromeBrowserMainPartsAsh : public ChromeBrowserMainPartsLinux {
 
   std::unique_ptr<LowDiskNotification> low_disk_notification_;
   std::unique_ptr<KioskController> kiosk_controller_;
+  std::unique_ptr<AmbientClientImpl> ambient_client_;
   std::unique_ptr<MultiCaptureNotifications> multi_capture_notifications_;
 
   std::unique_ptr<ShortcutMappingPrefService> shortcut_mapping_pref_service_;

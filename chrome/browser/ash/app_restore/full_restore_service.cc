@@ -17,11 +17,13 @@
 #include "ash/glanceables/post_login_glanceables_metrics_recorder.h"
 #include "ash/metrics/login_unlock_throughput_recorder.h"
 #include "ash/public/cpp/notification_utils.h"
+#include "ash/public/cpp/session/session_controller.h"
 #include "ash/shell.h"
 #include "ash/webui/settings/public/constants/routes.mojom.h"
 #include "ash/webui/settings/public/constants/setting.mojom-shared.h"
 #include "ash/wm/desks/templates/saved_desk_controller.h"
 #include "ash/wm/window_restore/informed_restore_controller.h"
+#include "ash/wm/window_restore/window_restore_metrics.h"
 #include "ash/wm/window_restore/window_restore_util.h"
 #include "base/barrier_callback.h"
 #include "base/command_line.h"
@@ -822,6 +824,7 @@ void FullRestoreService::MaybeShowRestoreNotification(
   notification_display_service->Display(NotificationHandler::Type::TRANSIENT,
                                         *notification_,
                                         /*metadata=*/nullptr);
+  base::UmaHistogramBoolean(kFullRestoreNotificationHistogram, true);
   show_notification = true;
 }
 

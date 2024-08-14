@@ -152,6 +152,9 @@ AppListSearchView::AppListSearchView(
 
   AppListModelProvider* const model_provider = AppListModelProvider::Get();
   model_provider->AddObserver(this);
+
+  // Set the role of AppListSearchView to ListBox.
+  GetViewAccessibility().SetRole(ax::mojom::Role::kListBox);
 }
 
 AppListSearchView::~AppListSearchView() {
@@ -254,8 +257,6 @@ void AppListSearchView::OnSearchResultContainerResultsChanged() {
   last_search_result_count_ = result_count;
   last_result_metadata_.swap(search_result_metadata);
 
-  ScheduleResultsChangedA11yNotification();
-
   // Reset selection to first when things change. The first result is set as
   // as the default result.
   result_selection_controller_->set_block_selection_changes(false);
@@ -268,6 +269,8 @@ void AppListSearchView::OnSearchResultContainerResultsChanged() {
   } else {
     search_box_view_->ClearAutocompleteText();
   }
+
+  ScheduleResultsChangedA11yNotification();
 }
 
 void AppListSearchView::VisibilityChanged(View* starting_from,
@@ -285,11 +288,8 @@ void AppListSearchView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
     return;
   }
 
-  // Set the role of AppListSearchView to ListBox along with notifying value
-  // change to "interject" the node announcement before the search result is
-  // announced.
-  node_data->role = ax::mojom::Role::kListBox;
-
+  // Notify value change to "interject" the node announcement before the search
+  // result is announced.
   std::u16string value;
   const std::u16string& query = search_box_view_->current_query();
   if (!query.empty()) {

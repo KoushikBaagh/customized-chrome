@@ -22,8 +22,16 @@ bool IsFeedBackgroundRefreshEnabledOnly() {
 
 }  // namespace
 
+BASE_FEATURE(kSegmentedDefaultBrowserPromo,
+             "SegmentedDefaultBrowserPromo",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+bool IsSegmentedDefaultBrowserPromoEnabled() {
+  return base::FeatureList::IsEnabled(kSegmentedDefaultBrowserPromo);
+}
+
 BASE_FEATURE(kIOSKeyboardAccessoryUpgrade,
-             "kIOSKeyboardAccessoryUpgrade",
+             "IOSKeyboardAccessoryUpgrade",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTestFeature, "TestFeature", base::FEATURE_DISABLED_BY_DEFAULT);
@@ -34,6 +42,10 @@ BASE_FEATURE(kSafetyCheckMagicStack,
 
 BASE_FEATURE(kSafetyCheckNotifications,
              "SafetyCheckNotifications",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kOmahaServiceRefactor,
+             "OmahaServiceRefactor",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 const char kSafetyCheckNotificationsExperimentType[] =
@@ -99,6 +111,10 @@ BASE_FEATURE(kIOSDockingPromo,
              "IOSDockingPromo",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kIOSDockingPromoForEligibleUsersOnly,
+             "IOSDockingPromoForEligibleUsersOnly",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kIOSDockingPromoFixedTriggerLogicKillswitch,
              "IOSDockingPromoFixedTriggerLogicKillswitch",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -109,7 +125,7 @@ BASE_FEATURE(kIOSDockingPromoPreventDeregistrationKillswitch,
 
 BASE_FEATURE(kNonModalDefaultBrowserPromoCooldownRefactor,
              "NonModalDefaultBrowserPromoCooldownRefactor",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 constexpr base::FeatureParam<int>
     kNonModalDefaultBrowserPromoCooldownRefactorParam{
@@ -224,10 +240,26 @@ int LargeContextualPanelEntrypointDelayInSeconds() {
 constexpr base::FeatureParam<int>
     kLargeContextualPanelEntrypointDisplayedInSeconds{
         &kContextualPanel,
-        /*name=*/"large-entrypoint-displayed-seconds", /*default_value=*/5};
+        /*name=*/"large-entrypoint-displayed-seconds", /*default_value=*/10};
 
 int LargeContextualPanelEntrypointDisplayedInSeconds() {
   return kLargeContextualPanelEntrypointDisplayedInSeconds.Get();
+}
+
+constexpr base::FeatureParam<bool> kContextualPanelEntrypointHighlightDuringIPH{
+    &kContextualPanel,
+    /*name=*/"entrypoint-highlight-iph", /*default_value=*/true};
+
+bool ShouldHighlightContextualPanelEntrypointDuringIPH() {
+  return kContextualPanelEntrypointHighlightDuringIPH.Get();
+}
+
+constexpr base::FeatureParam<bool> kContextualPanelEntrypointRichIPH{
+    &kContextualPanel,
+    /*name=*/"entrypoint-rich-iph", /*default_value=*/true};
+
+bool ShouldShowRichContextualPanelEntrypointIPH() {
+  return kContextualPanelEntrypointRichIPH.Get();
 }
 
 BASE_FEATURE(kNonModalDefaultBrowserPromoImpressionLimit,
@@ -257,47 +289,6 @@ BASE_FEATURE(kBottomOmniboxDefaultSetting,
              "BottomOmniboxDefaultSetting",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kBottomOmniboxPromoFRE,
-             "BottomOmniboxPromoFRE",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kBottomOmniboxPromoAppLaunch,
-             "BottomOmniboxPromoAppLaunch",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-const char kBottomOmniboxPromoParam[] = "BottomOmniboxPromoParam";
-const char kBottomOmniboxPromoParamForced[] = "Forced";
-
-bool IsBottomOmniboxPromoFlagEnabled(BottomOmniboxPromoType type) {
-  if (ui::GetDeviceFormFactor() != ui::DEVICE_FORM_FACTOR_PHONE) {
-    return false;
-  }
-  if ((type == BottomOmniboxPromoType::kFRE ||
-       type == BottomOmniboxPromoType::kAny) &&
-      base::FeatureList::IsEnabled(kBottomOmniboxPromoFRE)) {
-    return true;
-  }
-  if ((type == BottomOmniboxPromoType::kAppLaunch ||
-       type == BottomOmniboxPromoType::kAny) &&
-      base::FeatureList::IsEnabled(kBottomOmniboxPromoAppLaunch)) {
-    return true;
-  }
-  return false;
-}
-
-BASE_FEATURE(kBottomOmniboxPromoDefaultPosition,
-             "BottomOmniboxPromoDefaultPosition",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-const char kBottomOmniboxPromoDefaultPositionParam[] =
-    "BottomOmniboxPromoDefaultPositionParam";
-const char kBottomOmniboxPromoDefaultPositionParamTop[] = "Top";
-const char kBottomOmniboxPromoDefaultPositionParamBottom[] = "Bottom";
-
-BASE_FEATURE(kBottomOmniboxPromoRegionFilter,
-             "BottomOmniboxPromoRegionFilter",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 BASE_FEATURE(kOnlyAccessClipboardAsync,
              "OnlyAccessClipboardAsync",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -319,6 +310,10 @@ bool IsSafetyCheckMagicStackEnabled() {
 
 bool IsSafetyCheckNotificationsEnabled() {
   return base::FeatureList::IsEnabled(kSafetyCheckNotifications);
+}
+
+bool IsOmahaServiceRefactorEnabled() {
+  return base::FeatureList::IsEnabled(kOmahaServiceRefactor);
 }
 
 SafetyCheckNotificationsExperimentalArm
@@ -467,6 +462,10 @@ const char kBackgroundRefreshMaxAgeInSeconds[] =
 
 bool IsDockingPromoEnabled() {
   return base::FeatureList::IsEnabled(kIOSDockingPromo);
+}
+
+bool IsDockingPromoForEligibleUsersOnlyEnabled() {
+  return base::FeatureList::IsEnabled(kIOSDockingPromoForEligibleUsersOnly);
 }
 
 DockingPromoDisplayTriggerArm DockingPromoExperimentTypeEnabled() {
@@ -696,6 +695,8 @@ BASE_FEATURE(kTabResumption2,
              "TabResumption2",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+const char kTabResumption2BubbleParam[] = "tab-resumption-2-bubble-param";
+
 const char kMagicStackMostVisitedModuleParam[] = "MagicStackMostVisitedModule";
 
 const char kReducedSpaceParam[] = "ReducedNTPTopSpace";
@@ -733,6 +734,14 @@ bool IsTabResumption2_0Enabled() {
     return false;
   }
   return base::FeatureList::IsEnabled(kTabResumption2);
+}
+
+bool IsTabResumption2BubbleEnabled() {
+  if (!IsTabResumption2_0Enabled()) {
+    return false;
+  }
+  return base::GetFieldTrialParamByFeatureAsBool(
+      kTabResumption2, kTabResumption2BubbleParam, false);
 }
 
 const base::TimeDelta TabResumptionForXDevicesTimeThreshold() {
@@ -891,6 +900,12 @@ BASE_FEATURE(kEnableAppBackgroundRefresh,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 bool IsAppBackgroundRefreshEnabled() {
+  version_info::Channel channel = ::GetChannel();
+  if (channel == version_info::Channel::BETA ||
+      channel == version_info::Channel::STABLE) {
+    return false;
+  }
+
   return base::FeatureList::IsEnabled(kEnableAppBackgroundRefresh);
 }
 
@@ -901,3 +916,27 @@ BASE_FEATURE(kHomeMemoryImprovements,
 bool IsHomeMemoryImprovementsEnabled() {
   return base::FeatureList::IsEnabled(kHomeMemoryImprovements);
 }
+
+BASE_FEATURE(kRichBubbleWithoutImage,
+             "RichBubbleWithoutImage",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+bool IsRichBubbleWithoutImageEnabled() {
+  return base::FeatureList::IsEnabled(kRichBubbleWithoutImage);
+}
+
+BASE_FEATURE(kIdentityConfirmationSnackbar,
+             "IdentityConfirmationSnackbar",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Feature parameters for kIdentityConfirmationSnackbar.
+constexpr base::FeatureParam<base::TimeDelta>
+    kIdentityConfirmationMinDisplayInterval{
+        &kIdentityConfirmationSnackbar,
+        /*name=*/"IdentityConfirmationMinDisplayInterval",
+        /*default_value=*/base::Days(14)};
+constexpr base::FeatureParam<base::TimeDelta>
+    kIdentityConfirmationMinTimeSinceSignin{
+        &kIdentityConfirmationSnackbar,
+        /*name=*/"IdentityConfirmationMinTimeSinceSignin",
+        /*default_value=*/base::Hours(24)};

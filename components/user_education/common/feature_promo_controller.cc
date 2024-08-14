@@ -696,16 +696,35 @@ FeaturePromoResult FeaturePromoControllerCommon::CanShowPromoCommon(
   }
 
   // Check the lifecycle, but only if not in demo mode. This is especially
-  // important for snoozeable, app, and legal notice promos.
+  // important for snoozeable, app, and legal notice promos. This will determine
+  // if the promo is even eligible to show.
   auto lifecycle = std::make_unique<FeaturePromoLifecycle>(
       storage_service_, params.key, &*params.feature, spec->promo_type(),
       spec->promo_subtype(), spec->rotating_promos().size());
+  if (spec->reshow_delay()) {
+    lifecycle->SetReshowPolicy(*spec->reshow_delay(), spec->max_show_count());
+  }
   if (!for_demo && !in_iph_demo_mode_) {
     if (const auto result = lifecycle->CanShow(); !result) {
       return result;
     }
   }
 
+#if !BUILDFLAG(IS_ANDROID)
+  // Need to check that the Feature Engagement Tracker isn't blocking the
+  // feature for event-based reasons (e.g. the feature was already used so
+  // there's no need to promote it). This prevents us from allowing a promo to
+  // preempt and close another promo or Tutorial because it passes all of the
+  // checks, only to discover that it is blocked by the tracker config.
+  for (const auto& [config, count] :
+       feature_engagement_tracker_->ListEvents(*params.feature)) {
+    if (!config.comparator.MeetsCriteria(count)) {
+      return FeaturePromoResult::kBlockedByConfig;
+    }
+  }
+#endif
+
+  // Figure out if there's already a promo being shown.
   std::optional<FeaturePromoSessionPolicy::PromoInfo> current_promo;
   if (critical_promo_bubble_ || current_promo_) {
     current_promo = last_promo_info_;
@@ -1213,6 +1232,9 @@ void FeaturePromoControllerCommon::RecordPromoNotShown(
       break;
     case FeaturePromoResult::kBlockedByNewProfile:
       failure_action_name.append("BlockedByNewProfile");
+      break;
+    case FeaturePromoResult::kBlockedByReshowDelay:
+      failure_action_name.append("BlockedByReshowDelay");
       break;
     default:
       NOTREACHED_IN_MIGRATION();

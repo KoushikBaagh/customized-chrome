@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+
 
 <!-- android_chrome_strings.grd contains strings for Chrome for Android.
 
@@ -689,9 +689,6 @@ For more settings that use data to improve your Chrome experience, go to <ph nam
         Automatically sign in to websites using stored credentials. When the feature is off, you’ll be asked for verification every time before signing in to a website.
       </message>
       <message name="IDS_PASSWORDS_LEAK_DETECTION_SWITCH_TITLE" desc="Title for the switch toggling whether Chrome should check that entered credentials have been part of a leak.">
-        Warn you if passwords are exposed in a data breach
-      </message>
-      <message name="IDS_PASSWORDS_LEAK_DETECTION_SWITCH_TITLE_UPDATED" desc="Title for the switch toggling whether Chrome should check that entered credentials have been part of a leak.">
         Warn you if a password was compromised in a data breach
       </message>
       <message name="IDS_PASSWORDS_LEAK_DETECTION_SWITCH_SUMMARY" desc="Summary for the switch toggling whether Chrome should check that entered credentials have been part of a leak.">
@@ -903,6 +900,39 @@ For more settings that use data to improve your Chrome experience, go to <ph nam
       </message>
       <message name="IDS_CHROME_CHANNEL_NAME_BETA" desc="The Chrome channel name for beta channel">
         Chrome Beta
+      </message>
+      <message name="IDS_ACCESS_LOSS_UPDATE_GMS_TITLE" desc="The title of the password access loss warning shown in Settings when the user tries to navigate to the Password Manager settings having an outdated Goggle Play Services.">
+        Update Google Play services
+      </message>
+      <message name="IDS_ACCESS_LOSS_UPDATE_GMS_DESC" desc="The message in the password access loss warning shown in Settings when the user tries to navigate to the Password Manager settings having an outdated Goggle Play Services.">
+        Passwords will stop working soon on this device. To keep using your passwords, update Google Play services.
+      </message>
+      <message name="IDS_ACCESS_LOSS_FIX_PROBLEM_TITLE" desc="The title of the password access loss warning shown in Settings when the user tries to navigate to the Password Manager settings after failed local passwords migration to Google Play Services">
+        Fix problem with saved passwords
+      </message>
+      <message name="IDS_ACCESS_LOSS_FIX_PROBLEM_DESC" desc="The message in the password access loss warning shown in Settings when the user tries to navigate to the Password Manager settings after failed local passwords migration to Google Play Services">
+        Some passwords saved only on this device will stop working soon. You can move these passwords to Google Password Manager.
+      </message>
+      <message name="IDS_ACCESS_LOSS_FIX_PROBLEM_POSITIVE_BUTTON_TEXT" desc="If the user has local passwords migration failed to Google Play services, they see the warning proposing them to fix this problem. This string is the agreement button text in the warning.">
+        Fix now
+      </message>
+      <message name="IDS_ACCESS_LOSS_NO_GMS_TITLE" desc="The title of the password access loss warning shown in Settings when the user tries to navigate to the Password Manager settings if no Google Play Services is installed on the phone.">
+        Google Password Manager will stop working on this device
+      </message>
+      <message name="IDS_ACCESS_LOSS_NO_GMS_DESC" desc="The message in the password access loss warning shown in Settings when the user tries to navigate to the Password Manager settings if no Google Play Services is installed on the phone.">
+        Passwords will stop working soon because Google Play services isn’t available. You can make a copy of your saved passwords before they stop working.
+      </message>
+      <message name="IDS_ACCESS_LOSS_NO_GMS_POSITIVE_BUTTON_TEXT" desc="If the user has no Google Play services installed on the phone, they see the modal dialog warning them that passwords will stop working soon and proposing them to export their paswords before that. This string is the agreement button text in the warning.">
+        Export passwords
+      </message>
+      <message name="IDS_ACCESS_LOSS_EXPORT_DIALOG_TITLE" desc="The title of the modal dialog proposing the user to export their passwords from Chrome and remove them from Chrome's database (to later import them in Google Play Services).">
+        First, export and delete the passwords from Chrome
+      </message>
+      <message name="IDS_ACCESS_LOSS_EXPORT_DIALOG_MESSAGE" desc="The message of the modal dialog proposing the user to export their passwords from Chrome and remove them from Chrome's database (to later import them in Google Play Services).">
+        Your passwords will be downloaded as a CSV file. They will be visible to anyone who can access the file, including apps. Exported passwords will be deleted from Chrome.
+      </message>
+      <message name="IDS_ACCESS_LOSS_EXPORT_DIALOG_POSITIVE_BUTTON_TEXT" desc="The text on the button, confirming the user's agreement to export passwords and remove them from Chrome's database.">
+        Export and delete
       </message>
 
       <!-- Lock Screen Fragment -->
@@ -1473,14 +1503,8 @@ Your Google account may have other forms of browsing history like searches and a
       <message name="IDS_PRIVACY_GUIDE_SAFE_BROWSING_ENHANCED_TITLE" desc="Title for the radio button for the enhanced Safe Browsing.">
         Enhanced protection
       </message>
-      <message name="IDS_PRIVACY_GUIDE_SAFE_BROWSING_ENHANCED_DESCRIPTION" desc="Description for the radio button for the enhanced Safe Browsing.">
-        Faster, proactive protection against dangerous websites, downloads, and extensions
-      </message>
       <message name="IDS_PRIVACY_GUIDE_SAFE_BROWSING_STANDARD_TITLE" desc="Title for the radio button for the standard Safe Browsing.">
         Standard protection
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SAFE_BROWSING_STANDARD_DESCRIPTION" desc="Description for the radio button for the standard Safe Browsing.">
-        Standard protection against websites, downloads, and extensions that are known to be dangerous
       </message>
       <message name="IDS_PRIVACY_GUIDE_FINISH_BUTTON" desc="Text on the button to finish the privacy guide">
         Finish
@@ -1514,42 +1538,6 @@ Your Google account may have other forms of browsing history like searches and a
       </message>
       <message name="IDS_PRIVACY_GUIDE_EXPLANATION_CLOSED_DESCRIPTION" desc="The accessibility string read when the privacy guide explanation bottom sheet is closed.">
         Privacy guide explanation closed
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SB_STANDARD_ITEM_ONE" desc="First bullet point that describes the details of the Safe Browsing control.">
-        Detects and warns you about dangerous events when they happen
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SB_STANDARD_ITEM_TWO" desc="Second bullet point that describes the details of the Safe Browsing control.">
-        Checks URLs with a list of unsafe sites stored in Chrome
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SB_STANDARD_ITEM_TWO_PROXY" desc="Second bullet point that describes the details of the Safe Browsing control with proxy.">
-        Sends an obfuscated portion of the URL to Google through a privacy server that hides your IP address
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SB_STANDARD_ITEM_THREE" desc="Third bullet point that describes the details of the Safe Browsing control.">
-        If a site tries to steal your password, or when you download a harmful file, Chrome may send URLs including bits of page content to Safe Browsing
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SB_STANDARD_ITEM_THREE_PROXY" desc="Third bullet point that describes the details of the Safe Browsing control with proxy.">
-        If a site tries to steal your password, or when you download a harmful file, Chrome may send URLs including bits of page content to Google
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SB_ENHANCED_ITEM_ONE" desc="First bullet point that describes the details of the Safe Browsing control.">
-        Predicts and warns you about dangerous events before they happen
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SB_ENHANCED_ITEM_TWO" desc="Second bullet point that describes the details of the Safe Browsing control.">
-        Keeps you safe on Chrome and may be used to improve your security in other Google apps when you are signed in
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SB_ENHANCED_ITEM_THREE" desc="Third bullet point that describes the details of the Safe Browsing control.">
-        Improves security for you and everyone on the web
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SB_ENHANCED_ITEM_FOUR" desc="Fourth bullet point that describes the details of the Safe Browsing control.">
-        Warns you if passwords are exposed in a data breach
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SB_ENHANCED_ITEM_FIVE" desc="Fifth bullet point that describes the details of the Safe Browsing control.">
-        Sends URLs to Safe Browsing to check them
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SB_ENHANCED_ITEM_SIX" desc="Sixth bullet point that describes the details of the Safe Browsing control.">
-        Also sends a small sample of pages, downloads, extension activity, and system information to help discover new threats
-      </message>
-      <message name="IDS_PRIVACY_GUIDE_SB_ENHANCED_ITEM_SEVEN" desc="Seventh bullet point that describes the details of the Safe Browsing control.">
-        Temporarily links this data to your Google Account when you’re signed in, to protect you across Google apps
       </message>
       <message name="IDS_PRIVACY_GUIDE_SEARCH_SUGGESTIONS_ITEM_ONE" desc="First bullet point that describes the details of the search suggestions toggle.">
         When you tap or type in the address bar or search box, you'll see suggestions from your default search engine. This is off in Incognito.
@@ -1691,7 +1679,9 @@ Your Google account may have other forms of browsing history like searches and a
         Permissions allowed again for <ph name="SITE_NAME">%1$s<ex>https://example.com:443</ex></ph>
       </message>
       <message name="IDS_SAFETY_HUB_MULTIPLE_PERMISSIONS_SNACKBAR" desc="Snackbar text displayed when the user click the 'Got it' at the bottom of the permissions review subpage or in the permissions review module of the dashboard. Informs the user about the number of sites for which the revoked permissions were reviewed.">
-        Permissions reviewed for <ph name="SITE_NUMBER">%1$s<ex>3</ex></ph> sites
+        {NUM_SITES, plural,
+        =1 {Permissions reviewed for 1 site}
+        other {Permissions reviewed for # sites}}
       </message>
       <message name="IDS_SAFETY_HUB_NOTIFICATIONS_REVIEW_OK_TITLE" desc="Title for the notifications module in the Safety Hub dashboard. It is displayed when the user has no notification permissions that need to be reviewed.">
         Notifications look good
@@ -1742,13 +1732,15 @@ Your Google account may have other forms of browsing history like searches and a
         Notifications <ph name="SEPARATOR">•</ph> Chrome removed these permissions because this site is dangerous
       </message>
       <message name="IDS_SAFETY_HUB_NOTIFICATIONS_RESET_SNACKBAR" desc="Snackbar text displayed when the user clicks the Unsubscribe button for a site which sends a lot of notifications. Informs the user for which site the notifications were unsubscribed.">
-        Notifications not allowed for <ph name="SITE_NAME">%1$s<ex>https://example.com:443</ex></ph>
+       Unsubscribed from <ph name="SITE_NAME">%1$s<ex>https://example.com:443</ex></ph>. You'll be asked again on your next visit.
       </message>
       <message name="IDS_SAFETY_HUB_NOTIFICATIONS_ALLOW_SNACKBAR" desc="Snackbar text displayed when the user clicks the Allow button for a site which sends a lot of notifications. Informs the user for which site the notifications were allowed.">
         Notifications allowed for <ph name="SITE_NAME">%1$s<ex>https://example.com:443</ex></ph>
       </message>
       <message name="IDS_SAFETY_HUB_NOTIFICATIONS_BULK_RESET_SNACKBAR" desc="Snackbar text displayed when the user click the 'Unsubscribe all' button at the bottom of the notifications review subpage or in the notifications review module of the dashboard. Informs the user about the number of sites for which the notifications were unsubscribed.">
-        Notifications not allowed for <ph name="SITE_NUMBER">%1$s<ex>3</ex></ph> sites
+        {NUM_SITES, plural,
+        =1 {Unsubscribed from 1 site}
+        other {Unsubscribed from # sites}}
       </message>
       <message name="IDS_SAFETY_HUB_SAFE_BROWSING_ON_TITLE" desc="Title for the Safe Browsing check row in the Safety Check page indicating that the user currently has Safe Browsing turned on and is getting the standard level of protection.">
         Safe Browsing is on
@@ -1828,6 +1820,9 @@ Your Google account may have other forms of browsing history like searches and a
       <message name="IDS_SAFETY_HUB_NO_PASSWORDS_TITLE" desc="Title for the password check row in the Safety Check page indicating that the user does not have any passwords saved to their Google account.">
         No saved passwords
       </message>
+      <message name="IDS_SAFETY_HUB_NO_COMPROMISED_PASSWORDS_TITLE" desc="Title for the password check row in the Safety Check page indicating that the checkup did not find any compromised passwords.">
+        No compromised passwords
+      </message>
       <message name="IDS_SAFETY_HUB_NO_PASSWORDS_SUMMARY" desc="Summary for the password check row in the Safety Check page indicating that the user has no passwords saved and that Safety check will start checking for breached passwords when they save them.">
         Chrome can check your passwords when you save them
       </message>
@@ -1853,10 +1848,12 @@ Your Google account may have other forms of browsing history like searches and a
         Chrome automatically removes permissions from abusive and unused sites
       </message>
       <message name="IDS_SAFETY_HUB_PERMISSIONS_WARNING_SUMMARY" desc="Text shown as a header at the very top of the Safety Hub permissions review subpage, or as a summary in the permissions review dashboard module. Further educates the user about why their permissions were revoked.">
-        To protect your privacy, permissions were removed from some sites
+        To help keep you safe, permissions were removed from some sites
       </message>
       <message name="IDS_SAFETY_HUB_COMPROMISED_PASSWORDS_SUMMARY" desc="Summary for the password check row in the Safety Check page indicating that the checkup found compromised passwords and that the user should change them immediately.">
-        You should change these now
+        {NUM_PASSWORDS, plural,
+        =1 {You should change this now}
+        other {You should change these now}}
       </message>
       <message name="IDS_SAFETY_HUB_PASSWORD_CHECK_UNAVAILABLE_TITLE" desc="Title for the password check row in the Safety Check page indicating that the password checkup could not be completed.">
         Can't check passwords
@@ -1888,77 +1885,50 @@ Your Google account may have other forms of browsing history like searches and a
         Enhanced protection
       </message>
       <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_SUMMARY" desc="Summary for Safe Browsing enhanced protection mode.">
-        Faster, proactive protection against dangerous websites, downloads, and extensions. Warns you about password breaches. Requires browsing data to be sent to Google.
-      </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_SUMMARY_UPDATED" desc="Summary for Safe Browsing enhanced protection mode.">
         Real-time, proactive protection against dangerous sites, downloads, and extensions that’s based on your browsing data getting sent to Google
       </message>
       <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_TITLE" desc="Title for Safe Browsing standard protection mode. [CHAR_LIMIT=32]">
         Standard protection
       </message>
       <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_SUMMARY" desc="Summary for Safe Browsing standard protection mode.">
-        Standard protection against websites, downloads, and extensions that are known to be dangerous.
-      </message>
-      <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_SUMMARY_UPDATED" desc="Summary for Safe Browsing standard protection mode.">
         Protects against sites, downloads, and extensions that are known to be dangerous. If a page does something suspicious, URLs and bits of page content are sent to Google Safe Browsing.
       </message>
-      <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_SUMMARY_UPDATED_PROXY" desc="Summary for Safe Browsing standard protection mode with proxy.">
+      <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_SUMMARY_PROXY" desc="Summary for Safe Browsing standard protection mode with proxy.">
         Protects against sites, downloads, and extensions that are known to be dangerous. When you visit a site, Chrome sends an obfuscated portion of the URL to Google through a privacy server that hides your IP address. If a site does something suspicious, full URLs and bits of page content are also sent.
       </message>
       <message name="IDS_SAFE_BROWSING_NO_PROTECTION_TITLE" desc="Title for Safe Browsing no protection mode. [CHAR_LIMIT=32]">
         No protection (not recommended)
       </message>
       <message name="IDS_SAFE_BROWSING_NO_PROTECTION_SUMMARY" desc="Summary for Safe Browsing no protection mode.">
-        Does not protect you against dangerous websites, downloads, and extensions. You’ll still get Safe Browsing protection, where available, in other Google services, like Gmail and Search.
-      </message>
-      <message name="IDS_SAFE_BROWSING_NO_PROTECTION_SUMMARY_UPDATED" desc="Summary for Safe Browsing no protection mode.">
         Does not protect you against dangerous websites, downloads, and extensions. Your Safe Browsing settings in other Google products won't be affected.
       </message>
 
       <!-- Safe Browsing enhanced protection preferences -->
       <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_SUBTITLE" desc="Subtitle for Safe Browsing enhanced protection mode.">
-        Enhanced protection:
-      </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_SUBTITLE_UPDATED" desc="Subtitle for Safe Browsing enhanced protection mode.">
         Enhanced protection
       </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_ONE" desc="First bullet point under the Safe Browsing enhanced protection mode">
-        Predicts and warns you about dangerous events before they happen.
-      </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_ONE_UPDATED" desc="First bullet point that describes the details of the Safe Browsing control.">
+      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_ONE" desc="First bullet point that describes the details of the Safe Browsing control.">
         Warns you about dangerous sites, even ones Google didn’t know about before, by analyzing more data from sites than standard protection. You can choose to skip Chrome warnings.
       </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_TWO" desc="Second bullet point under the Safe Browsing enhanced protection mode">
-        Keeps you safe on Chrome and may be used to improve your security in other Google apps when you are signed in.
-      </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_TWO_UPDATED" desc="Second bullet point that describes the details of the Safe Browsing control.">
+      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_TWO" desc="Second bullet point that describes the details of the Safe Browsing control.">
         In-depth scans for suspicious downloads.
       </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_THREE" desc="Third bullet point under the Safe Browsing enhanced protection mode">
-        Improves security for you and everyone on the web.
-      </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_THREE_UPDATED" desc="Third bullet point that describes the details of the Safe Browsing control.">
+      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_THREE" desc="Third bullet point that describes the details of the Safe Browsing control.">
         When you're signed in, protects you across Google services.
       </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_FOUR" desc="Fourth bullet point under the Safe Browsing enhanced protection mode">
-        Warns you if passwords are exposed in a data breach.
-      </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_FOUR_UPDATED" desc="Fourth bullet point that describes the details of the Safe Browsing control.">
+      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_FOUR" desc="Fourth bullet point that describes the details of the Safe Browsing control.">
         Improves security for you and everyone on the web.
       </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_FIVE" desc="Fifth bullet point under the Safe Browsing enhanced protection mode">
-        Sends URLs to Safe Browsing to check them. Also sends a small sample of pages, downloads, extension activity, and system information to help discover new threats. Temporarily links this data to your Google Account when you’re signed in, to protect you across Google apps.
-      </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_FIVE_UPDATED" desc="Fifth bullet point that describes the details of the Safe Browsing control.">
+      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_FIVE" desc="Fifth bullet point that describes the details of the Safe Browsing control.">
         Warns you if you use a password that has been compromised in a data breach.
       </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_SIX_UPDATED" desc="Sixth bullet point that describes the details of the Safe Browsing control.">
+      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_SIX" desc="Sixth bullet point that describes the details of the Safe Browsing control.">
         Sends the URLs of sites you visit and a small sample of page content, downloads, extension activity, and system information to Google Safe Browsing to check if they’re harmful.
       </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_SEVEN_UPDATED" desc="Seventh bullet point that describes the details of the Safe Browsing control.">
+      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_SEVEN" desc="Seventh bullet point that describes the details of the Safe Browsing control.">
         When you’re signed in, this data is linked to your Google Account to protect you across Google services, for example increasing protection in Gmail after a security incident.
       </message>
-      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_EIGHT_UPDATED" desc="Eighth bullet point that describes the details of the Safe Browsing control.">
+      <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_BULLET_EIGHT" desc="Eighth bullet point that describes the details of the Safe Browsing control.">
         Doesn’t noticeably slow down your browser or device.
       </message>
       <message name="IDS_SAFE_BROWSING_ENHANCED_PROTECTION_LEARN_MORE_LABEL" desc="The text for a link to a help center article that gives more information about Safe Browsing.">
@@ -1984,24 +1954,9 @@ Your Google account may have other forms of browsing history like searches and a
 
       <!-- Safe Browsing standard protection preferences -->
       <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_SUBTITLE" desc="Subtitle for Safe Browsing standard protection mode.">
-        Standard protection:
-      </message>
-      <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_SUBTITLE_UPDATED" desc="Subtitle for Safe Browsing standard protection mode.">
         Standard protection
       </message>
-      <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_BULLET_ONE" desc="First bullet point under the Safe Browsing standard protection mode.">
-        Detects and warns you about dangerous events when they happen.
-      </message>
-      <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_BULLET_TWO" desc="Second bullet point under the Safe Browsing standard protection mode.">
-        Checks URLs with a list of unsafe sites stored in Chrome. If a site tries to steal your password, or when you download a harmful file, Chrome may also send URLs, including bits of page content, to Safe Browsing.
-      </message>
-      <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_BULLET_TWO_PROXY" desc="Second bullet point under the Safe Browsing standard protection mode when proxy is enabled.">
-        Sends an obfuscated portion of the URL to Google through a privacy server that hides your IP address. If a site tries to steal your password, or when you download a harmful file, Chrome may also send URLs, including bits of page content, to Google.
-      </message>
       <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_EXTENDED_REPORTING_TITLE" desc="Title for Safe Browsing extended reporting.">
-        Help improve security on the web
-      </message>
-      <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_EXTENDED_REPORTING_TITLE_UPDATED" desc="Title for Safe Browsing extended reporting.">
         Help improve security on the web for everyone
       </message>
       <message name="IDS_SAFE_BROWSING_STANDARD_PROTECTION_EXTENDED_REPORTING_SUMMARY" desc="Summary for Safe Browsing extended reporting.">
@@ -2448,9 +2403,6 @@ Your Google account may have other forms of browsing history like searches and a
       <message name="IDS_SIGN_IN_MANAGED_ACCOUNT" desc="Title for prompts to sign in to managed accounts">
         Sign in to managed account
       </message>
-      <message name="IDS_SIGN_IN_MANAGED_ACCOUNT_DESCRIPTION" desc="Description for signing in to managed accounts">
-        You are signing in with an account managed by <ph name="MANAGED_DOMAIN">%1$s<ex>Google</ex></ph> and giving its administrator control over your Chrome data. Your data will become permanently tied to this account. Signing out of Chrome will delete your data from this device, but it will remain stored in your Google Account.
-      </message>
       <message name="IDS_MANAGED_SIGNIN_WITH_USER_POLICY_SUBTITLE" desc="The subtitle of the Sign in with a managed account dialog when user policies are enabled.">
         Your organization, <ph name="MANAGED_DOMAIN">%1$s<ex>Google</ex></ph>, manages the account you're signing in to and how Chrome can be used. Your administrator can set up or restrict certain features.
       </message>
@@ -2582,6 +2534,56 @@ Your Google account may have other forms of browsing history like searches and a
       </message>
       <message name="IDS_SIGN_OUT" desc="Sign out button, visible if the user has authenticated. Clicking this clears authentication credentials and returns the web-app to the initial 'unauthenticated' state.">
         Sign out
+      </message>
+      <message name="IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_SECTION_SAVE_BUTTON" desc="This message appears in a user's settings for signing in to Chrome with their Google Account. The text appears on button in a temporary card to inform them that there is some local data, like passwords, saved to their device, but the data hasn't been saved to their Google Account yet. The user can click 'Save in Account' to enter a flow where they review the data and choose to save it in their account. When data is saved to the user's Google Account, it's backed up safely and is available on any device where they're signed in to Chrome.">
+        Save in account
+      </message>
+      <message name="IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_SECTION_DESCRIPTION_PASSWORD" desc="This message appears in a user's settings for signing in to Chrome with their Google Account. The text appears in a temporary card to inform them that there is some local data (passwords) saved to their device, but the data hasn't been saved to their Google Account yet. The user can click 'Save in Account' (find the corresponding string by IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_SECTION_SAVE_BUTTON name) to enter a flow where they review the data and choose to save it in their account. When data is saved to the user's Google Account, it's backed up safely and is available on any device where they're signed in to Chrome.">
+        {PASSWORDS_COUNT, plural,
+          =1 {1 password is saved only to this device. To use it on your other devices, save it in your Google Account, <ph name="ACCOUNT_EMAIL">%2$s<ex>elisa.g.beckett@gmail.com</ex></ph>.}
+          other {# passwords are saved only to this device. To use them on your other devices, save them in your Google Account, <ph name="ACCOUNT_EMAIL">%2$s<ex>elisa.g.beckett@gmail.com</ex></ph>.}}
+      </message>
+      <message name="IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_SECTION_DESCRIPTION_PASSWORD_AND_OTHER" desc="This message appears in a user's settings for signing in to Chrome with their Google Account. The text appears in a temporary card to inform them that there is some local data (bookmarks, or other data) saved to their device, but the data hasn't been saved to their Google Account yet. The user can click 'Save in Account' (find the corresponding string by IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_SECTION_SAVE_BUTTON name) to enter a flow where they review the data and choose to save it in their account. When data is saved to the user's Google Account, it's backed up safely and is available on any device where they're signed in to Chrome.">
+        {PASSWORDS_COUNT, plural,
+          =1 {1 password and other items are saved only to this device. To use them on your other devices, save them in your Google Account, <ph name="ACCOUNT_EMAIL">%2$s<ex>elisa.g.beckett@gmail.com</ex></ph>.}
+          other {# passwords and other items are saved only to this device. To use them on your other devices, save them in your Google Account, <ph name="ACCOUNT_EMAIL">%2$s<ex>elisa.g.beckett@gmail.com</ex></ph>.}}
+      </message>
+      <message name="IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_SECTION_DESCRIPTION_OTHER" desc="This message appears in a user's settings for signing in to Chrome with their Google Account. The text appears in a temporary card to inform them that there is some local data (passwords, bookmarks, or other data) saved to their device, but the data hasn't been saved to their Google Account yet. The user can click 'Save in Account' (find the corresponding string by IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_SECTION_SAVE_BUTTON name) to enter a flow where they review the data and choose to save it in their account. When data is saved to the user's Google Account, it's backed up safely and is available on any device where they're signed in to Chrome.">
+        {ITEMS_COUNT, plural,
+          =1 {1 item is saved only to this device. To use it on your other devices, save it in your Google Account, <ph name="ACCOUNT_EMAIL">%2$s<ex>elisa.g.beckett@gmail.com</ex></ph>.}
+          other {# items are saved only to this device. To use them on your other devices, save them in your Google Account, <ph name="ACCOUNT_EMAIL">%2$s<ex>elisa.g.beckett@gmail.com</ex></ph>.}}
+      </message>
+      <message name="IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_DIALOG_TITLE" desc="The text appears as the title of a confirmation dialog where the user can choose to save some data to their Google Account. When data is saved to the Google Account, it's backed up safely and is available on any device where they're signed in to Chrome.">
+        Save data in your Google Account
+      </message>
+      <message name="IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_DIALOG_DESCRIPTION" desc="The text appears as a note in a confirmation dialog where the user can choose to save some data to their Google Account. When data is saved to the Google Account, it's backed up safely and is available on any device where they're signed in to Chrome. This note explains where the user can go to view and manage individual items. like individual bookmarks or passwords.">
+        You can also view and manage these items in your bookmarks, reading list, or password manager
+      </message>
+      <message name="IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_DIALOG_BOOKMARKS" desc="One of the data types that we allow uploading through a confirmation dialog where the user can choose to save some data to their Google Account. When data is saved to the Google Account, it's backed up safely and is available on any device where they're signed in to Chrome.">
+        {ITEMS_COUNT, plural,
+          =1 {1 bookmark}
+          other {# bookmarks}}
+      </message>
+      <message name="IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_DIALOG_PASSWORDS" desc="One of the data types that we allow uploading through a confirmation dialog where the user can choose to save some data to their Google Account. When data is saved to the Google Account, it's backed up safely and is available on any device where they're signed in to Chrome.">
+        {ITEMS_COUNT, plural,
+          =1 {1 password}
+          other {# passwords}}
+      </message>
+      <message name="IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_DIALOG_READING_LIST" desc="One of the data types that we allow uploading through a confirmation dialog where the user can choose to save some data to their Google Account. When data is saved to the Google Account, it's backed up safely and is available on any device where they're signed in to Chrome.">
+        {ITEMS_COUNT, plural,
+          =1 {1 page on your reading list}
+          other {# pages on your reading list}}
+      </message>
+      <message name="IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_DIALOG_SAVE_BUTTON" desc="The text is the primary button in a confirmation dialog where the user can choose to save some data to their Google Account. When data is saved to the Google Account, it's backed up safely and is available on any device where they're signed in to Chrome.">
+        Save in account
+      </message>
+      <message name="IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_DIALOG_CANCEL_BUTTON" desc="Text for the cancel button belonging to the batch upload confirmation dialog where the user can choose to save some data to their Google Account. When data is saved to the Google Account, it's backed up safely and is available on any device where they're signed in to Chrome.">
+        Cancel
+      </message>
+      <message name="IDS_ACCOUNT_SETTINGS_BULK_UPLOAD_SAVED_SNACKBAR_MESSAGE" desc="The message appears in a small confirmation bubble with limited space after the user chose to save some data to their Google Account.">
+        {ITEMS_COUNT, plural,
+          =1 {Item saved in your Google Account, <ph name="ACCOUNT_EMAIL">%1$s<ex>elisa.g.beckett@gmail.com</ex></ph>.}
+          other {Items saved in your Google Account, <ph name="ACCOUNT_EMAIL">%1$s<ex>elisa.g.beckett@gmail.com</ex></ph>.}}
       </message>
       <message name="IDS_SYNC_REVIEW_DATA" desc="Title for link to https://chrome.google.com/sync Dashboard to manage sync data.">
         Review your synced data
@@ -3129,6 +3131,9 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_PAGE_INFO_CONNECTION_TRANSIENT_PDF" desc="Message to display in the page info bubble when viewing a transient pdf page.">
         You're viewing a PDF file
       </message>
+      <message name="IDS_PAGE_INFO_CONNECTION_TRANSIENT_PDF_INSECURE" desc="Message to display in the page info bubble when viewing a transient pdf page from a site using an insecure connection.">
+        This PDF file is from a site using an insecure connection
+      </message>
       <message name="IDS_PAGE_INFO_CONNECTION_LOCAL_PDF" desc="Message to display in the page info bubble when viewing a local pdf page.">
         You're viewing a local file
       </message>
@@ -3571,11 +3576,14 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_DEVICE_LOCK_EXISTING_LOCK_TITLE" desc="Title shown on the profile lock page if there is a pre-existing profile lock.">
         Your info is secured with a profile lock
       </message>
-      <message name="IDS_DEVICE_LOCK_DESCRIPTION" desc="Text description explaining that a profile lock is required for automotive devices to protect data privacy. 'Sync' is short for synchronization.">
+      <message name="IDS_DEVICE_LOCK_DESCRIPTION" desc="Text description explaining that a profile lock is required for automotive devices to protect data privacy.">
         To protect your sensitive content in the car, you must create a car profile lock.  You can do this with a pin, code, or password.
       </message>
       <message name="IDS_DEVICE_LOCK_EXISTING_LOCK_DESCRIPTION" desc="Text description explaining to users who have already set an existing lock that a profile lock is required for automotive devices to protect data privacy. 'Sync' is short for synchronization.">
         Your profile lock keeps your info secure in the car, including synced passwords, payments and more.
+      </message>
+      <message name="IDS_DEVICE_LOCK_EXISTING_LOCK_DESCRIPTION_FOR_SIGNIN" desc="Text description explaining to users who have already set an existing lock that a profile lock is required for automotive devices to protect data privacy. ">
+        Your profile lock keeps your info secure in the car, including passwords, payments, and more saved in your Google Account.
       </message>
       <message name="IDS_DEVICE_LOCK_CREATION_NOTICE" desc="Text description alerting users that if they continue and set a profile lock on the car, it will be required to unlock the profile every time they use the car.">
         You’ll unlock your screen every time you use the car
@@ -4033,9 +4041,6 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
 
       <!-- Toolbar button strings -->
-      <message name="IDS_OPEN_TABS" desc="Text for button to enter the tab switcher and show tabs that are open on this device">
-        Open tabs
-      </message>
       <message name="IDS_BUTTON_NEW_TAB" desc="Button name for opening a new tab.">
         New tab
       </message>
@@ -4259,6 +4264,12 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_MENU_STOP_IMAGE_DESCRIPTIONS" desc="Menu item to stop getting alt text accessibility image labels/descriptions [CHAR_LIMIT=27]">
         Stop image descriptions
       </message>
+      <message name="IDS_MENU_SWITCH_TO_INCOGNITO" desc="Menu item for switching to incognito.">
+        Switch to Incognito
+      </message>
+      <message name="IDS_MENU_SWITCH_OUT_OF_INCOGNITO" desc="Menu item for switching out of incognito.">
+        Switch out of Incognito
+      </message>
 
       <!-- Bookmarks strings -->
       <message name="IDS_BOOKMARKS" desc="Title of the bookmarks page, which shows a list of the user's bookmarks. [CHAR_LIMIT=18]">
@@ -4424,6 +4435,24 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_PRICE_INSIGHTS_BOTTOM_SHEET_CONTENT_OPENED_FULL" desc="Accessibility string that describes fully opening a price insights bottom sheet.">
         Price insights bottom sheet opened at full height
       </message>
+      <message name="IDS_PRICE_INSIGHTS_OPEN_URL_TITLE" desc="The label for the button that opens the link to buying options for a product.">
+        Search buying options
+      </message>
+      <message name="IDS_PRICE_INSIGHTS_OPEN_URL_BUTTON_CONTENT_DESCRIPTION" desc="Accessibility string that describes the button for opening the link to buying options for a product.">
+        Tap to search buying options for the product in a new tab.
+      </message>
+      <message name="IDS_PRICE_INSIGHTS_CONTENT_PRICE_TRACKING_DESCRIPTION" desc="The title of the section in the price insights bottom sheet that allows a user to track the price of a product.">
+        Get alerts when the price drops on any site across the web
+      </message>
+      <message name="IDS_PRICE_INSIGHTS_CONTENT_PRICE_TRACKING_DISABLED_BUTTON_TEXT" desc="The label of the price tracking button when the user is not tracking the product.">
+        Track
+      </message>
+      <message name="IDS_PRICE_INSIGHTS_CONTENT_PRICE_TRACKING_ENABLED_BUTTON_TEXT" desc="The label of the price tracking button when the user is tracking the product.">
+        Tracking
+      </message>
+      <message name="IDS_PRICE_INSIGHTS_CONTENT_PRICE_TRACKING_BUTTON_CONTENT_DESCRIPTION" desc="Accessibility string that describes the price tracking button to track or untrack a product.">
+        Tap to track or untrack a product.
+      </message>
       <message name="IDS_PRICE_INSIGHTS_TITLE" desc="The title for the price insights button.">
         Price insights
       </message>
@@ -4432,6 +4461,9 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
       <message name="IDS_PRICE_HISTORY_TITLE" desc="The title when a user see the price history graph section in the price insights bottom sheet.">
         Price history across the web
+      </message>
+      <message name="IDS_PRICE_HISTORY_MULTIPLE_CATALOGS_TITLE" desc="The title when a user see the price history graph for multiple catalog in the price insights bottom sheet.">
+        Price history across the web for this option
       </message>
       <message name="IDS_IPH_SHOPPING_LIST_SAVE_FLOW" desc="In-product help text that notifies a user that they can organize their saved products from a folder in bookmarks.">
         Organize your tracked products in Bookmarks
@@ -4878,11 +4910,35 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_UNDO_BAR_CLOSE_ALL_MESSAGE" desc="Message shown when you can undo a close all tabs action.">
         <ph name="TAB_COUNT">%1$s<ex>3</ex></ph> tabs closed
       </message>
-      <message name="IDS_UNDO_BAR_DELETE_TAB_GROUP_MESSAGE" desc="Message shown when you can undo a tab group deletion action.">
-        <ph name="TAB_COUNT">%1$s<ex>3</ex></ph> tabs deleted
+      <message name="IDS_UNDO_BAR_TAB_GROUP_DELETED_MESSAGE" desc="Message shown when you delete a tab group. This message is short for a sentence to indicate the tab group with the title TAB_GROUP_TITLE was deleted. The title can be anything as it is a user generated string.">
+        <ph name="TAB_GROUP_TITLE">%1$s<ex>Vacation</ex></ph> tab group deleted
       </message>
-      <message name="IDS_UNDO_BAR_DELETE_SINGLE_TAB_GROUP_MESSAGE" desc="Message shown when you can undo a tab group containing a single tab.">
-        <ph name="TAB_COUNT">%1$s<ex>1</ex></ph> tab deleted
+      <message name="IDS_UNDO_BAR_TAB_GROUP_CLOSED_AND_SAVED_MESSAGE" desc="Message shown when you close and save a tab group. This message is short for a sentence to indicate the tab group with the title TAB_GROUP_TITLE was closed and may be saved. The title can be anything as it is a user generated string.">
+        <ph name="TAB_GROUP_TITLE">%1$s<ex>Vacation</ex></ph> tab group closed and saved
+      </message>
+      <message name="IDS_UNDO_BAR_TAB_GROUP_CLOSED_MESSAGE" desc="Message shown when you close a tab group. This message is short for a sentence to indicate the tab group with the title TAB_GROUP_TITLE was closed and may be saved. The title can be anything as it is a user generated string.">
+        <ph name="TAB_GROUP_TITLE">%1$s<ex>Vacation</ex></ph> tab group closed
+      </message>
+      <message name="IDS_UNDO_BAR_TAB_GROUPS_PART" desc="Part of message shown when you close or delete multiple tab groups in combination with some tabs. See IDS_UNDO_BAR_TABS_PART for the next part.">
+        {TAB_GROUP_COUNT, plural,
+          =1 {<ph name="TAB_GROUPS_ONE">%1$d<ex>1</ex></ph> tab group}
+          other {<ph name="TAB_GROUPS_MANY">%1$d<ex>3</ex></ph> tab groups}
+        }
+      </message>
+      <message name="IDS_UNDO_BAR_TAB_GROUPS_AND_TABS_PART" desc="Part of message shown when you close or delete multiple tabs in combination with some tab groups. See IDS_UNDO_BAR_TAB_GROUPS_PART for the TAB_GROUPS_PART.">
+        {TAB_COUNT, plural,
+          =1 {<ph name="TAB_GROUPS_PART">%1$s<ex>3 tab groups</ex></ph>, <ph name="TAB_COUNT_ONE">%2$d<ex>1</ex></ph> tab}
+          other {<ph name="TAB_GROUPS_PART">%1$s<ex>3 tab groups</ex></ph>, <ph name="TAB_COUNT_MANY">%2$d<ex>3</ex></ph> tabs}
+        }
+      </message>
+      <message name="IDS_UNDO_BAR_DELETED_MESSAGE" desc="Message shown when you delete a combination of tabs and tab groups. See IDS_UNDO_BAR_TAB_GROUPS_AND_TABS_PART for TAB_GROUPS_AND_TABS_PART.">
+        <ph name="TAB_GROUPS_AND_TABS_PART">%1$s<ex>5 tab groups, 3 tabs</ex></ph> deleted
+      </message>
+      <message name="IDS_UNDO_BAR_CLOSED_AND_SAVED_MESSAGE" desc="Message shown when you closea combination of tabs and tab groups and the tab groups will be saved. See IDS_UNDO_BAR_TAB_GROUPS_AND_TABS_PART for TAB_GROUPS_AND_TABS_PART.">
+        <ph name="TAB_GROUPS_AND_TABS_PART">%1$s<ex>5 tab groups, 3 tabs</ex></ph> closed and saved
+      </message>
+      <message name="IDS_UNDO_BAR_CLOSED_MESSAGE" desc="Message shown when you close a combination of tabs and tab groups. See IDS_UNDO_BAR_TAB_GROUPS_AND_TABS_PART for TAB_GROUPS_AND_TABS_PART.">
+        <ph name="TAB_GROUPS_AND_TABS_PART">%1$s<ex>5 tab groups, 3 tabs</ex></ph> closed
       </message>
       <message name="IDS_CONFIRM_DELETE_MESSAGE" desc="Message shown or announced to get confirmation on whether a file should be deleted.">
         Do you want to delete <ph name="ITEM_TITLE">%1$s<ex>example.pdf</ex></ph>?
@@ -4936,6 +4992,14 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
       <message name="IDS_OVERSCROLL_NAVIGATION_SHEET_CLOSED" desc="Accessibility string read when the navigation bottom sheet is closed.">
         Navigation history is closed
+      </message>
+
+      <!-- Rtl Gesture Nav Iph -->
+      <message name="IDS_RTL_GESTURE_NAV_IPH_DIALOG_TITLE" desc="Title string for help dialog of educating users on how to navigate by gesture in RTL mode.">
+        A new way to swipe
+      </message>
+      <message name="IDS_RTL_GESTURE_NAV_IPH_DIALOG_CONTENT" desc="Content string for help dialog of educating users on how to navigate by gesture in RTL mode.">
+        Now, a right swipe takes you backward to see previous pages you’ve visited and a left swipe moves you forward
       </message>
 
       <!-- Ephemeral Tab -->
@@ -5021,13 +5085,16 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       Go to Google App Home
       </message>
       <message name="IDS_GOOGLE_BOTTOM_BAR_SEARCHBOX_TEXT" desc="Text used as hint text for searchbox">
-      Ask anything
+      Search
       </message>
       <message name="IDS_GOOGLE_BOTTOM_BAR_SEARCHBOX_MIC_BUTTON_DESCRIPTION" desc="Content description for mic button in a searchbox that opens Voice Search in Google App">
       Go to Google App Voice Search
       </message>
       <message name="IDS_GOOGLE_BOTTOM_BAR_SEARCHBOX_LENS_BUTTON_DESCRIPTION" desc="Content description for lens button in searchbox that opens Lens in Google App">
       Go to Lens
+      </message>
+      <message name="IDS_GOOGLE_BOTTOM_BAR_SEARCHBOX_LENS_NOT_ENABLED_TOOLTIP_MESSAGE" desc="Tooltip message when lens button is not enabled">
+      Lens is not available on this account.
       </message>
 
       <!-- WebFeed -->
@@ -5388,6 +5455,12 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
         Open tabs to visit different pages at the same time
       </message>
       <message name="IDS_IPH_TAB_SWITCHER_ACCESSIBILITY_TEXT" desc="The in-product-help accessibility text to open the new tab page. The 'open tabs' button name should match TC 3108541343994525384">
+        To open tabs and visit different pages at the same time, tap the open tabs button
+      </message>
+      <message name="IDS_IPH_ANDROID_TAB_DECLUTTER_TEXT" desc="The in-product-help text for the android tab declutter feature.">
+        Review your inactive tabs here
+      </message>
+      <message name="IDS_IPH_ANDROID_TAB_DECLUTTER_ACCESSIBILITY_TEXT" desc="The in-product-help accessibility text for the android tab declutter feature.">
         To open tabs and visit different pages at the same time, tap the open tabs button
       </message>
       <message name="IDS_IPH_TRANSLATE_MENU_BUTTON_TEXT" desc="The in-product-help message after a successful navigation prompting user to translate current page.">
@@ -6085,23 +6158,26 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
 
       <!-- WebID Account Selection strings -->
-      <message name="IDS_ACCOUNT_SELECTION_ADD_ACCOUNT" desc="Title of the button that lets the user sign in to an additional account" translateable="false">
+      <message name="IDS_ACCOUNT_SELECTION_ADD_ACCOUNT" desc="Title of the button that lets the user sign in to an additional account.">
         Use a different account
       </message>
       <message name="IDS_ACCOUNT_SELECTION_SHEET_TITLE_EXPLICIT_SIGNIN" desc="Header for sign in sheet. Sheet is shown to prompt user to sign in to a website using an account from an identity provider.">
         Sign in to <ph name="SITE_ETLD_PLUS_ONE">%1$s<ex>rp.example</ex></ph> with <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE">%2$s<ex>idp.com</ex></ph>
       </message>
-      <message name="IDS_ACCOUNT_SELECTION_BUTTON_MODE_SHEET_TITLE_EXPLICIT_SIGNIN" desc="Header for sign in sheet. Sheet is shown to prompt user to sign in to a website using an account from an identity provider." translateable="false">
+      <message name="IDS_ACCOUNT_SELECTION_BUTTON_MODE_SHEET_TITLE_EXPLICIT_SIGNIN" desc="Header for sign in sheet. Sheet is shown to prompt user to sign in to a website using an account from an identity provider.">
         Sign in with <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE">%1$s<ex>idp.com</ex></ph>
       </message>
-      <message name="IDS_ACCOUNT_SELECTION_BUTTON_MODE_SHEET_TITLE_EXPLICIT_SIGNUP" desc="Header for sign up sheet. Sheet is shown to prompt user to sign up to a website using an account from an identity provider." translateable="false">
+      <message name="IDS_ACCOUNT_SELECTION_BUTTON_MODE_SHEET_TITLE_EXPLICIT_SIGNUP" desc="Header for sign up sheet. Sheet is shown to prompt user to sign up to a website using an account from an identity provider.">
         Sign up with <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE">%1$s<ex>idp.com</ex></ph>
       </message>
-      <message name="IDS_ACCOUNT_SELECTION_BUTTON_MODE_SHEET_TITLE_EXPLICIT_USE" desc="Header for use sheet. Sheet is shown to prompt user to use a website using an account from an identity provider." translateable="false">
+      <message name="IDS_ACCOUNT_SELECTION_BUTTON_MODE_SHEET_TITLE_EXPLICIT_USE" desc="Header for use sheet. Sheet is shown to prompt user to use a website using an account from an identity provider.">
         Use with <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE">%1$s<ex>idp.com</ex></ph>
       </message>
-      <message name="IDS_ACCOUNT_SELECTION_BUTTON_MODE_SHEET_TITLE_EXPLICIT_CONTINUE" desc="Header for continue sheet. Sheet is shown to prompt user to continue to a website using an account from an identity provider." translateable="false">
+      <message name="IDS_ACCOUNT_SELECTION_BUTTON_MODE_SHEET_TITLE_EXPLICIT_CONTINUE" desc="Header for continue sheet. Sheet is shown to prompt user to continue to a website using an account from an identity provider.">
         Continue with <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE">%1$s<ex>idp.com</ex></ph>
+      </message>
+      <message name="IDS_ACCOUNT_SELECTION_BUTTON_MODE_SHEET_CHOOSE_AN_ACCOUNT" desc="Text to prompt a user to choose an account from an identity provider to sign in to a website with.">
+        Choose an account to continue on <ph name="SITE_ETLD_PLUS_ONE">%1$s<ex>rp.example</ex></ph>
       </message>
       <message name="IDS_ACCOUNT_SELECTION_SHEET_TITLE_EXPLICIT_SIGNUP" desc="Header for sign up sheet. Sheet is shown to prompt user to sign up to a website using an account from an identity provider.">
         Sign up to <ph name="SITE_ETLD_PLUS_ONE">%1$s<ex>rp.example</ex></ph> with <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE">%2$s<ex>idp.com</ex></ph>
@@ -6540,9 +6616,6 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_DATA_SHARING_INVITATION_NOTIFICATION_TITLE" desc="The title of the notification shown to user when a data sharing invitation is received. |NAME| will be the name of the inviter.">
         <ph name="NAME">%1$s<ex>Jane Doe</ex></ph> invited you to access a shared item.
       </message>
-      <message name="IDS_DATA_SHARING_ORIGIN_FALLBACK" desc="The fallback inviter name of the data sharing service notification.">
-        Someone
-      </message>
       <message name="IDS_DATA_SHARING_INVITATION_DIALOG_TITLE" desc="The title of the dialog shown when a user has received a tab group invitation.">
         Open Tab Group?
       </message>
@@ -6593,7 +6666,10 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
           other {Not used for # days or more}}
       </message>
       <message name="IDS_ARCHIVED_TAB_IPH_CARD_SUBTITLE" desc="In product help shown as a message in the archived tabs dialog.">
-        Tabs you haven’t used for <ph name="DAYS_INACTIVE">%1$d<ex>14</ex></ph> days are moved here and closed after <ph name="DAYS_ARCHIVED">%2$d<ex>60</ex></ph> days. You can change this anytime in <ph name="SETTINGS_TITLE">%3$s<ex>Settings</ex></ph>.
+        Tabs you haven’t used for <ph name="DAYS_INACTIVE">%1$d<ex>14</ex></ph> days are moved here<ph name="AUTODELETE_SECTION">%2$s<ex>and deleted after 60 days</ex></ph>. You can change this anytime in <ph name="SETTINGS_TITLE">%3$s<ex>Settings</ex></ph>.
+      </message>
+      <message name="IDS_ARCHIVED_TAB_IPH_CARD_SUBTITLE_AUTODELETE_SECTION" desc="A section describing auto-delete, shown if it's enabled.">
+        \u0020and closed after <ph name="DAYS_ARCHIVED">%1$d<ex>60</ex></ph> days
       </message>
       <message name="IDS_ARCHIVED_TAB_IPH_CARD_SUBTITLE_SETTINGS_TITLE" desc="The word for settings, used in IDS_ARCHIVED_TAB_IPH_CARD_SUBTITLE.">
         Settings

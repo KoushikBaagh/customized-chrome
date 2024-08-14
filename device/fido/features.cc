@@ -4,8 +4,6 @@
 
 #include "device/fido/features.h"
 
-#include <vector>
-
 #include "base/feature_list.h"
 #include "build/build_config.h"
 #include "build/chromeos_buildflags.h"
@@ -45,10 +43,10 @@ BASE_FEATURE(kWebAuthnGoogleCorpRemoteDesktopClientPrivilege,
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_ANDROID)
-// Added in M114. Not yet enabled by default.
+// Enabled in M129. Remove in or after M132.
 BASE_FEATURE(kWebAuthnAndroidCredMan,
              "WebAuthenticationAndroidCredMan",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_ANDROID)
 
 // Added in M115. Remove in or after M118
@@ -124,11 +122,6 @@ BASE_FEATURE(kAllowExtensionsToSetWebAuthnRpIds,
              "AllowExtensionsToSetWebAuthnRpIds",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Default enabled in M122. Remove in or after M125.
-BASE_FEATURE(kWebAuthnAndroidFidoJson,
-             "WebAuthenticationAndroidFidoJson",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Default enabled in M123. Remove in or after M126.
 BASE_FEATURE(kWebAuthnPreferVirtualPlatformAuthenticator,
              "WebAuthenticationPreferVirtualPlatformAuthenticator",
@@ -172,6 +165,11 @@ BASE_FEATURE(kWebAuthnAndroidOpenAccessory,
 // Development flag. Must not be enabled by default.
 BASE_FEATURE(kWebAuthnEnclaveAuthenticatorDelay,
              "WebAuthnEnclaveAuthenticatorDelay",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Not yet enabled by default.
+BASE_FEATURE(kWebAuthnAmbientSignin,
+             "WebAuthenticationAmbientSignin",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace device

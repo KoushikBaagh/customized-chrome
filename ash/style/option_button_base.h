@@ -71,7 +71,6 @@ class ASH_EXPORT OptionButtonBase : public views::LabelButton {
   void Layout(PassKey) override;
   void OnThemeChanged() override;
   void NotifyClick(const ui::Event& event) override;
-  void GetAccessibleNodeData(ui::AXNodeData* node_data) override;
 
  protected:
   // `icon_state` is a bitmask using the IconState enum.
@@ -86,6 +85,8 @@ class ASH_EXPORT OptionButtonBase : public views::LabelButton {
  private:
   // Update the label's color based on the enable state.
   void UpdateTextColor();
+
+  void SetAndUpdateAccessibleDefaultActionVerb();
 
   const int min_width_;
 

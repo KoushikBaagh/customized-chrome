@@ -53,9 +53,10 @@ constexpr base::TimeDelta kTaskItemViewFadeOutDuration =
     base::Milliseconds(200);
 
 std::u16string GetAccessibleTrayName(
-    const FocusModeSession::Snapshot& session_snapshot) {
+    const FocusModeSession::Snapshot& session_snapshot,
+    const size_t congratulatory_index) {
   if (session_snapshot.state == FocusModeSession::State::kEnding) {
-    return focus_mode_util::GetCongratulatoryTextAndEmoji();
+    return focus_mode_util::GetCongratulatoryTextAndEmoji(congratulatory_index);
   }
 
   const std::u16string duration_string =
@@ -72,9 +73,11 @@ std::u16string GetAccessibleTrayName(
 
 std::u16string GetAccessibleBubbleName(
     const FocusModeSession::Snapshot& session_snapshot,
-    const std::u16string& task_title) {
+    const std::u16string& task_title,
+    const size_t congratulatory_index) {
   if (session_snapshot.state == FocusModeSession::State::kEnding) {
-    std::u16string title = focus_mode_util::GetCongratulatoryTextAndEmoji();
+    std::u16string title =
+        focus_mode_util::GetCongratulatoryTextAndEmoji(congratulatory_index);
     std::u16string body = l10n_util::GetStringUTF16(
         IDS_ASH_STATUS_TRAY_FOCUS_MODE_ENDING_MOMENT_BODY);
     return l10n_util::GetStringFUTF16(
@@ -117,10 +120,14 @@ class FocusModeTray::TaskItemView : public views::BoxLayoutView {
                                            ? cros_tokens::kCrosSysPrimary
                                            : cros_tokens::kCrosSysDisabled,
                                        kIconSize));
-    radio_button_->GetViewAccessibility().SetName(l10n_util::GetStringFUTF16(
-        IDS_ASH_STATUS_TRAY_FOCUS_MODE_TRAY_RADIO_BUTTON, title));
-    radio_button_->SetTooltipText(
-        radio_button_->GetViewAccessibility().GetCachedName());
+
+    const std::u16string radio_text = l10n_util::GetStringUTF16(
+        IDS_ASH_STATUS_TRAY_FOCUS_MODE_TASK_VIEW_RADIO_BUTTON);
+    views::ViewAccessibility& radio_button_view_a11y =
+        radio_button_->GetViewAccessibility();
+    radio_button_view_a11y.SetName(radio_text);
+    radio_button_view_a11y.SetDescription(title);
+    radio_button_->SetTooltipText(radio_text);
     radio_button_->SetEnabled(is_network_connected);
 
     task_title_ = AddChildView(std::make_unique<views::Label>());
@@ -146,8 +153,7 @@ class FocusModeTray::TaskItemView : public views::BoxLayoutView {
   bool GetWasCompleted() const { return was_completed_; }
 
   void UpdateTitle(const std::u16string& title) {
-    radio_button_->GetViewAccessibility().SetName(l10n_util::GetStringFUTF16(
-        IDS_ASH_STATUS_TRAY_FOCUS_MODE_TRAY_RADIO_BUTTON, title));
+    radio_button_->GetViewAccessibility().SetDescription(title);
     task_title_->SetText(title);
     task_title_->SetTooltipText(title);
   }
@@ -286,7 +292,9 @@ std::u16string FocusModeTray::GetAccessibleNameForTray() {
     return std::u16string();
   }
 
-  return GetAccessibleTrayName(session_snapshot_.value());
+  return GetAccessibleTrayName(
+      session_snapshot_.value(),
+      FocusModeController::Get()->congratulatory_index());
 }
 
 std::u16string FocusModeTray::GetAccessibleNameForBubble() {
@@ -294,13 +302,15 @@ std::u16string FocusModeTray::GetAccessibleNameForBubble() {
     return std::u16string();
   }
 
+  auto* focus_mode_controller = FocusModeController::Get();
   const FocusModeTask* selected_task =
-      FocusModeController::Get()->tasks_model().selected_task();
+      focus_mode_controller->tasks_model().selected_task();
   const std::u16string task_title =
       selected_task ? base::UTF8ToUTF16(selected_task->title)
                     : std::u16string();
 
-  return GetAccessibleBubbleName(session_snapshot_.value(), task_title);
+  return GetAccessibleBubbleName(session_snapshot_.value(), task_title,
+                                 focus_mode_controller->congratulatory_index());
 }
 
 void FocusModeTray::HideBubbleWithView(const TrayBubbleView* bubble_view) {
@@ -319,7 +329,7 @@ TrayBubbleView* FocusModeTray::GetBubbleView() {
   return bubble_ ? bubble_->bubble_view() : nullptr;
 }
 
-void FocusModeTray::CloseBubble() {
+void FocusModeTray::CloseBubbleInternal() {
   CloseBubbleAndMaybeReset(/*should_reset=*/true);
 }
 
@@ -369,7 +379,6 @@ void FocusModeTray::ShowBubble() {
 }
 
 void FocusModeTray::UpdateTrayItemColor(bool is_active) {
-  CHECK(chromeos::features::IsJellyEnabled());
   UpdateTrayIcon();
 }
 
@@ -398,14 +407,17 @@ void FocusModeTray::OnFocusModeChanged(bool in_focus_session) {
   UpdateProgressRing();
   show_progress_ring_after_animation_ = false;
 
-  auto current_session = FocusModeController::Get()->current_session();
+  auto* focus_mode_controller = FocusModeController::Get();
+  auto current_session = focus_mode_controller->current_session();
   if (!current_session) {
     session_snapshot_.reset();
     return;
   }
 
   session_snapshot_ = current_session->GetSnapshot(base::Time::Now());
-  image_view_->SetTooltipText(GetAccessibleTrayName(session_snapshot_.value()));
+  image_view_->SetTooltipText(
+      GetAccessibleTrayName(session_snapshot_.value(),
+                            focus_mode_controller->congratulatory_index()));
 
   if (bubble_) {
     UpdateBubbleViews(session_snapshot_.value());
@@ -418,7 +430,9 @@ void FocusModeTray::OnFocusModeChanged(bool in_focus_session) {
 void FocusModeTray::OnTimerTick(
     const FocusModeSession::Snapshot& session_snapshot) {
   session_snapshot_ = session_snapshot;
-  image_view_->SetTooltipText(GetAccessibleTrayName(session_snapshot_.value()));
+  image_view_->SetTooltipText(GetAccessibleTrayName(
+      session_snapshot_.value(),
+      FocusModeController::Get()->congratulatory_index()));
   UpdateProgressRing();
   MaybeUpdateCountdownViewUI(session_snapshot);
 }
@@ -426,7 +440,9 @@ void FocusModeTray::OnTimerTick(
 void FocusModeTray::OnActiveSessionDurationChanged(
     const FocusModeSession::Snapshot& session_snapshot) {
   session_snapshot_ = session_snapshot;
-  image_view_->SetTooltipText(GetAccessibleTrayName(session_snapshot_.value()));
+  image_view_->SetTooltipText(GetAccessibleTrayName(
+      session_snapshot_.value(),
+      FocusModeController::Get()->congratulatory_index()));
   UpdateProgressRing();
   MaybeUpdateCountdownViewUI(session_snapshot);
 }
@@ -527,14 +543,9 @@ void FocusModeTray::CreateTaskItemView(const std::string& task_title) {
 }
 
 void FocusModeTray::UpdateTrayIcon() {
-  SkColor color;
-  if (chromeos::features::IsJellyEnabled()) {
-    color = GetColorProvider()->GetColor(
-        is_active() ? cros_tokens::kCrosSysSystemOnPrimaryContainer
-                    : cros_tokens::kCrosSysOnSurface);
-  } else {
-    color = GetColorProvider()->GetColor(kColorAshIconColorPrimary);
-  }
+  SkColor color = GetColorProvider()->GetColor(
+      is_active() ? cros_tokens::kCrosSysSystemOnPrimaryContainer
+                  : cros_tokens::kCrosSysOnSurface);
   image_view_->SetImage(CreateVectorIcon(kFocusModeLampIcon, color));
 }
 

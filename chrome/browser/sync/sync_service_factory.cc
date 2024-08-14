@@ -20,7 +20,7 @@
 #include "chrome/browser/favicon/favicon_service_factory.h"
 #include "chrome/browser/gcm/gcm_profile_service_factory.h"
 #include "chrome/browser/history/history_service_factory.h"
-#include "chrome/browser/metrics/variations/google_groups_updater_service_factory.h"
+#include "chrome/browser/metrics/variations/google_groups_manager_factory.h"
 #include "chrome/browser/password_manager/account_password_store_factory.h"
 #include "chrome/browser/password_manager/password_receiver_service_factory.h"
 #include "chrome/browser/password_manager/password_sender_service_factory.h"
@@ -41,9 +41,9 @@
 #include "chrome/browser/supervised_user/supervised_user_settings_service_factory.h"
 #include "chrome/browser/sync/account_bookmark_sync_service_factory.h"
 #include "chrome/browser/sync/chrome_sync_client.h"
+#include "chrome/browser/sync/data_type_store_service_factory.h"
 #include "chrome/browser/sync/device_info_sync_service_factory.h"
 #include "chrome/browser/sync/local_or_syncable_bookmark_sync_service_factory.h"
-#include "chrome/browser/sync/model_type_store_service_factory.h"
 #include "chrome/browser/sync/send_tab_to_self_sync_service_factory.h"
 #include "chrome/browser/sync/session_sync_service_factory.h"
 #include "chrome/browser/sync/sync_invalidations_service_factory.h"
@@ -61,7 +61,7 @@
 #include "components/sync/base/features.h"
 #include "components/sync/service/sync_service_impl.h"
 #include "components/sync_preferences/pref_service_syncable.h"
-#include "components/variations/service/google_groups_updater_service.h"
+#include "components/variations/service/google_groups_manager.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/network_service_instance.h"
 #include "content/public/browser/storage_partition.h"
@@ -69,9 +69,9 @@
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
-#include "extensions/browser/api/storage/storage_frontend.h"
-#include "extensions/browser/extension_system_provider.h"
-#include "extensions/browser/extensions_browser_client.h"
+#include "extensions/browser/api/storage/storage_frontend.h"  // nogncheck
+#include "extensions/browser/extension_system_provider.h"     // nogncheck
+#include "extensions/browser/extensions_browser_client.h"     // nogncheck
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -166,9 +166,14 @@ std::unique_ptr<KeyedService> BuildSyncService(
     AboutSigninInternalsFactory::GetForProfile(profile);
   }
 
+  browser_sync::ChromeSyncClient* client_ptr =
+      static_cast<browser_sync::ChromeSyncClient*>(
+          init_params.sync_client.get());
+
   auto sync_service =
       std::make_unique<syncer::SyncServiceImpl>(std::move(init_params));
-  sync_service->Initialize();
+  sync_service->Initialize(
+      client_ptr->CreateDataTypeControllers(sync_service.get()));
 
   // Notify the PasswordStore of complete initialisation to resolve a circular
   // dependency.
@@ -202,8 +207,8 @@ std::unique_ptr<KeyedService> BuildSyncService(
       PrefServiceSyncableFromProfile(profile);
   pref_service->OnSyncServiceInitialized(sync_service.get());
 
-  if (GoogleGroupsUpdaterService* groups_updater_service =
-          GoogleGroupsUpdaterServiceFactory::GetForBrowserContext(profile)) {
+  if (GoogleGroupsManager* groups_updater_service =
+          GoogleGroupsManagerFactory::GetForBrowserContext(profile)) {
     groups_updater_service->OnSyncServiceInitialized(sync_service.get());
   }
 
@@ -252,14 +257,15 @@ SyncServiceFactory::SyncServiceFactory()
   DependsOn(BookmarkUndoServiceFactory::GetInstance());
   DependsOn(browser_sync::UserEventServiceFactory::GetInstance());
   DependsOn(ConsentAuditorFactory::GetInstance());
+  DependsOn(DataTypeStoreServiceFactory::GetInstance());
   DependsOn(DeviceInfoSyncServiceFactory::GetInstance());
   DependsOn(data_sharing::DataSharingServiceFactory::GetInstance());
   DependsOn(FaviconServiceFactory::GetInstance());
   DependsOn(gcm::GCMProfileServiceFactory::GetInstance());
+  DependsOn(GoogleGroupsManagerFactory::GetInstance());
   DependsOn(HistoryServiceFactory::GetInstance());
   DependsOn(IdentityManagerFactory::GetInstance());
   DependsOn(LocalOrSyncableBookmarkSyncServiceFactory::GetInstance());
-  DependsOn(ModelTypeStoreServiceFactory::GetInstance());
 #if !BUILDFLAG(IS_ANDROID)
   DependsOn(PasskeyModelFactory::GetInstance());
 #endif  // !BUILDFLAG(IS_ANDROID)

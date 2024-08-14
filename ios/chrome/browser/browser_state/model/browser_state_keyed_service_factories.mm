@@ -64,7 +64,7 @@
 #import "ios/chrome/browser/language/model/language_model_manager_factory.h"
 #import "ios/chrome/browser/language/model/url_language_histogram_factory.h"
 #import "ios/chrome/browser/mailto_handler/model/mailto_handler_service_factory.h"
-#import "ios/chrome/browser/metrics/model/google_groups_updater_service_factory.h"
+#import "ios/chrome/browser/metrics/model/google_groups_manager_factory.h"
 #import "ios/chrome/browser/metrics/model/ios_profile_session_durations_service_factory.h"
 #import "ios/chrome/browser/optimization_guide/model/optimization_guide_service_factory.h"
 #import "ios/chrome/browser/page_content_annotations/model/page_content_annotations_service_factory.h"
@@ -78,6 +78,7 @@
 #import "ios/chrome/browser/passwords/model/ios_chrome_password_reuse_manager_factory.h"
 #import "ios/chrome/browser/passwords/model/ios_chrome_password_sender_service_factory.h"
 #import "ios/chrome/browser/passwords/model/ios_chrome_profile_password_store_factory.h"
+#import "ios/chrome/browser/passwords/model/ios_password_manager_settings_service_factory.h"
 #import "ios/chrome/browser/passwords/model/ios_password_requirements_service_factory.h"
 #import "ios/chrome/browser/passwords/model/password_manager_log_router_factory.h"
 #import "ios/chrome/browser/photos/model/photos_service_factory.h"
@@ -109,11 +110,14 @@
 #import "ios/chrome/browser/segmentation_platform/model/segmentation_platform_service_factory.h"
 #import "ios/chrome/browser/sessions/model/ios_chrome_tab_restore_service_factory.h"
 #import "ios/chrome/browser/sessions/model/session_restoration_service_factory.h"
+#import "ios/chrome/browser/sessions/model/web_session_state_cache_factory.h"
 #import "ios/chrome/browser/share_extension/model/share_extension_service_factory.h"
 #import "ios/chrome/browser/shared/model/browser/browser_list_factory.h"
 #import "ios/chrome/browser/sharing_message/model/ios_sharing_message_bridge_factory.h"
+#import "ios/chrome/browser/sharing_message/model/ios_sharing_service_factory.h"
 #import "ios/chrome/browser/signin/model/about_signin_internals_factory.h"
 #import "ios/chrome/browser/signin/model/account_consistency_service_factory.h"
+#import "ios/chrome/browser/signin/model/account_investigator_factory.h"
 #import "ios/chrome/browser/signin/model/account_reconcilor_factory.h"
 #import "ios/chrome/browser/signin/model/authentication_service_factory.h"
 #import "ios/chrome/browser/signin/model/chrome_account_manager_service_factory.h"
@@ -121,15 +125,16 @@
 #import "ios/chrome/browser/signin/model/signin_browser_state_info_updater_factory.h"
 #import "ios/chrome/browser/signin/model/signin_client_factory.h"
 #import "ios/chrome/browser/signin/model/signin_error_controller_factory.h"
+#import "ios/chrome/browser/signin/model/signin_metrics_service_factory.h"
 #import "ios/chrome/browser/signin/model/trusted_vault_client_backend_factory.h"
 #import "ios/chrome/browser/supervised_user/model/child_account_service_factory.h"
 #import "ios/chrome/browser/supervised_user/model/list_family_members_service_factory.h"
 #import "ios/chrome/browser/supervised_user/model/supervised_user_metrics_service_factory.h"
 #import "ios/chrome/browser/supervised_user/model/supervised_user_service_factory.h"
 #import "ios/chrome/browser/supervised_user/model/supervised_user_settings_service_factory.h"
+#import "ios/chrome/browser/sync/model/data_type_store_service_factory.h"
 #import "ios/chrome/browser/sync/model/device_info_sync_service_factory.h"
 #import "ios/chrome/browser/sync/model/ios_user_event_service_factory.h"
-#import "ios/chrome/browser/sync/model/model_type_store_service_factory.h"
 #import "ios/chrome/browser/sync/model/send_tab_to_self_sync_service_factory.h"
 #import "ios/chrome/browser/sync/model/session_sync_service_factory.h"
 #import "ios/chrome/browser/sync/model/sync_invalidations_service_factory.h"
@@ -145,7 +150,6 @@
 #import "ios/chrome/browser/visited_url_ranking/model/visited_url_ranking_service_factory.h"
 #import "ios/chrome/browser/voice/ui_bundled/text_to_speech_playback_controller_factory.h"
 #import "ios/chrome/browser/web/model/java_script_console/java_script_console_feature_factory.h"
-#import "ios/chrome/browser/web/model/session_state/web_session_state_cache_factory.h"
 #import "ios/chrome/browser/webauthn/model/ios_passkey_model_factory.h"
 #import "ios/chrome/browser/webdata_services/model/web_data_service_factory.h"
 
@@ -183,6 +187,7 @@ void EnsureBrowserStateKeyedServiceFactoriesBuilt() {
   ios::AboutSigninInternalsFactory::GetInstance();
   ios::AccountBookmarkSyncServiceFactory::GetInstance();
   ios::AccountConsistencyServiceFactory::GetInstance();
+  ios::AccountInvestigatorFactory::GetInstance();
   ios::AccountReconcilorFactory::GetInstance();
   ios::AutocompleteClassifierFactory::GetInstance();
   ios::AutocompleteScoringModelServiceFactory::GetInstance();
@@ -226,6 +231,7 @@ void EnsureBrowserStateKeyedServiceFactoriesBuilt() {
   ContentNotificationServiceFactory::GetInstance();
   ContextualPanelModelServiceFactory::GetInstance();
   CredentialsCleanerRunnerFactory::GetInstance();
+  DataTypeStoreServiceFactory::GetInstance();
   DeviceAuthenticatorProxyFactory::GetInstance();
   DeviceInfoSyncServiceFactory::GetInstance();
   DeviceSharingManagerFactory::GetInstance();
@@ -233,7 +239,7 @@ void EnsureBrowserStateKeyedServiceFactoriesBuilt() {
   DomainDiversityReporterFactory::GetInstance();
   ExternalFileRemoverFactory::GetInstance();
   FollowServiceFactory::GetInstance();
-  GoogleGroupsUpdaterServiceFactory::GetInstance();
+  GoogleGroupsManagerFactory::GetInstance();
   GoogleLogoServiceFactory::GetInstance();
   HashRealTimeServiceFactory::GetInstance();
   HttpsUpgradeServiceFactory::GetInstance();
@@ -255,9 +261,11 @@ void EnsureBrowserStateKeyedServiceFactoriesBuilt() {
   IOSChromeSafetyCheckManagerFactory::GetInstance();
   IOSChromeTabRestoreServiceFactory::GetInstance();
   IOSPasskeyModelFactory::GetInstance();
+  IOSPasswordManagerSettingsServiceFactory::GetInstance();
   IOSPasswordRequirementsServiceFactory::GetInstance();
   IOSProfileSessionDurationsServiceFactory::GetInstance();
   IOSSharingMessageBridgeFactory::GetInstance();
+  IOSSharingServiceFactory::GetInstance();
   IOSTrustedVaultServiceFactory::GetInstance();
   IOSUserEventServiceFactory::GetInstance();
   JavaScriptConsoleFeatureFactory::GetInstance();
@@ -266,7 +274,6 @@ void EnsureBrowserStateKeyedServiceFactoriesBuilt() {
   ListFamilyMembersServiceFactory::GetInstance();
   MailtoHandlerServiceFactory::GetInstance();
   ManagedBookmarkServiceFactory::GetInstance();
-  ModelTypeStoreServiceFactory::GetInstance();
   OhttpKeyServiceFactory::GetInstance();
   OptimizationGuideServiceFactory::GetInstance();
   PageContentAnnotationsServiceFactory::GetInstance();
@@ -293,6 +300,7 @@ void EnsureBrowserStateKeyedServiceFactoriesBuilt() {
   ShareExtensionServiceFactory::GetInstance();
   SigninBrowserStateInfoUpdaterFactory::GetInstance();
   SigninClientFactory::GetInstance();
+  SigninMetricsServiceFactory::GetInstance();
   SupervisedUserMetricsServiceFactory::GetInstance();
   SupervisedUserServiceFactory::GetInstance();
   SupervisedUserSettingsServiceFactory::GetInstance();

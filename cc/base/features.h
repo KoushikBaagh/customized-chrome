@@ -60,10 +60,6 @@ CC_BASE_EXPORT BASE_DECLARE_FEATURE(kHudDisplayForPerformanceMetrics);
 // render surface's owning effect.
 CC_BASE_EXPORT BASE_DECLARE_FEATURE(kRenderSurfaceCommonAncestorClip);
 
-// When enabled, Fluent scrollbars will paint the scrollbar's track and button
-// using nine-patch scaling.
-CC_BASE_EXPORT BASE_DECLARE_FEATURE(kFluentScrollbarUsesNinePatchTrack);
-
 // When enabled, the main thread does not block while commit is running on the
 // impl thread.
 // WARNING: This feature is not yet safe to enable. Work is needed to ensure
@@ -197,6 +193,12 @@ CC_BASE_EXPORT BASE_DECLARE_FEATURE(kDontAlwaysPushPictureLayerImpls);
 // to be used when prerender initial navigation is happening in background.
 // Please see crbug.com/41496019 for more details.
 CC_BASE_EXPORT BASE_DECLARE_FEATURE(kWarmUpCompositor);
+
+// Kill switch for a bunch of optimizations for cc-slimming project.
+// Please see crbug.com/335450599 for more details.
+CC_BASE_EXPORT BASE_DECLARE_FEATURE(kCCSlimming);
+// Check if the above feature is enabled. For performance purpose.
+CC_BASE_EXPORT bool IsCCSlimmingEnabled();
 
 // Modes for `kWaitForLateScrollEvents` changing event dispatch. Where the
 // default is to just always enqueue scroll events.

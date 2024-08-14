@@ -118,6 +118,8 @@ const AcceleratorData kDebugAcceleratorData[] = {
      AcceleratorAction::kDebugClearUseKMeansPref},
     {true, ui::VKEY_H, kDebugModifier,
      AcceleratorAction::kDebugToggleFocusModeState},
+    {true, ui::VKEY_8, kDebugModifier,
+     AcceleratorAction::kDebugStartSunfishSession},
 };
 
 const size_t kDebugAcceleratorDataLength = std::size(kDebugAcceleratorData);
@@ -230,6 +232,7 @@ const AcceleratorAction kActionsAllowedAtLoginOrLockScreen[] = {
     AcceleratorAction::kToggleFullscreenMagnifier,
     AcceleratorAction::kToggleHighContrast,
     AcceleratorAction::kToggleMirrorMode,
+    AcceleratorAction::kTogglePicker,
     AcceleratorAction::kToggleSpokenFeedback,
     AcceleratorAction::kToggleSystemTrayBubble,
     AcceleratorAction::kToggleWifi,
@@ -318,6 +321,7 @@ const AcceleratorAction kActionsAllowedAtModalWindow[] = {
     AcceleratorAction::kToggleHighContrast,
     AcceleratorAction::kToggleMirrorMode,
     AcceleratorAction::kToggleSpokenFeedback,
+    AcceleratorAction::kTogglePicker,
     AcceleratorAction::kToggleWifi,
     AcceleratorAction::kTouchFingerprintSensor1,
     AcceleratorAction::kTouchFingerprintSensor2,

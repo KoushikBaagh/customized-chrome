@@ -22,14 +22,14 @@ chromium-metrics-reviews@google.com.
 
 <histograms>
 
-<variants name="AppDisplayModes">
-<!-- Should be kept in sync with variants DisplayModes in
-  tools/metrics/histograms/metadata/ash/histograms.xml.
--->
+<!-- LINT.IfChange(AshDisplayModes) -->
 
+<variants name="AppDisplayModes">
   <variant name="ClamshellMode" summary="Clamshell mode"/>
   <variant name="TabletMode" summary="Tablet mode"/>
 </variants>
+
+<!-- LINT.ThenChange(//tools/metrics/histograms/metadata/ash/histograms.xml:AshDisplayModes) -->
 
 <variants name="AppInstallSurface">
   <variant name="" summary="All surfaces"/>
@@ -145,17 +145,17 @@ chromium-metrics-reviews@google.com.
   <variant name="Swipe" summary="Open launcher by swiping on the shelf"/>
 </variants>
 
-<variants name="LauncherSearchSessionConclusionVariants">
-<!-- Should be kept in sync with enum LauncherSearchSessionConclusion in
-  tools/metrics/histograms/metadata/apps/enums.xml.
--->
+<!-- LINT.IfChange(LauncherSearchSessionConclusion) -->
 
+<variants name="LauncherSearchSessionConclusionVariants">
   <variant name="" summary="All variants"/>
   <variant name=".AnswerCardSeen"
       summary="An answer card makes an impression then launcher is dismissed"/>
   <variant name=".Launch" summary="A result is launched"/>
   <variant name=".Quit" summary="Launcher is dismissed"/>
 </variants>
+
+<!-- LINT.ThenChange(//ash/public/cpp/app_list/app_list_metrics.cc:SearchSessionConclusion) -->
 
 <variants name="LauncherUISurface">
   <variant name=".AppsSearch" summary="App tiles search"/>
@@ -170,6 +170,17 @@ chromium-metrics-reviews@google.com.
   <variant name="Ignore" summary="ignore"/>
   <variant name="Impression" summary="impression"/>
   <variant name="Launch" summary="launch"/>
+</variants>
+
+<variants name="SearchCategory">
+  <variant name="Apps" summary="installed apps"/>
+  <variant name="AppShortcut" summary="shortcut for installed apps"/>
+  <variant name="Files" summary="local and Google Drive files"/>
+  <variant name="Games" summary="system settings"/>
+  <variant name="Helps" summary="help articles"/>
+  <variant name="Images" summary="image results"/>
+  <variant name="PlayStore" summary="play store suggestions"/>
+  <variant name="Web" summary="webpages"/>
 </variants>
 
 <variants name="SearchFileExtension">
@@ -198,7 +209,7 @@ chromium-metrics-reviews@google.com.
 </variants>
 
 <histogram name="AppManagement.AppDetailViews" enum="AppManagementUserAction"
-    expires_after="2024-11-17">
+    expires_after="2025-01-26">
 <!-- Name completed by histogram_suffixes name="AppType" -->
 
   <owner>sharminzaman@google.com</owner>
@@ -731,7 +742,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.AppList.FileSearchProvider.Relevance" units="score"
-    expires_after="2024-12-04">
+    expires_after="2025-02-02">
   <owner>chenjih@google.com</owner>
   <owner>laurencom@chromium.org</owner>
   <summary>
@@ -1073,7 +1084,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.AppList.Search.ContinueResultCount.{Type}" units="count"
-    expires_after="2024-11-17">
+    expires_after="2025-01-26">
   <owner>chenjih@google.com</owner>
   <owner>ypitsishin@google.com</owner>
   <owner>chromeos-launcher-search@google.com</owner>
@@ -1118,7 +1129,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.AppList.Search.DriveContinueResultsShown"
-    enum="BooleanShown" expires_after="2024-09-01">
+    enum="BooleanShown" expires_after="2025-09-01">
   <owner>chenjih@google.com</owner>
   <owner>ypitsishin@google.com</owner>
   <owner>chromeos-launcher-search@google.com</owner>
@@ -1130,7 +1141,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.AppList.Search.Error" enum="AppListUserEventError"
-    expires_after="2024-09-01">
+    expires_after="2025-09-01">
   <owner>chenjih@google.com</owner>
   <owner>ypitsishin@google.com</owner>
   <owner>chromeos-launcher-search@google.com</owner>
@@ -1220,7 +1231,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Apps.AppList.Search.SearchCategoriesEnableState.{SearchCategory}"
-    enum="AppListSearchCategoryState" expires_after="2024-07-31">
+    enum="AppListSearchCategoryState" expires_after="2025-01-31">
   <owner>wcwang@chromium.org</owner>
   <owner>chromeos-launcher@google.com</owner>
   <summary>
@@ -1238,10 +1249,11 @@ chromium-metrics-reviews@google.com.
 
     Disabled: The category is available but manually disabled by users.
   </summary>
+  <token key="SearchCategory" variants="SearchCategory"/>
 </histogram>
 
 <histogram name="Apps.AppList.Search.SearchCategoryFilterMenuOpenedCount"
-    units="count" expires_after="2024-07-31">
+    units="count" expires_after="2025-01-31">
   <owner>wcwang@chromium.org</owner>
   <owner>chromeos-launcher@google.com</owner>
   <summary>
@@ -2058,7 +2070,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.AppListPlayStoreQueryState"
-    enum="AppListPlayStoreQueryState" expires_after="2024-12-08">
+    enum="AppListPlayStoreQueryState" expires_after="2025-02-09">
   <owner>tby@chromium.org</owner>
   <owner>ypitsishin@google.com</owner>
   <owner>chrome-knowledge-eng@google.com</owner>
@@ -2175,7 +2187,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.AppsCountPerInstallReason.{AppType}.{InstallReason}"
-    units="Apps" expires_after="2024-12-08">
+    units="Apps" expires_after="2025-02-09">
   <owner>nancylingwang@chromium.org</owner>
   <owner>chromeos-apps-foundation-team@google.com</owner>
   <component>Platform&gt;Apps&gt;Foundation</component>
@@ -2237,7 +2249,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.ContextMenuExecuteCommand{ContextMenuFromApp}"
-    enum="ChromeOSUICommands" expires_after="2024-12-01">
+    enum="ChromeOSUICommands" expires_after="2025-02-02">
   <owner>tbarzic@chromium.org</owner>
   <owner>newcomer@chromium.org</owner>
   <owner>mmourgos@chromium.org</owner>
@@ -2256,7 +2268,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Apps.ContextMenuShowSourceV2{AppUIComponent}{TabletOrClamshellMode}"
-    enum="MenuSourceType" expires_after="2024-12-01">
+    enum="MenuSourceType" expires_after="2025-02-02">
   <owner>wcwang@chromium.org</owner>
   <owner>mmourgos@chromium.org</owner>
   <owner>tbarzic@chromium.org</owner>
@@ -2513,7 +2525,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Apps.MediaApp.Load.OtherOpenWindowCount" units="windows"
-    expires_after="2024-12-01">
+    expires_after="2025-02-02">
   <owner>tapted@chromium.org</owner>
   <owner>patricialor@chromium.org</owner>
   <summary>

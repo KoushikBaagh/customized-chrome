@@ -14,7 +14,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/containers/flat_set.h"
 #include "base/files/file_util.h"
@@ -90,7 +89,6 @@
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_paths.h"
-#include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/fake_profile_manager.h"
 #include "chrome/test/base/scoped_testing_local_state.h"
@@ -137,7 +135,6 @@
 #include "components/omnibox/browser/zero_suggest_cache_service.h"
 #include "components/omnibox/common/omnibox_features.h"
 #include "components/os_crypt/sync/os_crypt_mocker.h"
-#include "components/password_manager/core/browser/features/password_features.h"
 #include "components/password_manager/core/browser/password_manager_test_utils.h"
 #include "components/password_manager/core/browser/password_store/mock_password_store_interface.h"
 #include "components/password_manager/core/browser/password_store/mock_smart_bubble_stats_store.h"
@@ -211,14 +208,18 @@
 #include "url/scheme_host_port.h"
 
 #if BUILDFLAG(IS_ANDROID)
+#include "base/android/build_info.h"
 #include "chrome/browser/android/customtabs/chrome_origin_verifier.h"
 #include "chrome/browser/android/search_permissions/search_permissions_service.h"
 #include "chrome/browser/android/webapps/webapp_registry.h"
 #include "chrome/browser/ui/android/tab_model/tab_model_list.h"
 #include "chrome/browser/ui/android/tab_model/tab_model_test_helper.h"
-#include "components/feed/buildflags.h"
+#include "components/password_manager/core/browser/password_store/split_stores_and_local_upm.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #else
+#include "chrome/browser/user_education/browser_feature_promo_storage_service.h"
+#include "chrome/browser/user_education/user_education_service.h"
+#include "chrome/browser/user_education/user_education_service_factory.h"
 #include "content/public/browser/host_zoom_map.h"
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -1023,6 +1024,11 @@ class MockReportingService : public net::ReportingService {
     NOTREACHED_IN_MIGRATION();
   }
 
+  void SetEnterpriseReportingEndpoints(
+      const base::flat_map<std::string, GURL>& endpoints) override {
+    NOTREACHED_NORETURN();
+  }
+
   void SendReportsAndRemoveSource(
       const base::UnguessableToken& reporting_source) override {
     NOTREACHED_IN_MIGRATION();
@@ -1473,6 +1479,32 @@ class ChromeBrowsingDataRemoverDelegateTest : public testing::Test {
   std::unique_ptr<TestingProfileManager> profile_manager_;
   raw_ptr<TestingProfile> profile_;  // Owned by `profile_manager_`.
 };
+
+#if !BUILDFLAG(IS_ANDROID)
+TEST_F(ChromeBrowsingDataRemoverDelegateTest,
+       ClearUserEducationSessionHistory) {
+  auto& storage_service = static_cast<BrowserFeaturePromoStorageService&>(
+      UserEducationServiceFactory::GetForBrowserContext(GetProfile())
+          ->feature_promo_storage_service());
+  RecentSessionData data;
+  data.enabled_time = base::Time::Now() - base::Days(90);
+  data.recent_session_start_times = {base::Time::Now(),
+                                     base::Time::Now() - base::Days(10),
+                                     base::Time::Now() - base::Days(20)};
+  storage_service.SaveRecentSessionData(data);
+
+  data = storage_service.ReadRecentSessionData();
+  ASSERT_EQ(3U, data.recent_session_start_times.size());
+  ASSERT_TRUE(data.enabled_time.has_value());
+
+  BlockUntilBrowsingDataRemoved(base::Time::Now(), base::Time::Max(),
+                                constants::DATA_TYPE_HISTORY, false);
+
+  data = storage_service.ReadRecentSessionData();
+  ASSERT_EQ(0U, data.recent_session_start_times.size());
+  ASSERT_FALSE(data.enabled_time.has_value());
+}
+#endif
 
 #if BUILDFLAG(ENABLE_REPORTING)
 class ChromeBrowsingDataRemoverDelegateWithReportingServiceTest
@@ -2316,6 +2348,31 @@ TEST_F(ChromeBrowsingDataRemoverDelegateTest, DeleteTabs) {
   base::Time two_hours_ago = base::Time::Now() - base::Hours(2);
 
   EXPECT_CALL(tab_model,
+              CloseTabsNavigatedInTimeWindow(two_hours_ago, base::Time::Max()))
+      .Times(1);
+
+  BlockUntilBrowsingDataRemoved(two_hours_ago, base::Time::Max(),
+                                chrome_browsing_data_remover::DATA_TYPE_TABS,
+                                false);
+
+  EXPECT_EQ(chrome_browsing_data_remover::DATA_TYPE_TABS, GetRemovalMask());
+}
+
+TEST_F(ChromeBrowsingDataRemoverDelegateTest,
+       DeleteTabs_WithArchivedTabModelPresent) {
+  ::testing::NiceMock<MockTabModel> tab_model(GetProfile());
+  TabModelList::AddTabModel(&tab_model);
+  ::testing::NiceMock<MockTabModel> archived_tab_model(GetProfile());
+  TabModelList::SetArchivedTabModel(&archived_tab_model);
+
+  ASSERT_EQ(1u, TabModelList::models().size());
+
+  base::Time two_hours_ago = base::Time::Now() - base::Hours(2);
+
+  EXPECT_CALL(tab_model,
+              CloseTabsNavigatedInTimeWindow(two_hours_ago, base::Time::Max()))
+      .Times(1);
+  EXPECT_CALL(archived_tab_model,
               CloseTabsNavigatedInTimeWindow(two_hours_ago, base::Time::Max()))
       .Times(1);
 
@@ -4141,14 +4198,10 @@ class ChromeBrowsingDataRemoverDelegateWithAccountPasswordsTest
  public:
   ChromeBrowsingDataRemoverDelegateWithAccountPasswordsTest() {
 #if BUILDFLAG(IS_ANDROID)
-    // Using the account store on Android requires enabling the flag for UPM
-    // support of local passwords. Skip the Gms version check, otherwise the
-    // flag won't do anything in bots that have outdated GmsCore.
-    feature_list_.InitAndEnableFeature(
-        password_manager::features::
-            kUnifiedPasswordManagerLocalPasswordsAndroidNoMigration);
-    base::CommandLine::ForCurrentProcess()->AppendSwitch(
-        switches::kSkipLocalUpmGmsCoreVersionCheckForTesting);
+    // Override the GMS version to be big enough for local UPM support, so these
+    // tests still pass in bots with an outdated version.
+    base::android::BuildInfo::GetInstance()->set_gms_version_code_for_test(
+        base::NumberToString(password_manager::GetLocalUpmMinGmsVersion()));
 #endif
   }
 

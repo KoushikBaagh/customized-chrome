@@ -10,6 +10,8 @@
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/commerce/mock_commerce_ui_tab_helper.h"
+#include "chrome/browser/ui/tabs/public/tab_features.h"
+#include "chrome/browser/ui/tabs/public/tab_interface.h"
 #include "chrome/browser/ui/views/commerce/product_specifications_icon_view.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/test_with_browser_view.h"
@@ -35,7 +37,9 @@ const char kUrlB[] = "about:blank";
 class ProductSpecificationsIconViewIntegrationTest
     : public TestWithBrowserView {
  public:
-  ProductSpecificationsIconViewIntegrationTest() = default;
+  ProductSpecificationsIconViewIntegrationTest() {
+    MockCommerceUiTabHelper::ReplaceFactory();
+  }
 
   ProductSpecificationsIconViewIntegrationTest(
       const ProductSpecificationsIconViewIntegrationTest&) = delete;
@@ -54,8 +58,11 @@ class ProductSpecificationsIconViewIntegrationTest
             browser()->profile()));
     shopping_service_->SetAccountChecker(account_checker_.get());
     AddTab(browser(), GURL(kUrlA));
-    mock_tab_helper_ = AttachTabHelperToWebContents(
-        browser()->tab_strip_model()->GetActiveWebContents());
+    mock_tab_helper_ =
+        static_cast<MockCommerceUiTabHelper*>(browser()
+                                                  ->GetActiveTabInterface()
+                                                  ->GetTabFeatures()
+                                                  ->commerce_ui_tab_helper());
   }
 
   TestingProfile::TestingFactories GetTestingFactories() override {
@@ -93,13 +100,6 @@ class ProductSpecificationsIconViewIntegrationTest
   raw_ptr<MockCommerceUiTabHelper, DanglingUntriaged> mock_tab_helper_;
 
  private:
-  MockCommerceUiTabHelper* AttachTabHelperToWebContents(
-      content::WebContents* web_contents) {
-    MockCommerceUiTabHelper::CreateForWebContents(web_contents);
-    return static_cast<MockCommerceUiTabHelper*>(
-        MockCommerceUiTabHelper::FromWebContents(web_contents));
-  }
-
   base::test::ScopedFeatureList test_features_;
   raw_ptr<commerce::MockShoppingService, AcrossTasksDanglingUntriaged>
       shopping_service_;
@@ -133,27 +133,30 @@ TEST_F(ProductSpecificationsIconViewIntegrationTest, IconExecution) {
 }
 
 TEST_F(ProductSpecificationsIconViewIntegrationTest, TestVisualState) {
+  std::u16string added_title = u"Added to set";
+  std::u16string add_title = u"Add to set";
+
   ON_CALL(*GetTabHelper(), ShouldShowProductSpecificationsIconView)
       .WillByDefault(testing::Return(true));
   ON_CALL(*GetTabHelper(), IsInRecommendedSet)
       .WillByDefault(testing::Return(true));
+  ON_CALL(*GetTabHelper(), GetProductSpecificationsLabel)
+      .WillByDefault(testing::Return(added_title));
 
   NavigateAndCommitActiveTab(GURL(kUrlB));
   auto* icon_view = GetChip();
   EXPECT_TRUE(icon_view->GetVisible());
-  EXPECT_EQ(icon_view->GetText(),
-            l10n_util::GetStringUTF16(
-                IDS_PRODUCT_SPECIFICATIONS_PAGE_ACTION_ADDED_DEFAULT));
+  EXPECT_EQ(icon_view->GetText(), added_title);
 
   ON_CALL(*GetTabHelper(), ShouldShowProductSpecificationsIconView)
       .WillByDefault(testing::Return(true));
   ON_CALL(*GetTabHelper(), IsInRecommendedSet)
       .WillByDefault(testing::Return(false));
+  ON_CALL(*GetTabHelper(), GetProductSpecificationsLabel)
+      .WillByDefault(testing::Return(add_title));
 
   NavigateAndCommitActiveTab(GURL(kUrlA));
   icon_view = GetChip();
   EXPECT_TRUE(icon_view->GetVisible());
-  EXPECT_EQ(icon_view->GetText(),
-            l10n_util::GetStringUTF16(
-                IDS_PRODUCT_SPECIFICATIONS_PAGE_ACTION_ADD_DEFAULT));
+  EXPECT_EQ(icon_view->GetText(), add_title);
 }

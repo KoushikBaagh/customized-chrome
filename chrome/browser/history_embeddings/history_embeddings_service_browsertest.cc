@@ -8,6 +8,7 @@
 #include "base/test/scoped_feature_list.h"
 #include "base/test/test_future.h"
 #include "chrome/browser/history_embeddings/history_embeddings_service_factory.h"
+#include "chrome/browser/optimization_guide/browser_test_util.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service_factory.h"
 #include "chrome/browser/page_content_annotations/page_content_annotations_service_factory.h"
@@ -17,6 +18,7 @@
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/history_embeddings/history_embeddings_features.h"
+#include "components/optimization_guide/core/model_execution/model_execution_features.h"
 #include "components/optimization_guide/core/test_model_info_builder.h"
 #include "components/page_content_annotations/core/page_content_annotations_features.h"
 #include "components/page_content_annotations/core/page_content_annotations_service.h"
@@ -34,6 +36,16 @@ class HistoryEmbeddingsBrowserTest : public InProcessBrowserTest {
   void SetUp() override {
     InitializeFeatureList();
     InProcessBrowserTest::SetUp();
+  }
+
+  void SetUpOnMainThread() override {
+    optimization_guide::EnableSigninAndModelExecutionCapability(
+        browser()->profile());
+    browser()->profile()->GetPrefs()->SetInteger(
+        optimization_guide::prefs::GetSettingEnabledPrefName(
+            optimization_guide::UserVisibleFeatureKey::kHistorySearch),
+        static_cast<int>(
+            optimization_guide::prefs::FeatureOptInState::kEnabled));
   }
 
  protected:
@@ -141,7 +153,8 @@ IN_PROC_BROWSER_TEST_F(HistoryEmbeddingsBrowserTest,
 
   // Search for the passage.
   base::test::TestFuture<SearchResult> search_future;
-  service()->Search("A B C D e f g", {}, 1, search_future.GetCallback());
+  service()->Search("A B C D e f g", {}, 1,
+                    search_future.GetRepeatingCallback());
   SearchResult result = search_future.Take();
   EXPECT_EQ(result.scored_url_rows.size(), 1u);
   EXPECT_EQ(result.scored_url_rows[0].GetBestPassage(), "A a B C b a 2 D");
@@ -194,7 +207,7 @@ IN_PROC_BROWSER_TEST_F(HistoryEmbeddingsWithLowAggregationBrowserTest,
 
   // Search for the passage.
   base::test::TestFuture<SearchResult> search_future;
-  service()->Search("A B C", {}, 1, search_future.GetCallback());
+  service()->Search("A B C", {}, 1, search_future.GetRepeatingCallback());
   SearchResult result = search_future.Take();
   EXPECT_EQ(result.scored_url_rows.size(), 1u);
   EXPECT_EQ(result.scored_url_rows[0].GetBestPassage(),
@@ -243,7 +256,8 @@ IN_PROC_BROWSER_TEST_F(
 
   // Search for the passage.
   base::test::TestFuture<SearchResult> search_future;
-  service()->Search("A B C D e f g", {}, 1, search_future.GetCallback());
+  service()->Search("A B C D e f g", {}, 1,
+                    search_future.GetRepeatingCallback());
   SearchResult result = search_future.Take();
   EXPECT_TRUE(result.scored_url_rows.empty());
 
@@ -271,7 +285,8 @@ IN_PROC_BROWSER_TEST_F(HistoryEmbeddingsBrowserTest,
 
   // Search for the passage.
   base::test::TestFuture<SearchResult> search_future;
-  service()->Search("A B C D e f g", {}, 1, search_future.GetCallback());
+  service()->Search("A B C D e f g", {}, 1,
+                    search_future.GetRepeatingCallback());
   SearchResult result = search_future.Take();
   EXPECT_TRUE(result.scored_url_rows.empty());
 
@@ -419,7 +434,8 @@ IN_PROC_BROWSER_TEST_F(HistoryEmbeddingsWithUrlFilterBrowserTest,
 
   // Search for the passage, should return empty result because of the filter.
   base::test::TestFuture<SearchResult> search_future;
-  service()->Search("A B C D e f g", {}, 1, search_future.GetCallback());
+  service()->Search("A B C D e f g", {}, 1,
+                    search_future.GetRepeatingCallback());
   SearchResult result = search_future.Take();
   EXPECT_TRUE(result.scored_url_rows.empty());
 
@@ -452,7 +468,8 @@ IN_PROC_BROWSER_TEST_F(HistoryEmbeddingsWithUrlFilterBrowserTest,
 
   // Search for the passage; should have valid result since the URL is allowed.
   base::test::TestFuture<SearchResult> search_future;
-  service()->Search("A B C D e f g", {}, 1, search_future.GetCallback());
+  service()->Search("A B C D e f g", {}, 1,
+                    search_future.GetRepeatingCallback());
   SearchResult result = search_future.Take();
   EXPECT_EQ(result.scored_url_rows.size(), 1u);
   EXPECT_EQ(result.scored_url_rows[0].GetBestPassage(), "A a B C b a 2 D");

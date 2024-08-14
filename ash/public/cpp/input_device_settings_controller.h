@@ -79,6 +79,12 @@ class ASH_PUBLIC_EXPORT InputDeviceSettingsController {
     virtual void OnTouchpadBatteryInfoChanged(const mojom::Touchpad& touchpad) {
     }
     virtual void OnMouseCompanionAppInfoChanged(const mojom::Mouse& mouse) {}
+    virtual void OnKeyboardCompanionAppInfoChanged(
+        const mojom::Keyboard& keyboard) {}
+    virtual void OnTouchpadCompanionAppInfoChanged(
+        const mojom::Touchpad& touchpad) {}
+    virtual void OnGraphicsTabletCompanionAppInfoChanged(
+        const mojom::GraphicsTablet& graphics_tablet) {}
   };
 
   static InputDeviceSettingsController* Get();
@@ -182,6 +188,9 @@ class ASH_PUBLIC_EXPORT InputDeviceSettingsController {
   virtual void GetDeviceImageDataUrl(
       const std::string& device_key,
       base::OnceCallback<void(const std::optional<std::string>&)> callback) = 0;
+
+  // Resets the tracking of device IDs associated with notification clicks.
+  virtual void ResetNotificationDeviceTracking() = 0;
 
   virtual void AddObserver(Observer* observer) = 0;
   virtual void RemoveObserver(Observer* observer) = 0;

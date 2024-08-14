@@ -9,6 +9,7 @@
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
 #include "base/check_deref.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/android/plus_addresses/all_plus_addresses_bottom_sheet_controller.h"
 #include "components/plus_addresses/plus_address_types.h"
 #include "components/strings/grit/components_strings.h"
@@ -52,12 +53,12 @@ void AllPlusAddressesBottomSheetView::Show(
   }
 
   JNIEnv* env = jni_zero::AttachCurrentThread();
-  std::vector<base::android::ScopedJavaLocalRef<jobject>> java_profiles(
-      profiles.size());
+  std::vector<base::android::ScopedJavaLocalRef<jobject>> java_profiles;
+  java_profiles.reserve(profiles.size());
 
   for (const PlusProfile& profile : profiles) {
     java_profiles.emplace_back(Java_PlusProfile_Constructor(
-        env, profile.plus_address, GetOriginFromPlusProfile(profile)));
+        env, *profile.plus_address, GetOriginFromPlusProfile(profile)));
   }
 
   base::android::ScopedJavaLocalRef<jobject> ui_info =
@@ -70,11 +71,25 @@ void AllPlusAddressesBottomSheetView::Show(
       env, ui_info,
       l10n_util::GetStringUTF16(
           IDS_PLUS_ADDRESS_ALL_PLUS_ADDRESSES_BOTTOMSHEET_WARNING_ANDROID));
+  Java_AllPlusAddressesBottomSheetUIInfo_setQueryHint(
+      env, ui_info,
+      l10n_util::GetStringUTF16(
+          IDS_PLUS_ADDRESS_ALL_PLUS_ADDRESSES_BOTTOMSHEET_QUERY_HINT_ANDROID));
   Java_AllPlusAddressesBottomSheetUIInfo_setPlusProfiles(env, ui_info,
                                                          java_profiles);
 
   Java_AllPlusAddressesBottomSheetBridge_showPlusAddresses(env, java_object,
                                                            ui_info);
+}
+
+void AllPlusAddressesBottomSheetView::OnPlusAddressSelected(
+    JNIEnv* env,
+    const std::string& plus_address) {
+  controller_->OnPlusAddressSelected(plus_address);
+}
+
+void AllPlusAddressesBottomSheetView::OnDismissed(JNIEnv* env) {
+  controller_->OnBottomSheetDismissed();
 }
 
 base::android::ScopedJavaGlobalRef<jobject>
@@ -88,7 +103,8 @@ AllPlusAddressesBottomSheetView::GetOrCreateJavaObject() {
   }
   return java_object_internal_ = Java_AllPlusAddressesBottomSheetBridge_create(
              jni_zero::AttachCurrentThread(), reinterpret_cast<intptr_t>(this),
-             controller_->GetNativeView()->GetWindowAndroid()->GetJavaObject());
+             controller_->GetNativeView()->GetWindowAndroid()->GetJavaObject(),
+             controller_->GetProfile()->GetJavaObject());
 }
 
 }  // namespace plus_addresses

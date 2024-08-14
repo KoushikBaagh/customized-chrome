@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "components/pdf/renderer/pdf_accessibility_tree.h"
 
 #include <map>
@@ -299,7 +304,8 @@ class TestPdfAccessibilityTree : public PdfAccessibilityTree {
       : PdfAccessibilityTree(render_frame,
                              action_handler,
                              image_fetcher,
-                             /*plugin_container=*/nullptr) {
+                             /*plugin_container=*/nullptr,
+                             /*print_preview=*/false) {
     ForcePluginAXObjectForTesting(blink::WebAXObject::FromWebNode(
         render_frame->GetWebFrame()->GetDocument().Body()));
   }

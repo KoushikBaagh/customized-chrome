@@ -115,6 +115,7 @@ class CORE_EXPORT MediaVideoVisibilityTracker final
   // Friend class for testing.
   friend class MediaVideoVisibilityTrackerTest;
   friend class HTMLMediaElementTest;
+  friend class HTMLVideoElementTest;
 
   HTMLVideoElement& VideoElement() const { return *video_element_; }
 
@@ -171,6 +172,7 @@ class CORE_EXPORT MediaVideoVisibilityTracker final
   RequestVisibilityCallback request_visibility_callback_;
   base::TimeTicks last_hit_test_timestamp_;
   const base::TimeDelta hit_test_interval_;
+  bool meets_visibility_threshold_ = false;
 
   // Keeps track of the |Document| to which the tracker has registered for
   // lifecycle notifications.

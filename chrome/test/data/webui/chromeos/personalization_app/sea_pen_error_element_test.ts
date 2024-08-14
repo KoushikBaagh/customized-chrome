@@ -17,7 +17,10 @@ suite('SeaPenErrorElementTest', function() {
   let seaPenErrorElement: SeaPenErrorElement|null;
 
   setup(() => {
-    loadTimeData.overrideValues({isSeaPenEnabled: true});
+    loadTimeData.overrideValues({
+      isSeaPenEnabled: true,
+      isSeaPenTextInputEnabled: false,
+    });
   });
 
   teardown(async () => {
@@ -36,6 +39,28 @@ suite('SeaPenErrorElementTest', function() {
     assertTrue(!!errorMessage);
     assertEquals(
         seaPenErrorElement.i18n('seaPenErrorNoInternet'),
+        errorMessage!.innerText);
+
+    const errorIllo = seaPenErrorElement.shadowRoot!.querySelector(
+                          'iron-icon') as HTMLElement;
+    assertTrue(!!errorIllo);
+    assertEquals(
+        errorIllo.getAttribute('icon'),
+        'personalization-shared-illo:network_error');
+  });
+
+  test('display no network error state for freeform', async () => {
+    loadTimeData.overrideValues({isSeaPenTextInputEnabled: true});
+    seaPenErrorElement = initElement(
+        SeaPenErrorElement,
+        {thumbnailResponseStatusCode: MantaStatusCode.kNoInternetConnection});
+    await waitAfterNextRender(seaPenErrorElement);
+
+    const errorMessage = seaPenErrorElement.shadowRoot!.querySelector(
+                             '.error-message') as HTMLElement;
+    assertTrue(!!errorMessage);
+    assertEquals(
+        seaPenErrorElement.i18n('seaPenFreeformErrorNoInternet'),
         errorMessage!.innerText);
 
     const errorIllo = seaPenErrorElement.shadowRoot!.querySelector(
@@ -162,7 +187,9 @@ suite('SeaPenErrorElementTest', function() {
         const errorMessage = seaPenErrorElement.shadowRoot!.querySelector(
                                  '.error-message') as HTMLElement;
         assertTrue(!!errorMessage, 'an error message should be displayed');
-        assertEquals('unsupported language', errorMessage!.innerText);
+        assertEquals(
+            seaPenErrorElement.i18n('seaPenFreeformErrorUnsupportedLanguage'),
+            errorMessage!.innerText);
 
         const errorIllo = seaPenErrorElement.shadowRoot!.querySelector(
                               'iron-icon') as HTMLElement;
@@ -182,7 +209,9 @@ suite('SeaPenErrorElementTest', function() {
     const errorMessage = seaPenErrorElement.shadowRoot!.querySelector(
                              '.error-message') as HTMLElement;
     assertTrue(!!errorMessage, 'an error message should be displayed');
-    assertEquals('blocked outputs', errorMessage!.innerText);
+    assertEquals(
+        seaPenErrorElement.i18n('seaPenFreeformErrorBlockedOutputs'),
+        errorMessage!.innerText);
 
     const errorIllo = seaPenErrorElement.shadowRoot!.querySelector(
                           'iron-icon') as HTMLElement;

@@ -736,6 +736,78 @@ class MockPartitionStatsDumper : public PartitionStatsDumper {
   std::vector<PartitionBucketMemoryStats> bucket_stats;
 };
 
+#if PA_BUILDFLAG(IS_APPLE)
+// After deallocating the memory, another thread may allocate memory whose
+// address region overlaps the deallocated memory's. This sometimes happen
+// when running the test on apple os with PartitionAlloc-Everywhere.
+// So if `IsManagedByNormalBuckets(address_to_check)` returns true, we
+// will also check whether `allocator.root()` allocated the memory or not.
+// Regarding IsManagedByDirectMap(), this rarely happens because of allocation
+// size. But we should also check who allocates the memory.
+bool IsNormalBucketsAllocatedByRoot(uintptr_t address, PartitionRoot* root) {
+  partition_alloc::internal::ReadOnlyPartitionSuperPageExtentEntry* extent =
+      root->first_extent;
+  while (extent != nullptr) {
+    uintptr_t super_page =
+        partition_alloc::internal::SuperPagesBeginFromExtent(extent);
+    uintptr_t super_page_end =
+        partition_alloc::internal::SuperPagesEndFromExtent(extent);
+    if (super_page <= address && address < super_page_end) {
+      return true;
+    }
+    extent = extent->next;
+  }
+  return false;
+}
+
+bool IsDirectMapAllocatedByRoot(uintptr_t address, PartitionRoot* root) {
+  ::partition_alloc::internal::ScopedGuard locker{
+      partition_alloc::internal::PartitionRootLock(root)};
+
+  partition_alloc::internal::ReadOnlyPartitionDirectMapExtent* extent =
+      root->direct_map_list;
+  while (extent != nullptr) {
+    uintptr_t super_page =
+        reinterpret_cast<uintptr_t>(extent) & kSuperPageBaseMask;
+    uintptr_t super_page_end = super_page + extent->reservation_size;
+    if (super_page <= address && address < super_page_end) {
+      return true;
+    }
+    extent = extent->next_extent;
+  }
+  return false;
+}
+#endif  // PA_BUILDFLAG(IS_APPLE)
+
+bool IsManagedByNormalBucketsForTesting(uintptr_t address,
+                                        [[maybe_unused]] PartitionRoot* root) {
+  return IsManagedByNormalBuckets(address)
+#if PA_BUILDFLAG(IS_APPLE)
+         && IsNormalBucketsAllocatedByRoot(address, root)
+#endif  // PA_BUILDFLAG(IS_APPLE)
+      ;
+}
+
+bool IsManagedByDirectMapForTesting(uintptr_t address,
+                                    [[maybe_unused]] PartitionRoot* root) {
+  return IsManagedByDirectMap(address)
+#if PA_BUILDFLAG(IS_APPLE)
+         && IsDirectMapAllocatedByRoot(address, root)
+#endif  // PA_BUILDFLAG(IS_APPLE)
+      ;
+}
+
+bool IsManagedByNormalBucketsOrDirectMapForTesting(
+    uintptr_t address,
+    [[maybe_unused]] PartitionRoot* root) {
+  return IsManagedByNormalBucketsOrDirectMap(address)
+#if PA_BUILDFLAG(IS_APPLE)
+         && (IsManagedByNormalBucketsForTesting(address, root) ||
+             IsManagedByDirectMapForTesting(address, root))
+#endif  // PA_BUILDFLAG(IS_APPLE)
+      ;
+}
+
 }  // namespace
 
 INSTANTIATE_TEST_SUITE_P(AlternateTestParams,
@@ -2517,6 +2589,41 @@ TEST_P(PartitionAllocDeathTest, MTEProtectsFreedPtr) {
   allocator.root()->Free(ptr);
 
   // Writing to ptr after free() should crash
+  EXPECT_EXIT(
+      {
+        // Should be in synchronous MTE mode for running this test.
+        *ptr = kQuarantined;
+      },
+      testing::KilledBySignal(SIGSEGV), "");
+}
+
+// Check that accessing freed memory will not trigger a crash in
+// SuspendTagCheckingScope.
+TEST_P(PartitionAllocDeathTest, SuspendTagCheckingScope) {
+  base::CPU cpu;
+  if (!cpu.has_mte()) {
+    // This test won't pass on systems without MTE.
+    GTEST_SKIP();
+  }
+
+  constexpr uint64_t kQuarantined = 0xEFEFEFEFEFEFEFEF;
+
+  // Make an arbitrary-sized small allocation.
+  size_t alloc_size = 64 - ExtraAllocSize(allocator);
+  uint64_t* ptr =
+      static_cast<uint64_t*>(allocator.root()->Alloc(alloc_size, type_name));
+  EXPECT_TRUE(ptr);
+
+  // Invalidate ptr by freeing it.
+  allocator.root()->Free(ptr);
+
+  // Writing to ptr after free() should usually crash but not in
+  // |SuspendTagCheckingScope|.
+  {
+    partition_alloc::SuspendTagCheckingScope scope;
+    *ptr = kQuarantined;
+  }
+  // Check that access after the scope will crash.
   EXPECT_EXIT(
       {
         // Should be in synchronous MTE mode for running this test.
@@ -4948,28 +5055,40 @@ TEST_P(PartitionAllocTest, CheckReservationType) {
   uintptr_t address = UntagPtr(ptr);
   uintptr_t address_to_check = address;
   EXPECT_FALSE(IsReservationStart(address_to_check));
-  EXPECT_TRUE(IsManagedByNormalBuckets(address_to_check));
-  EXPECT_FALSE(IsManagedByDirectMap(address_to_check));
-  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMap(address_to_check));
+  EXPECT_TRUE(
+      IsManagedByNormalBucketsForTesting(address_to_check, allocator.root()));
+  EXPECT_FALSE(
+      IsManagedByDirectMapForTesting(address_to_check, allocator.root()));
+  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMapForTesting(address_to_check,
+                                                            allocator.root()));
   address_to_check = address + kTestAllocSize - 1;
   EXPECT_FALSE(IsReservationStart(address_to_check));
-  EXPECT_TRUE(IsManagedByNormalBuckets(address_to_check));
-  EXPECT_FALSE(IsManagedByDirectMap(address_to_check));
-  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMap(address_to_check));
+  EXPECT_TRUE(
+      IsManagedByNormalBucketsForTesting(address_to_check, allocator.root()));
+  EXPECT_FALSE(
+      IsManagedByDirectMapForTesting(address_to_check, allocator.root()));
+  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMapForTesting(address_to_check,
+                                                            allocator.root()));
   address_to_check =
       partition_alloc::internal::base::bits::AlignDown(address, kSuperPageSize);
   EXPECT_TRUE(IsReservationStart(address_to_check));
-  EXPECT_TRUE(IsManagedByNormalBuckets(address_to_check));
-  EXPECT_FALSE(IsManagedByDirectMap(address_to_check));
-  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMap(address_to_check));
+  EXPECT_TRUE(
+      IsManagedByNormalBucketsForTesting(address_to_check, allocator.root()));
+  EXPECT_FALSE(
+      IsManagedByDirectMapForTesting(address_to_check, allocator.root()));
+  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMapForTesting(address_to_check,
+                                                            allocator.root()));
   allocator.root()->Free(ptr);
   // Freeing keeps a normal-bucket super page in memory.
   address_to_check =
       partition_alloc::internal::base::bits::AlignDown(address, kSuperPageSize);
   EXPECT_TRUE(IsReservationStart(address_to_check));
-  EXPECT_TRUE(IsManagedByNormalBuckets(address_to_check));
-  EXPECT_FALSE(IsManagedByDirectMap(address_to_check));
-  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMap(address_to_check));
+  EXPECT_TRUE(
+      IsManagedByNormalBucketsForTesting(address_to_check, allocator.root()));
+  EXPECT_FALSE(
+      IsManagedByDirectMapForTesting(address_to_check, allocator.root()));
+  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMapForTesting(address_to_check,
+                                                            allocator.root()));
 
   size_t large_size = 2 * kSuperPageSize;
   ASSERT_GT(large_size, kMaxBucketed);
@@ -4978,26 +5097,38 @@ TEST_P(PartitionAllocTest, CheckReservationType) {
   address = UntagPtr(ptr);
   address_to_check = address;
   EXPECT_FALSE(IsReservationStart(address_to_check));
-  EXPECT_FALSE(IsManagedByNormalBuckets(address_to_check));
-  EXPECT_TRUE(IsManagedByDirectMap(address_to_check));
-  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMap(address_to_check));
+  EXPECT_FALSE(
+      IsManagedByNormalBucketsForTesting(address_to_check, allocator.root()));
+  EXPECT_TRUE(
+      IsManagedByDirectMapForTesting(address_to_check, allocator.root()));
+  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMapForTesting(address_to_check,
+                                                            allocator.root()));
   address_to_check =
       partition_alloc::internal::base::bits::AlignUp(address, kSuperPageSize);
   EXPECT_FALSE(IsReservationStart(address_to_check));
-  EXPECT_FALSE(IsManagedByNormalBuckets(address_to_check));
-  EXPECT_TRUE(IsManagedByDirectMap(address_to_check));
-  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMap(address_to_check));
+  EXPECT_FALSE(
+      IsManagedByNormalBucketsForTesting(address_to_check, allocator.root()));
+  EXPECT_TRUE(
+      IsManagedByDirectMapForTesting(address_to_check, allocator.root()));
+  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMapForTesting(address_to_check,
+                                                            allocator.root()));
   address_to_check = address + large_size - 1;
   EXPECT_FALSE(IsReservationStart(address_to_check));
-  EXPECT_FALSE(IsManagedByNormalBuckets(address_to_check));
-  EXPECT_TRUE(IsManagedByDirectMap(address_to_check));
-  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMap(address_to_check));
+  EXPECT_FALSE(
+      IsManagedByNormalBucketsForTesting(address_to_check, allocator.root()));
+  EXPECT_TRUE(
+      IsManagedByDirectMapForTesting(address_to_check, allocator.root()));
+  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMapForTesting(address_to_check,
+                                                            allocator.root()));
   address_to_check =
       partition_alloc::internal::base::bits::AlignDown(address, kSuperPageSize);
   EXPECT_TRUE(IsReservationStart(address_to_check));
-  EXPECT_FALSE(IsManagedByNormalBuckets(address_to_check));
-  EXPECT_TRUE(IsManagedByDirectMap(address_to_check));
-  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMap(address_to_check));
+  EXPECT_FALSE(
+      IsManagedByNormalBucketsForTesting(address_to_check, allocator.root()));
+  EXPECT_TRUE(
+      IsManagedByDirectMapForTesting(address_to_check, allocator.root()));
+  EXPECT_TRUE(IsManagedByNormalBucketsOrDirectMapForTesting(address_to_check,
+                                                            allocator.root()));
   allocator.root()->Free(ptr);
   // Freeing releases direct-map super pages.
   address_to_check =
@@ -5011,9 +5142,12 @@ TEST_P(PartitionAllocTest, CheckReservationType) {
 #endif  //  PA_BUILDFLAG(DCHECKS_ARE_ON) && (!defined(OFFICIAL_BUILD) ||
         //  !defined(NDEBUG))
 
-  EXPECT_FALSE(IsManagedByNormalBuckets(address_to_check));
-  EXPECT_FALSE(IsManagedByDirectMap(address_to_check));
-  EXPECT_FALSE(IsManagedByNormalBucketsOrDirectMap(address_to_check));
+  EXPECT_FALSE(
+      IsManagedByNormalBucketsForTesting(address_to_check, allocator.root()));
+  EXPECT_FALSE(
+      IsManagedByDirectMapForTesting(address_to_check, allocator.root()));
+  EXPECT_FALSE(IsManagedByNormalBucketsOrDirectMapForTesting(address_to_check,
+                                                             allocator.root()));
 }
 
 // Test for crash http://crbug.com/1169003.

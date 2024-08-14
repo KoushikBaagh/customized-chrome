@@ -26,6 +26,7 @@
 #include "components/signin/public/base/signin_client.h"
 #include "components/signin/public/base/signin_metrics.h"
 #include "components/signin/public/base/signin_pref_names.h"
+#include "components/signin/public/base/signin_prefs.h"
 #include "components/signin/public/base/signin_switches.h"
 #include "components/signin/public/identity_manager/account_info.h"
 #include "google_apis/gaia/core_account_id.h"
@@ -68,21 +69,18 @@ void LogPrimaryAccountChangeMetrics(PrimaryAccountChangeEvent event_details) {
         break;
       }
 
-      DCHECK(absl::holds_alternative<signin_metrics::AccessPoint>(
-          event_details.GetEventSource()));
+      DCHECK(event_details.GetSetPrimaryAccountAccessPoint().has_value());
       base::UmaHistogramEnumeration(
           "Signin.SignIn.Completed",
-          absl::get<signin_metrics::AccessPoint>(
-              event_details.GetEventSource()),
+          event_details.GetSetPrimaryAccountAccessPoint().value(),
           signin_metrics::AccessPoint::ACCESS_POINT_MAX);
       break;
 
     case PrimaryAccountChangeEvent::Type::kCleared:
-      DCHECK(absl::holds_alternative<signin_metrics::ProfileSignout>(
-          event_details.GetEventSource()));
-      base::UmaHistogramEnumeration("Signin.SignOut.Completed",
-                                    absl::get<signin_metrics::ProfileSignout>(
-                                        event_details.GetEventSource()));
+      DCHECK(event_details.GetClearPrimaryAccountSource().has_value());
+      base::UmaHistogramEnumeration(
+          "Signin.SignOut.Completed",
+          event_details.GetClearPrimaryAccountSource().value());
       break;
   }
 
@@ -91,21 +89,18 @@ void LogPrimaryAccountChangeMetrics(PrimaryAccountChangeEvent event_details) {
       break;
 
     case PrimaryAccountChangeEvent::Type::kSet:
-      DCHECK(absl::holds_alternative<signin_metrics::AccessPoint>(
-          event_details.GetEventSource()));
+      DCHECK(event_details.GetSetPrimaryAccountAccessPoint().has_value());
       base::UmaHistogramEnumeration(
           "Signin.SyncOptIn.Completed",
-          absl::get<signin_metrics::AccessPoint>(
-              event_details.GetEventSource()),
+          event_details.GetSetPrimaryAccountAccessPoint().value(),
           signin_metrics::AccessPoint::ACCESS_POINT_MAX);
       break;
 
     case PrimaryAccountChangeEvent::Type::kCleared:
-      DCHECK(absl::holds_alternative<signin_metrics::ProfileSignout>(
-          event_details.GetEventSource()));
-      base::UmaHistogramEnumeration("Signin.SyncTurnOff.Completed",
-                                    absl::get<signin_metrics::ProfileSignout>(
-                                        event_details.GetEventSource()));
+      DCHECK(event_details.GetClearPrimaryAccountSource().has_value());
+      base::UmaHistogramEnumeration(
+          "Signin.SyncTurnOff.Completed",
+          event_details.GetClearPrimaryAccountSource().value());
       break;
   }
 }
@@ -222,6 +217,11 @@ PrimaryAccountManager::PrimaryAccountManager(
     scoped_pref_commit.ClearPref(prefs::kExplicitBrowserSignin);
     scoped_pref_commit.ClearPref(
         prefs::kCookieClearOnExitMigrationNoticeComplete);
+  } else {
+    signin_allowed_.Init(
+        prefs::kSigninAllowed, client_->GetPrefs(),
+        base::BindRepeating(&PrimaryAccountManager::OnSigninAllowedPrefChanged,
+                            base::Unretained(this)));
   }
 }
 
@@ -229,8 +229,6 @@ PrimaryAccountManager::~PrimaryAccountManager() = default;
 
 // static
 void PrimaryAccountManager::RegisterProfilePrefs(PrefRegistrySimple* registry) {
-  registry->RegisterStringPref(
-      prefs::kGoogleServicesLastSyncingAccountIdDeprecated, std::string());
   registry->RegisterStringPref(prefs::kGoogleServicesLastSyncingGaiaId,
                                std::string());
   registry->RegisterStringPref(prefs::kGoogleServicesLastSyncingUsername,
@@ -409,6 +407,10 @@ void PrimaryAccountManager::Initialize() {
                                    account_info.gaia);
       scoped_pref_commit.SetString(prefs::kGoogleServicesLastSyncingUsername,
                                    account_info.email);
+    } else if (ShouldSigninAllowedPrefAffectPrimaryAccount(
+                   pref_consented_to_sync)) {
+      SetPrimaryAccountInternal(CoreAccountInfo(), /*consented_to_sync=*/false,
+                                scoped_pref_commit);
     } else {
       SetPrimaryAccountInternal(account_info, /*consented_to_sync=*/false,
                                 scoped_pref_commit);
@@ -735,9 +737,9 @@ void PrimaryAccountManager::ComputeExplicitBrowserSignin(
       }
       return;
     case PrimaryAccountChangeEvent::Type::kSet:
-      CHECK(event_details.GetAccessPoint().has_value());
+      CHECK(event_details.GetSetPrimaryAccountAccessPoint().has_value());
       signin_metrics::AccessPoint access_point =
-          event_details.GetAccessPoint().value();
+          event_details.GetSetPrimaryAccountAccessPoint().value();
 
       if (access_point == signin_metrics::AccessPoint::ACCESS_POINT_UNKNOWN ||
           access_point ==
@@ -777,6 +779,15 @@ void PrimaryAccountManager::FirePrimaryAccountChanged(
   LogPrimaryAccountChangeMetrics(event_details);
 
   ComputeExplicitBrowserSignin(event_details, scoped_pref_commit);
+
+#if BUILDFLAG(ENABLE_DICE_SUPPORT)
+  if (event_details.GetEventTypeFor(signin::ConsentLevel::kSignin) ==
+      PrimaryAccountChangeEvent::Type::kCleared) {
+    SigninPrefs(*client_->GetPrefs())
+        .SetChromeLastSignoutTime(previous_state.primary_account.gaia,
+                                  base::Time::Now());
+  }
+#endif
 
   client_->OnPrimaryAccountChanged(event_details);
 
@@ -818,4 +829,26 @@ void PrimaryAccountManager::OnRefreshTokensLoaded() {
       }
     }
   }
+}
+
+void PrimaryAccountManager::OnSigninAllowedPrefChanged() {
+#if BUILDFLAG(ENABLE_DICE_SUPPORT)
+  if (ShouldSigninAllowedPrefAffectPrimaryAccount(
+          /*is_sync_consent=*/GetPrimaryAccountState().consent_level ==
+          signin::ConsentLevel::kSync)) {
+    ClearPrimaryAccount(signin_metrics::ProfileSignout::kPrefChanged);
+  }
+#endif
+}
+
+bool PrimaryAccountManager::ShouldSigninAllowedPrefAffectPrimaryAccount(
+    bool is_sync_consent) {
+  return switches::IsExplicitBrowserSigninUIOnDesktopEnabled() &&
+         !signin_allowed_.GetValue() &&
+         // If sync is enabled, we do not directly clear the primary account.
+         // This is handled by `PrimaryAccountPolicyManager`. That flow is
+         // extremely hard to follow especially for the case when the user is
+         // syncing with a managed account as in that case the whole profile
+         // needs to be deleted.
+         !is_sync_consent;
 }

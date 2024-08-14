@@ -2,12 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "media/gpu/windows/d3d12_helpers.h"
 
 #include <numeric>
 #include <vector>
 
 #include "base/rand_util.h"
+#include "media/base/video_codecs.h"
 #include "media/base/win/d3d12_mocks.h"
 #include "media/gpu/windows/format_utils.h"
 #include "media/gpu/windows/supported_profile_helpers.h"
@@ -119,6 +125,9 @@ TEST_F(D3D12Helpers, GetD3D12VideoDecodeGUID) {
   EXPECT_EQ(GetD3D12VideoDecodeGUID(HEVCPROFILE_MAIN10, 10,
                                     VideoChromaSampling::k420),
             D3D12_VIDEO_DECODE_PROFILE_HEVC_MAIN10);
+  EXPECT_EQ(GetD3D12VideoDecodeGUID(HEVCPROFILE_MAIN_STILL_PICTURE, 8,
+                                    VideoChromaSampling::k420),
+            D3D12_VIDEO_DECODE_PROFILE_HEVC_MAIN);
   EXPECT_EQ(
       GetD3D12VideoDecodeGUID(HEVCPROFILE_REXT, 8, VideoChromaSampling::k422),
       DXVA_ModeHEVC_VLD_Main422_10_Intel);

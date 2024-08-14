@@ -6,5 +6,6 @@
 
 validateInputFromAnotherBuilder('softsign');
 
-validateUnaryOperation(
-    'softsign', floatingPointTypes, /*alsoBuildActivation=*/ true);
+const label = 'softsign_xxx';
+const regrexp = new RegExp('\\[' + label + '\\]');
+validateSingleInputOperation('softsign', label, regrexp);

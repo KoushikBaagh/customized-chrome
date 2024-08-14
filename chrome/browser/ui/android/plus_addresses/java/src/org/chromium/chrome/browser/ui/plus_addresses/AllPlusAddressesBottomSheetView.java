@@ -8,20 +8,50 @@ import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.SearchView;
+import android.widget.SearchView.OnQueryTextListener;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.chromium.base.Callback;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetContent;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+import org.chromium.components.browser_ui.bottomsheet.BottomSheetObserver;
+import org.chromium.components.browser_ui.bottomsheet.EmptyBottomSheetObserver;
+import org.chromium.ui.base.LocalizationUtils;
 
 /** Implements the bottom sheet content for the all plus addresses bottom sheet. */
 class AllPlusAddressesBottomSheetView implements BottomSheetContent {
     private final BottomSheetController mBottomSheetController;
     private final RecyclerView mSheetItemListView;
     private final LinearLayout mContentView;
+
+    private final BottomSheetObserver mBottomSheetObserver =
+            new EmptyBottomSheetObserver() {
+                @Override
+                public void onSheetClosed(@BottomSheetController.StateChangeReason int reason) {
+                    super.onSheetClosed(reason);
+                    assert mOnDismissed != null;
+                    mOnDismissed.run();
+                    mBottomSheetController.removeObserver(mBottomSheetObserver);
+                }
+
+                @Override
+                public void onSheetStateChanged(
+                        @BottomSheetController.SheetState int newState,
+                        @BottomSheetController.StateChangeReason int reason) {
+                    super.onSheetStateChanged(newState, reason);
+                    if (newState != BottomSheetController.SheetState.HIDDEN) return;
+                    // This is a fail-safe for cases where onSheetClosed isn't triggered.
+                    mOnDismissed.run();
+                    mBottomSheetController.removeObserver(mBottomSheetObserver);
+                }
+            };
+
+    private Runnable mOnDismissed;
 
     public AllPlusAddressesBottomSheetView(
             Context context, BottomSheetController bottomSheetController) {
@@ -34,11 +64,23 @@ class AllPlusAddressesBottomSheetView implements BottomSheetContent {
         mSheetItemListView.setLayoutManager(
                 new LinearLayoutManager(
                         mSheetItemListView.getContext(), LinearLayoutManager.VERTICAL, false));
+
+        // Apply RTL layout changes.
+        int layoutDirection =
+                LocalizationUtils.isLayoutRtl()
+                        ? View.LAYOUT_DIRECTION_RTL
+                        : View.LAYOUT_DIRECTION_LTR;
+        mContentView.setLayoutDirection(layoutDirection);
     }
 
     void setVisible(boolean isVisible) {
         if (isVisible) {
-            mBottomSheetController.requestShowContent(this, true);
+            mBottomSheetController.addObserver(mBottomSheetObserver);
+            if (!mBottomSheetController.requestShowContent(this, true)) {
+                assert (mOnDismissed != null);
+                mOnDismissed.run();
+                mBottomSheetController.removeObserver(mBottomSheetObserver);
+            }
         } else {
             mBottomSheetController.hideContent(this, true);
         }
@@ -52,8 +94,34 @@ class AllPlusAddressesBottomSheetView implements BottomSheetContent {
         ((TextView) mContentView.findViewById(R.id.sheet_warning)).setText(warning);
     }
 
+    void setQueryHint(String queryHint) {
+        ((SearchView) mContentView.findViewById(R.id.all_plus_addresses_search_view))
+                .setQueryHint(queryHint);
+    }
+
+    void setOnQueryChangedCallback(Callback<String> callback) {
+        ((SearchView) mContentView.findViewById(R.id.all_plus_addresses_search_view))
+                .setOnQueryTextListener(
+                        new OnQueryTextListener() {
+                            @Override
+                            public boolean onQueryTextSubmit(String s) {
+                                return false;
+                            }
+
+                            @Override
+                            public boolean onQueryTextChange(String newString) {
+                                callback.onResult(newString);
+                                return true;
+                            }
+                        });
+    }
+
     void setSheetItemListAdapter(RecyclerView.Adapter adapter) {
         mSheetItemListView.setAdapter(adapter);
+    }
+
+    void setOnDismissedCallback(Runnable onDismissed) {
+        mOnDismissed = onDismissed;
     }
 
     @Override
@@ -73,7 +141,9 @@ class AllPlusAddressesBottomSheetView implements BottomSheetContent {
     }
 
     @Override
-    public void destroy() {}
+    public void destroy() {
+        mBottomSheetController.removeObserver(mBottomSheetObserver);
+    }
 
     @Override
     public int getPriority() {

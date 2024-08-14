@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include <dawn/native/DawnNative.h>
 
 #include "build/build_config.h"
@@ -355,7 +360,7 @@ TEST_P(WebGPUMailboxTest, AssociateMailboxCmd) {
           AssociateMailboxCmdStorage cmd;
           cmd.cmd.Init(reservation.deviceId, reservation.deviceGeneration,
                        reservation.id, reservation.generation,
-                       WGPUTextureUsage_Force32, 0u,
+                       UINT64_MAX, 0u,
                        webgpu::WEBGPU_MAILBOX_NONE, 0u,
                        ComputeNumEntries(sizeof(mailbox.name)),
                        reinterpret_cast<const GLuint*>(&mailbox.name));
@@ -370,7 +375,7 @@ TEST_P(WebGPUMailboxTest, AssociateMailboxCmd) {
           cmd.cmd.Init(reservation.deviceId, reservation.deviceGeneration,
                        reservation.id, reservation.generation,
                        WGPUTextureUsage_TextureBinding,
-                       WGPUTextureUsage_Force32, webgpu::WEBGPU_MAILBOX_NONE,
+                       UINT64_MAX, webgpu::WEBGPU_MAILBOX_NONE,
                        0u, ComputeNumEntries(sizeof(mailbox.name)),
                        reinterpret_cast<const GLuint*>(&mailbox.name));
           EXPECT_EQ(

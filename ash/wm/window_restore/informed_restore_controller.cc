@@ -16,6 +16,7 @@
 #include "ash/public/cpp/system/anchored_nudge_manager.h"
 #include "ash/public/cpp/window_properties.h"
 #include "ash/screen_util.h"
+#include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/shell_delegate.h"
 #include "ash/strings/grit/ash_strings.h"
@@ -27,8 +28,8 @@
 #include "ash/wm/overview/overview_controller.h"
 #include "ash/wm/overview/overview_grid.h"
 #include "ash/wm/overview/overview_session.h"
-#include "ash/wm/window_restore/informed_restore_contents_data.h"
 #include "ash/wm/window_restore/informed_restore_constants.h"
+#include "ash/wm/window_restore/informed_restore_contents_data.h"
 #include "ash/wm/window_restore/window_restore_metrics.h"
 #include "ash/wm/window_restore/window_restore_util.h"
 #include "ash/wm/window_util.h"
@@ -36,6 +37,7 @@
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
+#include "base/metrics/histogram_functions.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
 #include "chromeos/ui/base/app_types.h"
@@ -43,6 +45,7 @@
 #include "chromeos/ui/base/window_properties.h"
 #include "components/prefs/pref_service.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/mojom/ui_base_types.mojom-shared.h"
 #include "ui/base/ui_base_types.h"
 #include "ui/compositor/layer.h"
 #include "ui/views/background.h"
@@ -137,7 +140,7 @@ void InformedRestoreController::MaybeShowInformedRestoreOnboarding(
       .SetMainAxisAlignment(views::LayoutAlignment::kCenter)
       .SetCrossAxisAlignment(views::LayoutAlignment::kCenter)
       .SetCollapseMargins(true);
-  dialog->SetModalType(ui::MODAL_TYPE_SYSTEM);
+  dialog->SetModalType(ui::mojom::ModalType::kSystem);
   dialog->SetTopContentView(
       views::Builder<views::ImageView>()
           .SetImage(
@@ -236,7 +239,7 @@ void InformedRestoreController::MaybeStartInformedRestoreSession(
   // times currently via dev accelerator. Remove this block when
   // `MaybeStartInformedRestoreSessionDevAccelerator()` is removed.
   if (contents_data_) {
-    StartPineOverviewSession();
+    StartInformedRestoreSession();
     return;
   }
 
@@ -368,10 +371,10 @@ void InformedRestoreController::OnInformedRestoreImageDecoded(
       base::BindOnce(base::IgnoreResult(&base::DeleteFile),
                      GetInformedRestoreImagePath()));
 
-  StartPineOverviewSession();
+  StartInformedRestoreSession();
 }
 
-void InformedRestoreController::StartPineOverviewSession() {
+void InformedRestoreController::StartInformedRestoreSession() {
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kForceBirchFetch)) {
     LOG(WARNING) << "Forcing Birch data fetch";
@@ -392,6 +395,9 @@ void InformedRestoreController::StartPineOverviewSession() {
           }
         }));
   }
+
+  base::UmaHistogramBoolean(kFullRestoreDialogHistogram, true);
+
   // TODO(sammiequon): Add a new start action for this type of overview session.
   OverviewController::Get()->StartOverview(
       OverviewStartAction::kAccelerator,
@@ -408,7 +414,7 @@ void InformedRestoreController::OnOnboardingAcceptPressed(bool restore_on) {
         base::BindOnce(
             [](const base::WeakPtr<InformedRestoreController>& weak_this) {
               if (weak_this) {
-                weak_this->StartPineOverviewSession();
+                weak_this->StartInformedRestoreSession();
               }
             },
             weak_ptr_factory_.GetWeakPtr()));

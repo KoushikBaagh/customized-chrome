@@ -6,12 +6,12 @@
 
 #import "base/metrics/user_metrics.h"
 #import "base/strings/sys_string_conversions.h"
-#import "ios/chrome/browser/favicon/model/favicon_loader.h"
-#import "ios/chrome/browser/shared/public/features/features.h"
-#import "ios/chrome/browser/shared/ui/list_model/list_model.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_cell_utils.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_content_injector.h"
 #import "ios/chrome/browser/autofill/ui_bundled/manual_fill/manual_fill_credential.h"
+#import "ios/chrome/browser/favicon/model/favicon_loader.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/ui/list_model/list_model.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
 #import "ios/chrome/common/ui/favicon/favicon_container_view.h"
 #import "ios/chrome/common/ui/favicon/favicon_view.h"
@@ -68,6 +68,10 @@ CGFloat GetFaviconSize() {
 @implementation ManualFillCredentialItem {
   // If `YES`, autofill button is shown for the item.
   BOOL _showAutofillFormButton;
+
+  // If `YES`, the user should be asked to re-authenticate before autofilling
+  // the entire form.
+  BOOL _shouldReauthToAutofill;
 }
 
 - (instancetype)initWithCredential:(ManualFillCredential*)credential
@@ -77,7 +81,8 @@ CGFloat GetFaviconSize() {
                        (id<ManualFillContentInjector>)contentInjector
                        menuActions:(NSArray<UIAction*>*)menuActions
        cellIndexAccessibilityLabel:(NSString*)cellIndexAccessibilityLabel
-            showAutofillFormButton:(BOOL)showAutofillFormButton {
+            showAutofillFormButton:(BOOL)showAutofillFormButton
+            shouldReauthToAutofill:(BOOL)shouldReauthToAutofill {
   self = [super initWithType:kItemTypeEnumZero];
   if (self) {
     _credential = credential;
@@ -87,6 +92,7 @@ CGFloat GetFaviconSize() {
     _menuActions = menuActions;
     _cellIndexAccessibilityLabel = cellIndexAccessibilityLabel;
     _showAutofillFormButton = showAutofillFormButton;
+    _shouldReauthToAutofill = shouldReauthToAutofill;
     self.cellClass = [ManualFillPasswordCell class];
   }
   return self;
@@ -101,7 +107,8 @@ CGFloat GetFaviconSize() {
                   contentInjector:self.contentInjector
                       menuActions:self.menuActions
       cellIndexAccessibilityLabel:_cellIndexAccessibilityLabel
-           showAutofillFormButton:_showAutofillFormButton];
+           showAutofillFormButton:_showAutofillFormButton
+           shouldReauthToAutofill:_shouldReauthToAutofill];
 }
 
 - (const GURL&)faviconURL {
@@ -171,8 +178,9 @@ static const CGFloat kOffsetForConnectedCell = 16;
 @end
 
 @implementation ManualFillPasswordCell {
-  // If `YES`, autofill button is shown for the cell.
-  BOOL _showAutofillFormButton;
+  // If `YES`, the user should be asked to re-authenticate before autofilling
+  // the entire form.
+  BOOL _shouldReauthToAutofill;
 }
 
 #pragma mark - Public
@@ -208,8 +216,10 @@ static const CGFloat kOffsetForConnectedCell = 16;
                 contentInjector:(id<ManualFillContentInjector>)contentInjector
                     menuActions:(NSArray<UIAction*>*)menuActions
     cellIndexAccessibilityLabel:(NSString*)cellIndexAccessibilityLabel
-         showAutofillFormButton:(BOOL)showAutofillFormButton {
-  _showAutofillFormButton = showAutofillFormButton;
+         showAutofillFormButton:(BOOL)showAutofillFormButton
+         shouldReauthToAutofill:(BOOL)shouldReauthToAutofill {
+  _shouldReauthToAutofill = shouldReauthToAutofill;
+
   if (self.contentView.subviews.count == 0) {
     [self createViewHierarchy];
   }
@@ -226,13 +236,16 @@ static const CGFloat kOffsetForConnectedCell = 16;
     self.faviconView.hidden = YES;
   } else {
     NSAttributedString* attributedText =
-        [self createSiteNameLabelAttributedText:credential];
+        CreateSiteNameLabelAttributedText(credential);
     self.siteNameLabel.attributedText = attributedText;
     if (IsKeyboardAccessoryUpgradeEnabled()) {
       self.siteNameLabel.numberOfLines = 0;
-      self.accessibilityLabel =
+      NSString* accessibilityLabel =
           [NSString stringWithFormat:@"%@, %@", cellIndexAccessibilityLabel,
                                      attributedText.string];
+      GiveAccessibilityContextToCellAndButton(
+          self.contentView, self.overflowMenuButton, self.autofillFormButton,
+          accessibilityLabel);
     }
     self.siteNameLabel.hidden = NO;
     self.faviconView.hidden = NO;
@@ -296,10 +309,14 @@ static const CGFloat kOffsetForConnectedCell = 16;
     self.grayLine.hidden = YES;
   }
 
-  if (ShouldCreateAutofillFormButton(_showAutofillFormButton)) {
+  if (showAutofillFormButton) {
+    CHECK(IsKeyboardAccessoryUpgradeEnabled());
     AddViewToVerticalLeadViews(self.autofillFormButton,
                                ManualFillCellView::ElementType::kOther,
                                verticalLeadViews);
+    self.autofillFormButton.hidden = NO;
+  } else {
+    self.autofillFormButton.hidden = YES;
   }
 
   // Set and activate constraints.
@@ -329,6 +346,14 @@ static const CGFloat kOffsetForConnectedCell = 16;
 
 // Creates and sets up the view hierarchy.
 - (void)createViewHierarchy {
+  // Holds the views that should be accessible. The ordering in which views are
+  // added to this array will reflect the order followed by VoiceOver. When the
+  // Keyboard Accessory Upgrade feature is enabled, subviews that need to be
+  // read by VoiceOver must be added to this array. Otherwise, they will be
+  // ignored.
+  NSMutableArray<UIView*>* accessibilityElements =
+      [[NSMutableArray alloc] initWithObjects:self.contentView, nil];
+
   self.layoutGuide =
       AddLayoutGuideToContentView(self.contentView, /*cell_has_header=*/YES);
 
@@ -354,6 +379,7 @@ static const CGFloat kOffsetForConnectedCell = 16;
   self.headerView = CreateHeaderView(self.faviconView, self.siteNameLabel,
                                      self.overflowMenuButton);
   [self.contentView addSubview:self.headerView];
+  [accessibilityElements addObject:self.overflowMenuButton];
   AppendHorizontalConstraintsForViews(staticConstraints, @[ self.headerView ],
                                       self.layoutGuide);
 
@@ -362,6 +388,7 @@ static const CGFloat kOffsetForConnectedCell = 16;
   self.usernameButton = CreateChipWithSelectorAndTarget(
       @selector(userDidTapUsernameButton:), self);
   [self.contentView addSubview:self.usernameButton];
+  [accessibilityElements addObject:self.usernameButton];
   AppendHorizontalConstraintsForViews(
       staticConstraints, @[ self.usernameButton ], self.layoutGuide,
       kChipsHorizontalMargin,
@@ -370,19 +397,24 @@ static const CGFloat kOffsetForConnectedCell = 16;
   self.passwordButton = CreateChipWithSelectorAndTarget(
       @selector(userDidTapPasswordButton:), self);
   [self.contentView addSubview:self.passwordButton];
+  [accessibilityElements addObject:self.passwordButton];
   AppendHorizontalConstraintsForViews(
       staticConstraints, @[ self.passwordButton ], self.layoutGuide,
       kChipsHorizontalMargin,
       AppendConstraintsHorizontalEqualOrSmallerThanGuide);
 
-  if (ShouldCreateAutofillFormButton(_showAutofillFormButton)) {
     self.autofillFormButton = CreateAutofillFormButton();
     [self.contentView addSubview:self.autofillFormButton];
+    [self.autofillFormButton addTarget:self
+                                action:@selector(onAutofillFormButtonTapped)
+                      forControlEvents:UIControlEventTouchUpInside];
+    [accessibilityElements addObject:self.autofillFormButton];
     AppendHorizontalConstraintsForViews(
         staticConstraints, @[ self.autofillFormButton ], self.layoutGuide);
-  }
 
   [NSLayoutConstraint activateConstraints:staticConstraints];
+
+  SetUpCellAccessibilityElements(self, accessibilityElements);
 }
 
 - (void)userDidTapUsernameButton:(UIButton*)button {
@@ -405,6 +437,13 @@ static const CGFloat kOffsetForConnectedCell = 16;
                              requiresHTTPS:YES];
 }
 
+// Called when the "Autofill Form" button is tapped. Fills the current form with
+// the credential' data.
+- (void)onAutofillFormButtonTapped {
+  [self.contentInjector autofillFormWithCredential:self.credential
+                                      shouldReauth:_shouldReauthToAutofill];
+}
+
 // Configure the favicon with the given `attributes`.
 - (void)configureFaviconWithAttributes:(FaviconAttributes*)attributes {
   FaviconView* favicon;
@@ -416,45 +455,6 @@ static const CGFloat kOffsetForConnectedCell = 16;
     favicon = static_cast<FaviconView*>(self.faviconView);
   }
   [favicon configureWithAttributes:attributes];
-}
-
-// Creates the attributed string containing the site name and potentially a host
-// subtitle for the site name label.
-- (NSMutableAttributedString*)createSiteNameLabelAttributedText:
-    (ManualFillCredential*)credential {
-  NSString* siteName = credential.siteName ? credential.siteName : @"";
-  NSString* host;
-  NSMutableAttributedString* attributedString;
-
-  BOOL shouldShowHost = credential.host && credential.host.length &&
-                        ![credential.host isEqualToString:credential.siteName];
-  if (shouldShowHost) {
-    if (IsKeyboardAccessoryUpgradeEnabled()) {
-      host = credential.host;
-    }
-
-    // If the Keyboard Accessory Upgrade feature is disabled, `host` will be
-    // `nil` here, and so it won't be added to `attributedString` right away.
-    attributedString = CreateHeaderAttributedString(siteName, host);
-
-    if (!IsKeyboardAccessoryUpgradeEnabled()) {
-      host = [NSString stringWithFormat:@" –– %@", credential.host];
-      NSDictionary* attributes = @{
-        NSForegroundColorAttributeName :
-            [UIColor colorNamed:kTextSecondaryColor],
-        NSFontAttributeName :
-            [UIFont preferredFontForTextStyle:UIFontTextStyleBody]
-      };
-      NSAttributedString* hostAttributedString =
-          [[NSAttributedString alloc] initWithString:host
-                                          attributes:attributes];
-      [attributedString appendAttributedString:hostAttributedString];
-    }
-  } else {
-    attributedString = CreateHeaderAttributedString(siteName, nil);
-  }
-
-  return attributedString;
 }
 
 @end

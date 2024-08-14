@@ -25,6 +25,35 @@ BASE_FEATURE(kAdditionalOpaqueOriginEnforcements,
              "AdditionalOpaqueOriginEnforcements",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Warm up a spare renderer after each navigation on Android.
+BASE_FEATURE(kAndroidWarmUpSpareRendererWithTimeout,
+             "AndroidWarmUpSpareRendererWithTimeout",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Create the spare renderer in DidStopLoading rather than in
+// SpareRenderProcessHostManager::PrepareForFutureRequests.
+const base::FeatureParam<std::string> kAndroidSpareRendererCreationTiming{
+    &kAndroidWarmUpSpareRendererWithTimeout, "spare_renderer_creation_timing",
+    kAndroidSpareRendererCreationAfterLoading};
+
+// The delay for creating the Android spare renderer in
+// SpareRenderProcessHostManager::PrepareForFutureRequests.
+// The parameter will not be effective if
+// `spare_renderer_creation_after_stop_loading` is enabled.
+// Since the function is called during loading, a delay is introduced to avoid
+// interfering with critical loading procedures.
+const base::FeatureParam<int> kAndroidSpareRendererCreationDelayMs{
+    &kAndroidWarmUpSpareRendererWithTimeout, "spare_renderer_creation_delay_ms",
+    2000};
+
+// The timeout for the created spare renderer after each navigation on Android.
+// The created renderer will be destroyed after the timeout.
+// A negative value indicates that no timeout will be set for the spare
+// renderer.
+const base::FeatureParam<int> kAndroidSpareRendererTimeoutSeconds{
+    &kAndroidWarmUpSpareRendererWithTimeout, "spare_renderer_timeout_seconds",
+    60};
+
 // Launches the audio service on the browser startup.
 BASE_FEATURE(kAudioServiceLaunchOnStartup,
              "AudioServiceLaunchOnStartup",
@@ -95,11 +124,6 @@ BASE_FEATURE(kBackForwardCacheMemoryControls,
              base::FEATURE_DISABLED_BY_DEFAULT
 #endif
 );
-
-// If enabled, makes battery saver request render process tuning.
-BASE_FEATURE(kBatterySaverModeRenderTuning,
-             "BatterySaverModeRenderTuning",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, makes battery saver request heavy align wake ups.
 BASE_FEATURE(kBatterySaverModeAlignWakeUps,
@@ -250,6 +274,20 @@ BASE_FEATURE(kDeferSpeculativeRFHCreation,
 // DeferSpeculativeRFHCreation.
 const base::FeatureParam<bool> kWarmupSpareProcessCreationWhenDeferRFH{
     &kDeferSpeculativeRFHCreation, "warmup_spare_process", false};
+// When enabled, the browser will not try to create a speculative RFH after
+// loading starts for BFCache restore and prerender activation. The
+// `OnResponseStarted` function will be called immediately and the RFH will be
+// created there.
+const base::FeatureParam<bool> kCreateSpeculativeRFHFilterRestore{
+    &kDeferSpeculativeRFHCreation, "create_speculative_rfh_filter_restore",
+    false};
+// When enabled, the creation of the speculative RFH will be delayed for
+// a short time after the loading starts. The loading start functions are
+// critical for performance. We try not to interfere with it.
+// Zero or negative value will disable the delay and create the speculative
+// RFH instantly.
+const base::FeatureParam<int> kCreateSpeculativeRFHDelayMs{
+    &kDeferSpeculativeRFHCreation, "create_speculative_rfh_delay_ms", 0};
 
 // Controls whether the Digital Goods API is enabled.
 // https://github.com/WICG/digital-goods/
@@ -460,11 +498,6 @@ BASE_FEATURE(kNetworkQualityEstimatorWebHoldback,
 // (activated by kUserAgentClientHint)
 BASE_FEATURE(kGreaseUACH, "GreaseUACH", base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Guard for work on https://crbug.com/40279485
-BASE_FEATURE(kIndexedDBShardBackingStores,
-             "IndexedDBShardBackingStores",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Kill switch for the GetInstalledRelatedApps API.
 BASE_FEATURE(kInstalledApp, "InstalledApp", base::FEATURE_ENABLED_BY_DEFAULT);
 
@@ -631,6 +664,15 @@ BASE_FEATURE(kOverscrollHistoryNavigation,
              "OverscrollHistoryNavigation",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Enables additional ChildProcessSecurityPolicy enforcements for PDF renderer
+// processes, including blocking storage and cookie access for them.
+//
+// TODO(https://crbug.com/40205612): Remove this kill switch once the PDF
+// enforcements are verified not to cause problems.
+BASE_FEATURE(kPdfEnforcements,
+             "PdfEnforcements",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 // Whether web apps can run periodic tasks upon network connectivity.
 BASE_FEATURE(kPeriodicBackgroundSync,
              "PeriodicBackgroundSync",
@@ -786,6 +828,11 @@ BASE_FEATURE(kRestrictThreadPoolInBackground,
              "RestrictThreadPoolInBackground",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Set a tri-state priority on v8 isolates reflecting the renderer priority.
+BASE_FEATURE(kSetIsolatesPriority,
+             "SetIsolatesPriority",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Reuse compositor instances with RenderDocument
 BASE_FEATURE(kRenderDocumentCompositorReuse,
              "RenderDocumentCompositorReuse",
@@ -830,6 +877,25 @@ constexpr base::FeatureParam<bool>
     kProcessPerSiteMainFrameAllowDevToolsAttached{
         &kProcessPerSiteUpToMainFrameThreshold,
         "ProcessPerSiteMainFrameAllowDevToolsAttached", false};
+
+// Specifies the scaling factor for `kProcessPerSiteUpToMainFrameThreshold`
+// feature. This factor will be multiplied to the calculated size of a top
+// level frame in the process and ensure there is more than that enough
+// space in the process. For example if the expected size of a top level frame
+// was 100K, and the factor was 1.5, the process must have 150K left in its
+// allocation limit.
+constexpr base::FeatureParam<double> kProcessPerSiteMainFrameSiteScalingFactor{
+    &kProcessPerSiteUpToMainFrameThreshold,
+    "ProcessPerSiteMainFrameSiteScalingFactor", 1.5f};
+
+// Specifies the total memory limit for `kProcessPerSiteUpToMainFrameThreshold`
+// feature. This is a limit of the private memory footprint calculation, if
+// adding an additional top level frame would take us over this limit the
+// addition will be denied. An application may indeed allocate more than this
+// but we use this limit as a heuristic only.
+constexpr base::FeatureParam<double> kProcessPerSiteMainFrameTotalMemoryLimit{
+    &kProcessPerSiteUpToMainFrameThreshold,
+    "ProcessPerSiteMainFrameTotalMemoryLimit", 2 * 1024 * 1024 * 1024u};
 
 // Enables ServiceWorker static routing API.
 // https://github.com/WICG/service-worker-static-routing-api
@@ -903,12 +969,6 @@ BASE_FEATURE(kShouldAllowFirstPartyStorageKeyOverrideFromEmbedder,
              "ShouldAllowFirstPartyStorageKeyOverrideFromEmbedder",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Origin-Signed HTTP Exchanges (for WebPackage Loading)
-// https://www.chromestatus.com/feature/5745285984681984
-BASE_FEATURE(kSignedHTTPExchange,
-             "SignedHTTPExchange",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // If enabled, GetUserMedia API will only work when the concerned tab is in
 // focus
 BASE_FEATURE(kUserMediaCaptureOnFocus,
@@ -978,6 +1038,12 @@ const base::FeatureParam<SkiaFontServiceTypefaceType>
     kSkiaFontServiceTypefaceType{&kSkiaFontService, "typeface",
                                  SkiaFontServiceTypefaceType::kDwrite,
                                  &skia_font_service_typeface};
+
+// Whether a utility process configured to use a "UI" message pump should also
+// initialize COM.
+BASE_FEATURE(kUtilityWithUiPumpInitializesCom,
+             "UtilityWithUiPumpInitializesCom",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_WIN)
 
 // When enabled, OOPIFs will not try to reuse compatible processes from
@@ -1144,6 +1210,11 @@ BASE_FEATURE(kWebPayments, "WebPayments", base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kWebUICodeCache,
              "WebUICodeCache",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Restricts the WebUI scripts able to use the generated code cache according to
+// embedder-specified heuristics.
+const base::FeatureParam<bool> kRestrictedWebUICodeCache{
+    &kWebUICodeCache, "RestrictedWebUICodeCache", false};
 
 // Controls whether the WebUSB API is enabled:
 // https://wicg.github.io/webusb

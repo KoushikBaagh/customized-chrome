@@ -60,6 +60,26 @@ chromium-metrics-reviews@google.com.
   <variant name="Test" summary="the tutorial used for testing only"/>
 </variants>
 
+<variants name="WhatsNewModule">
+  <variant name="FamilyLink" summary="the module for Family Link"/>
+  <variant name="GeminiSiteSearchShortcut"
+      summary="the module for Gemini Site Search Shortcut"/>
+  <variant name="GenerativeTheming"
+      summary="the module for Generative Theming"/>
+  <variant name="GoogleLens" summary="the module for Google Lens"/>
+  <variant name="GooglePayReauth" summary="the module for Google Pay Re-auth"/>
+  <variant name="HelpMeWrite" summary="the module for Help Me Write"/>
+  <variant name="SafetyCheck" summary="the module for Safety Check"/>
+  <variant name="SaveTabGroups" summary="the module for Saved Tab Groups"/>
+  <variant name="SearchBoxSuggestions"
+      summary="the module for Search Box Suggestions"/>
+  <variant name="SidePanelPinning" summary="the module for Side Panel Pinning"/>
+  <variant name="TabOrganizer" summary="the module for Tab Organizer"/>
+  <variant name="TestModule" summary="the module used for testing only"/>
+  <variant name="TranslationSettings"
+      summary="the module for Translation Settings"/>
+</variants>
+
 <histogram name="Tutorial.TabGroup.EditedTitle" enum="BooleanSuccess"
     expires_after="2024-09-20">
   <owner>dpenning@chromium.org</owner>
@@ -84,7 +104,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tutorial.{TutorialID}.Completion" enum="BooleanSuccess"
-    expires_after="2024-11-17">
+    expires_after="2025-02-02">
   <owner>dpenning@chromium.org</owner>
   <owner>dfried@chromium.org</owner>
   <summary>
@@ -107,7 +127,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tutorial.{TutorialID}.StartedFromWhatsNewPage"
-    enum="BooleanSuccess" expires_after="2024-09-20">
+    enum="BooleanSuccess" expires_after="2025-02-02">
   <owner>dpenning@chromium.org</owner>
   <owner>dfried@chromium.org</owner>
   <summary>
@@ -119,7 +139,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="UserEducation.MessageNotShown" enum="PromoFailure"
-    expires_after="2024-12-01">
+    expires_after="2025-02-02">
   <owner>mickeyburks@chromium.org</owner>
   <owner>frizzle-team@google.com</owner>
   <summary>
@@ -143,6 +163,9 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="UserEducation.MessageShown.RotatingPromoIndex" units="Index"
     expires_after="2024-09-01">
+  <expired_intentionally>
+    Deprecated. Replaced by UserEducation.RotatingPromoIndex.{IPHFeature}.
+  </expired_intentionally>
   <owner>dfried@chromium.org</owner>
   <owner>frizzle-team@google.com</owner>
   <summary>
@@ -216,7 +239,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="UserEducation.Session.ActivePeriodDuration.Min.Under24Hours"
-    units="minutes" expires_after="2024-09-21">
+    units="minutes" expires_after="2025-01-19">
   <owner>mickeyburks@chromium.org</owner>
   <owner>frizzle-team@google.com</owner>
   <summary>
@@ -322,7 +345,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="UserEducation.WhatsNew.ExploreMoreExpanded"
-    enum="BooleanSuccess" expires_after="2024-12-03">
+    enum="BooleanYesNo" expires_after="2024-12-03">
   <owner>mickeyburks@chromium.org</owner>
   <owner>frizzle-team@google.com</owner>
   <summary>
@@ -331,8 +354,30 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="UserEducation.WhatsNew.ModuleLinkClicked.{ModuleName}"
+    enum="WhatsNewModulePosition" expires_after="2024-12-03">
+  <owner>mickeyburks@chromium.org</owner>
+  <owner>frizzle-team@google.com</owner>
+  <summary>
+    Records that a link or button in the {ModuleName} module on the What's New
+    page was clicked. The value indicates the module's position in its section.
+  </summary>
+  <token key="ModuleName" variants="WhatsNewModule"/>
+</histogram>
+
+<histogram name="UserEducation.WhatsNew.ModuleShown.{ModuleName}"
+    enum="WhatsNewModulePosition" expires_after="2024-12-03">
+  <owner>mickeyburks@chromium.org</owner>
+  <owner>frizzle-team@google.com</owner>
+  <summary>
+    Records that the {ModuleName} module on the What's New page was visible to
+    the user. The value indicates the module's position in its section.
+  </summary>
+  <token key="ModuleName" variants="WhatsNewModule"/>
+</histogram>
+
 <histogram name="UserEducation.WhatsNew.ScrollDepth" enum="ScrollDepthQuartile"
-    expires_after="2024-12-03">
+    expires_after="2025-02-02">
   <owner>mickeyburks@chromium.org</owner>
   <owner>frizzle-team@google.com</owner>
   <summary>
@@ -342,7 +387,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="UserEducation.WhatsNew.TimeOnPage" units="ms"
-    expires_after="2024-12-03">
+    expires_after="2025-02-02">
   <owner>mickeyburks@chromium.org</owner>
   <owner>frizzle-team@google.com</owner>
   <summary>
@@ -362,7 +407,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WhatsNew.LoadEvent" enum="WhatsNewLoadEvent"
-    expires_after="2024-12-03">
+    expires_after="2025-02-02">
   <owner>mickeyburks@chromium.org</owner>
   <owner>frizzle-team@google.com</owner>
   <summary>
@@ -377,7 +422,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WhatsNew.LoadResponseCode"
-    enum="CombinedHttpResponseAndNetErrorCode" expires_after="2024-12-03">
+    enum="CombinedHttpResponseAndNetErrorCode" expires_after="2025-02-02">
   <owner>mickeyburks@chromium.org</owner>
   <owner>frizzle-team@google.com</owner>
   <summary>
@@ -388,7 +433,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WhatsNew.StartupType" enum="WhatsNewStartupType"
-    expires_after="2024-12-03">
+    expires_after="2025-02-02">
   <owner>mickeyburks@chromium.org</owner>
   <owner>frizzle-team@google.com</owner>
   <summary>

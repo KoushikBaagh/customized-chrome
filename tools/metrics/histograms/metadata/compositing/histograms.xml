@@ -133,7 +133,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Compositing.DecodeLCPCandidateImage.{DecodeMethod}"
-    enum="Boolean" expires_after="2024-12-01">
+    enum="Boolean" expires_after="2025-02-02">
   <owner>mmocny@chromium.org</owner>
   <owner>paint-dev@chromium.org</owner>
   <summary>
@@ -166,6 +166,16 @@ chromium-metrics-reviews@google.com.
     Recorded on every commit. Indicates whether the renderer's main thread was
     blocked waiting for the impl thread to commit. True indicates the main
     thread did block.
+  </summary>
+</histogram>
+
+<histogram name="Compositing.DirectRenderer.DrawnRectAssignmentType"
+    enum="RenderPassDrawRectAssign" expires_after="2025-03-01">
+  <owner>petermcneeley@chromium.org</owner>
+  <owner>graphics-dev@chromium.org</owner>
+  <summary>
+    Records update type to the drawn rect for every draw to each non root
+    renderpass.
   </summary>
 </histogram>
 
@@ -229,7 +239,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Compositing.DirectRenderer.PartialSwap.TotalDamage" units="%"
-    expires_after="2024-11-17">
+    expires_after="2025-01-26">
   <owner>vasilyt@chromium.org</owner>
   <owner>petermcneeley@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
@@ -826,7 +836,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Compositing.SurfaceAggregator.ExcessPixelsClipped"
-    units="pixels" expires_after="2024-11-17">
+    units="pixels" expires_after="2025-01-26">
   <owner>petermcneeley@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -886,7 +896,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Compositing.SurfaceManager.MarkForDestructionToDestroy"
-    units="ms" expires_after="2024-10-20">
+    units="ms" expires_after="2025-01-26">
   <owner>jonross@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -923,8 +933,19 @@ chromium-metrics-reviews@google.com.
   <token key="ProcessType" variants="TileManagerProcessType"/>
 </histogram>
 
+<histogram name="Compositing.TileManager.TileInvalidationArea" units="%"
+    expires_after="2025-06-09">
+  <owner>petermcneeley@chromium.org</owner>
+  <owner>graphics-dev@chromium.org</owner>
+  <summary>
+    When resource is assigned to tile for rasterization, records the percentage
+    area of invalidation of said resource. This will only be recorded for
+    partially rasterized tiles.
+  </summary>
+</histogram>
+
 <histogram name="Compositing.VizBreakdownToPresentationUnexpected"
-    enum="VizBreakdown" expires_after="M129">
+    enum="VizBreakdown" expires_after="2025-01-26">
   <owner>jonross@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -950,7 +971,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="CompositorLatency.CompositorOnlyFrame{InteractionType}.{StageType}"
-    units="microseconds" expires_after="2024-11-17">
+    units="microseconds" expires_after="2025-01-26">
   <owner>jonross@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -1064,7 +1085,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="CompositorLatency{ReportType}{InteractionType}.{StageType}"
-    units="microseconds" expires_after="2024-11-24">
+    units="microseconds" expires_after="2025-01-26">
   <owner>jonross@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -1192,7 +1213,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Graphics.Smoothness.CheckerboardingNeedRaster4.AllSequences"
-    units="%" expires_after="2024-11-17">
+    units="%" expires_after="2025-01-26">
   <owner>wangxianzhu@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -1216,7 +1237,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Graphics.Smoothness.CheckerboardingNeedRecord4.AllSequences"
-    units="%" expires_after="2024-11-17">
+    units="%" expires_after="2025-01-26">
   <owner>wangxianzhu@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -1240,7 +1261,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Graphics.Smoothness.Checkerboarding{Version}.AllSequences"
-    units="%" expires_after="2024-11-17">
+    units="%" expires_after="2025-01-26">
   <owner>jonross@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -1264,7 +1285,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Graphics.Smoothness.Checkerboarding{Version}.{Sequence}"
-    units="%" expires_after="2024-11-17">
+    units="%" expires_after="2025-01-19">
   <owner>jonross@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -1288,7 +1309,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Graphics.Smoothness.Checkerboarding{Version}.{Thread}{Sequence}"
-    units="%" expires_after="2024-11-17">
+    units="%" expires_after="2025-01-26">
   <owner>jonross@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -1312,7 +1333,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Graphics.Smoothness.Jank3.AllSequences" units="%"
-    expires_after="2024-12-08">
+    expires_after="2025-02-09">
   <owner>jonross@chromium.org</owner>
   <owner>mjzhang@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
@@ -1335,7 +1356,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Graphics.Smoothness.Jank3.{Sequence}" units="%"
-    expires_after="2024-12-08">
+    expires_after="2025-02-09">
   <owner>jonross@chromium.org</owner>
   <owner>mjzhang@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
@@ -1357,7 +1378,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Graphics.Smoothness.Jank3.{Thread}{Sequence}" units="%"
-    expires_after="2024-12-08">
+    expires_after="2025-02-09">
   <owner>jonross@chromium.org</owner>
   <owner>mjzhang@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
@@ -1428,7 +1449,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Graphics.Smoothness.PercentDroppedFrames3.{Sequence}"
-    units="%" expires_after="2024-11-17">
+    units="%" expires_after="2025-01-19">
   <owner>jonross@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>
@@ -1452,8 +1473,35 @@ chromium-metrics-reviews@google.com.
   <token key="Sequence" variants="AccumulatedSequences"/>
 </histogram>
 
+<histogram
+    name="Graphics.Smoothness.PercentDroppedFrames3.{Sequence}.1MinAfterResume"
+    units="%" expires_after="2025-02-02">
+  <owner>kawasin@google.com</owner>
+  <owner>baseos-perf@google.com</owner>
+  <summary>
+    Tracks the percent of dropped frames for a sequence by aggregating all
+    {Sequence}, where a sequence is a series of frames produced which contain at
+    least one of the aforementioned effects.
+
+    PercentDroppedFrames is measured by tracking the number of frames which were
+    not displayed on screen out of the total number of frames expected to be
+    produced and displayed. In other words, the lower this number is, the
+    smoother the experience.
+
+    Note that this metric is reported only when there are a sufficient number of
+    frames (&gt;= 100). If there are sequences with fewer frames, then these are
+    aggregated until an additional sequence completes where there are (&gt;=
+    100) frames available in total.
+
+    This metric is only recorded for 1 minute after the device is resumed.
+
+    This is supported by ChromeOS only.
+  </summary>
+  <token key="Sequence" variants="AccumulatedSequences"/>
+</histogram>
+
 <histogram name="Graphics.Smoothness.PercentDroppedFrames3.{Thread}{Sequence}"
-    units="%" expires_after="2024-11-17">
+    units="%" expires_after="2025-01-19">
   <owner>jonross@chromium.org</owner>
   <owner>graphics-dev@chromium.org</owner>
   <summary>

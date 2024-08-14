@@ -17,6 +17,7 @@ static_library("auto_sleep") {
   ]
   public_deps = [
     "//base",
+    "//chrome/browser:browser_public_dependencies",
     "//chromeos/ash/components/policy",
     "//chromeos/ash/components/settings",
     "//chromeos/dbus/power",
@@ -25,6 +26,7 @@ static_library("auto_sleep") {
   deps = [
     "//ash",
     "//chrome/browser:browser_process",
+    "//chrome/browser/ash/policy/scheduled_task_handler",
     "//chrome/common:constants",
     "//components/policy:generated",
     "//components/policy:policy_code_generate",

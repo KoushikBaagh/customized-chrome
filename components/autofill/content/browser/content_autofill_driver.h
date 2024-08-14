@@ -110,6 +110,13 @@ class AutofillDriverRouter;
 class ContentAutofillDriver : public AutofillDriver,
                               public mojom::AutofillDriver {
  public:
+  class ContentAutofillDriverFactoryPassKey {
+   private:
+    friend class ContentAutofillDriverFactory;
+    friend class ContentAutofillDriverTestApi;
+    ContentAutofillDriverFactoryPassKey() = default;
+  };
+
   // Gets the driver for |render_frame_host|.
   // If |render_frame_host| is currently being deleted, this may be nullptr.
   static ContentAutofillDriver* GetForRenderFrameHost(
@@ -122,6 +129,11 @@ class ContentAutofillDriver : public AutofillDriver,
   ContentAutofillDriver(const ContentAutofillDriver&) = delete;
   ContentAutofillDriver& operator=(const ContentAutofillDriver&) = delete;
   ~ContentAutofillDriver() override;
+
+  // Clears the driver's and the manager's stored forms and other state,
+  // *except* for the LifecycleState, which is controlled by the
+  // AutofillDriverFactory. Called on certain types of navigations.
+  void Reset(ContentAutofillDriverFactoryPassKey pass_key);
 
   content::RenderFrameHost* render_frame_host() { return &*render_frame_host_; }
   const content::RenderFrameHost* render_frame_host() const {
@@ -157,9 +169,6 @@ class ContentAutofillDriver : public AutofillDriver,
   bool HasSharedAutofillPermission() const override;
   bool CanShowAutofillUi() const override;
   std::optional<net::IsolationInfo> GetIsolationInfo() override;
-
-  // Called on certain types of navigations by ContentAutofillDriverFactory.
-  void Reset();
 
  private:
   friend class ContentAutofillDriverTestApi;
@@ -227,12 +236,13 @@ class ContentAutofillDriver : public AutofillDriver,
   void GetFourDigitCombinationsFromDOM(
       base::OnceCallback<void(const std::vector<std::string>&)>
           potential_matches) override;
-  void TriggerFormExtractionInDriverFrame() override;
+  void TriggerFormExtractionInDriverFrame(
+      AutofillDriverRouterAndFormForestPassKey pass_key) override;
 
   // Group (2a): renderer -> browser events, broadcast (see comment above).
   // mojom::AutofillDriver:
   void DidEndTextFieldEditing() override;
-  void FocusOnNonFormField(bool had_interacted_form) override;
+  void FocusOnNonFormField() override;
   void HidePopup() override;
 
   // Group (2b): renderer -> browser events, routed (see comment above).

@@ -8,7 +8,6 @@
 
 #include "base/check.h"
 #include "base/memory/scoped_refptr.h"
-#include "gpu/command_buffer/common/gpu_memory_buffer_support.h"
 #include "gpu/command_buffer/service/gl_utils.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_backing.h"
 #include "gpu/command_buffer/service/shared_image/shared_image_format_service_utils.h"
@@ -52,7 +51,6 @@ gfx::BufferPlane GetBufferPlane(viz::SharedImageFormat format,
   DCHECK(format.IsValidPlaneIndex(plane_index));
   switch (format.plane_config()) {
     case viz::SharedImageFormat::PlaneConfig::kY_U_V:
-    case viz::SharedImageFormat::PlaneConfig::kY_V_U:
       switch (plane_index) {
         case 0:
           return gfx::BufferPlane::Y;
@@ -60,6 +58,15 @@ gfx::BufferPlane GetBufferPlane(viz::SharedImageFormat format,
           return gfx::BufferPlane::U;
         case 2:
           return gfx::BufferPlane::V;
+      }
+    case viz::SharedImageFormat::PlaneConfig::kY_V_U:
+      switch (plane_index) {
+        case 0:
+          return gfx::BufferPlane::Y;
+        case 1:
+          return gfx::BufferPlane::V;
+        case 2:
+          return gfx::BufferPlane::U;
       }
     case viz::SharedImageFormat::PlaneConfig::kY_UV:
       switch (plane_index) {
@@ -150,11 +157,10 @@ std::unique_ptr<ui::NativePixmapGLBinding> GetBinding(
 scoped_refptr<OzoneImageGLTexturesHolder>
 OzoneImageGLTexturesHolder::CreateAndInitTexturesHolder(
     SharedImageBacking* backing,
-    scoped_refptr<gfx::NativePixmap> pixmap,
-    gfx::BufferPlane plane) {
+    scoped_refptr<gfx::NativePixmap> pixmap) {
   scoped_refptr<OzoneImageGLTexturesHolder> holder =
       base::WrapRefCounted(new OzoneImageGLTexturesHolder());
-  if (!holder->Initialize(backing, std::move(pixmap), plane)) {
+  if (!holder->Initialize(backing, std::move(pixmap))) {
     holder.reset();
   }
   return holder;
@@ -202,35 +208,20 @@ size_t OzoneImageGLTexturesHolder::GetNumberOfTextures() const {
 
 bool OzoneImageGLTexturesHolder::Initialize(
     SharedImageBacking* backing,
-    scoped_refptr<gfx::NativePixmap> pixmap,
-    gfx::BufferPlane plane) {
+    scoped_refptr<gfx::NativePixmap> pixmap) {
   DCHECK(backing && pixmap);
   const viz::SharedImageFormat format = backing->format();
-  if (format.is_single_plane()) {
-    // Initialize the holder with a single texture with format and size of the
-    // backing. For legacy multiplanar formats, the plane must be DEFAULT.
-    auto size = backing->size();
-    auto buffer_format = ToBufferFormat(format);
-    if (format.IsLegacyMultiplanar()) {
-      DCHECK_EQ(plane, gfx::BufferPlane::DEFAULT);
-    }
-    auto buffer_plane = plane;
-    return CreateAndStoreTexture(backing, std::move(pixmap), buffer_format,
-                                 buffer_plane, size);
-  } else if (format.PrefersExternalSampler()) {
+  if (format.is_single_plane() || format.PrefersExternalSampler()) {
     // Initialize the holder with a single texture with format of the
     // NativePixmap, size of the backing and DEFAULT plane.
     auto size = backing->size();
     auto buffer_format = pixmap->GetBufferFormat();
-    DCHECK_EQ(plane, gfx::BufferPlane::DEFAULT);
-    auto buffer_plane = plane;
     return CreateAndStoreTexture(backing, std::move(pixmap), buffer_format,
-                                 buffer_plane, size);
+                                 gfx::BufferPlane::DEFAULT, size);
   } else {
     // Initialize the holder with N textures with format using
     // GetBufferFormatForPlane(), size using GetPlaneSize() and plane using
     // GetBufferPlane()
-    DCHECK_EQ(plane, gfx::BufferPlane::DEFAULT);
     for (int plane_index = 0; plane_index < format.NumberOfPlanes();
          plane_index++) {
       auto size = format.GetPlaneSize(plane_index, backing->size());

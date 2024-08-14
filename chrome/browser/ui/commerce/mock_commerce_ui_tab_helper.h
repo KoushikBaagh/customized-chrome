@@ -18,8 +18,14 @@ class View;
 
 class MockCommerceUiTabHelper : public commerce::CommerceUiTabHelper {
  public:
-  static void CreateForWebContents(content::WebContents* content);
-  explicit MockCommerceUiTabHelper(content::WebContents* content);
+  // Anytime a CommerceUiTabHelper would be created, a MockCommerceUiTabHelper
+  // is created instead. This is done by replacing the factory for TabFeatures.
+  // As such this is not compatible with other code that also replaces
+  // TabFeatures.
+  static void ReplaceFactory();
+
+  MockCommerceUiTabHelper(content::WebContents* content,
+                          SidePanelRegistry* registry);
   ~MockCommerceUiTabHelper() override;
 
   const gfx::Image& GetValidProductImage();
@@ -34,6 +40,10 @@ class MockCommerceUiTabHelper : public commerce::CommerceUiTabHelper {
   MOCK_METHOD(void, OnProductSpecificationsIconClicked, (), (override));
   MOCK_METHOD(bool, IsPriceTracking, ());
   MOCK_METHOD(bool, IsInRecommendedSet, (), (override));
+  MOCK_METHOD(std::u16string,
+              GetProductSpecificationsLabel,
+              (bool is_added),
+              (override));
   MOCK_METHOD(void,
               SetPriceTrackingState,
               (bool enable,

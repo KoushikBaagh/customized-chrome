@@ -63,6 +63,16 @@ IN_PROC_BROWSER_TEST_F(ProductSpecificationsTest, App) {
   RunTest("commerce/product_specifications/app_test.js", "mocha.run()");
 }
 
+IN_PROC_BROWSER_TEST_F(ProductSpecificationsTest, DescriptionCitation) {
+  RunTest("commerce/product_specifications/description_citation_test.js",
+          "mocha.run()");
+}
+
+IN_PROC_BROWSER_TEST_F(ProductSpecificationsTest, DisclosureApp) {
+  RunTest("commerce/product_specifications/disclosure_app_test.js",
+          "mocha.run()");
+}
+
 IN_PROC_BROWSER_TEST_F(ProductSpecificationsTest, DragAndDropManager) {
   RunTest("commerce/product_specifications/drag_and_drop_manager_test.js",
           "mocha.run()");
@@ -70,6 +80,11 @@ IN_PROC_BROWSER_TEST_F(ProductSpecificationsTest, DragAndDropManager) {
 
 IN_PROC_BROWSER_TEST_F(ProductSpecificationsTest, Header) {
   RunTest("commerce/product_specifications/header_test.js", "mocha.run()");
+}
+
+IN_PROC_BROWSER_TEST_F(ProductSpecificationsTest, HorizontalCarousel) {
+  RunTest("commerce/product_specifications/horizontal_carousel_test.js",
+          "mocha.run()");
 }
 
 IN_PROC_BROWSER_TEST_F(ProductSpecificationsTest, Table) {

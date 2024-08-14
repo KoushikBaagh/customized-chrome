@@ -11,6 +11,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/no_destructor.h"
+#include "base/not_fatal_until.h"
 #include "base/ranges/algorithm.h"
 #include "build/build_config.h"
 #include "chrome/app/vector_icons/vector_icons.h"
@@ -257,7 +258,7 @@ void ExtensionsToolbarContainer::RemoveAction(
 
   auto iter = base::ranges::find(actions_, action_id,
                                  &ToolbarActionViewController::GetId);
-  DCHECK(iter != actions_.end());
+  CHECK(iter != actions_.end(), base::NotFatalUntil::M130);
   // Ensure the action outlives the UI element to perform any cleanup.
   std::unique_ptr<ToolbarActionViewController> controller = std::move(*iter);
   actions_.erase(iter);
@@ -866,7 +867,7 @@ views::View::DropCallback ExtensionsToolbarContainer::GetDropCallback(
 void ExtensionsToolbarContainer::OnWidgetDestroying(views::Widget* widget) {
   auto iter =
       base::ranges::find(anchored_widgets_, widget, &AnchoredWidget::widget);
-  DCHECK(iter != anchored_widgets_.end());
+  CHECK(iter != anchored_widgets_.end(), base::NotFatalUntil::M130);
   iter->widget->RemoveObserver(this);
   const std::string extension_id = std::move(iter->extension_id);
   anchored_widgets_.erase(iter);
@@ -976,10 +977,10 @@ void ExtensionsToolbarContainer::OnMenuClosed() {
 void ExtensionsToolbarContainer::UpdateSidePanelState(bool is_active) {
   close_side_panel_button_->SetVisible(is_active);
   if (is_active) {
-    close_side_panel_button_anchor_higlight_ =
+    close_side_panel_button_anchor_highlight_ =
         close_side_panel_button_->AddAnchorHighlight();
   } else {
-    close_side_panel_button_anchor_higlight_.reset();
+    close_side_panel_button_anchor_highlight_.reset();
   }
 }
 

@@ -48,9 +48,9 @@
 #include "components/url_formatter/url_fixer.h"
 #include "components/url_formatter/url_formatter.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
-#include "third_party/metrics_proto/omnibox_event.pb.h"
 #include "third_party/metrics_proto/omnibox_focus_type.pb.h"
 #include "third_party/metrics_proto/omnibox_input_type.pb.h"
+#include "third_party/metrics_proto/omnibox_scoring_signals.pb.h"
 #include "ui/base/page_transition_types.h"
 #include "url/gurl.h"
 #include "url/third_party/mozilla/url_parse.h"
@@ -58,7 +58,7 @@
 
 namespace {
 
-using ScoringSignals = ::metrics::OmniboxEventProto::Suggestion::ScoringSignals;
+using ScoringSignals = ::metrics::OmniboxScoringSignals;
 
 // Acts like the > operator for URLInfo classes.
 bool CompareHistoryMatch(const history::HistoryMatch& a,
@@ -1188,9 +1188,8 @@ AutocompleteMatch HistoryURLProvider::HistoryMatchToACMatch(
 
   RecordAdditionalInfoFromUrlRow(info, &match);
 
-  // Populate scoring signals for machine learning model training and scoring.
-  if (populate_scoring_signals &&
-      AutocompleteScoringSignalsAnnotator::IsEligibleMatch(match)) {
+  // Populate ML scoring signals when appropriate.
+  if (populate_scoring_signals && match.IsMlSignalLoggingEligible()) {
     match.scoring_signals = std::make_optional<ScoringSignals>();
     match.scoring_signals->set_typed_count(info.typed_count());
     match.scoring_signals->set_visit_count(info.visit_count());

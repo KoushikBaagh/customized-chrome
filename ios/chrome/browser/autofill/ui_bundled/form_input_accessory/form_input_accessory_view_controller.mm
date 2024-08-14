@@ -168,7 +168,9 @@ using manual_fill::ManualFillDataType;
 #pragma mark - FormInputAccessoryConsumer
 
 - (void)showAccessorySuggestions:(NSArray<FormSuggestion*>*)suggestions {
-  BOOL hasSingleManualFillButton = suggestions.count > 0;
+  BOOL hasSingleManualFillButton =
+      suggestions.count > 0 &&
+      (_mainFillingProduct != FillingProduct::kAutocomplete);
   self.formInputAccessoryView.manualFillButton.hidden =
       !hasSingleManualFillButton;
   self.formInputAccessoryView.passwordManualFillButton.hidden =
@@ -444,6 +446,7 @@ using manual_fill::ManualFillDataType;
         break;
       case FillingProduct::kMerchantPromoCode:
       case FillingProduct::kCompose:
+      case FillingProduct::kPredictionImprovements:
       case FillingProduct::kNone:
         // `kMerchantPromoCode` and `kCompose` cases are currently not available
         // on iOS. Also, there shouldn't be suggestions of type `kNone`.

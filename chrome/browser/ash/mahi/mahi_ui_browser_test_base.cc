@@ -21,6 +21,7 @@
 #include "chrome/browser/ui/settings_window_manager_chromeos.h"
 #include "chrome/browser/ui/views/mahi/mahi_menu_constants.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "components/manta/mahi_provider.h"
 #include "components/manta/manta_service.h"
 #include "components/manta/manta_service_callbacks.h"
@@ -128,9 +129,17 @@ std::unique_ptr<KeyedService> CreateMockMantaService(
 
 }  // namespace
 
-MahiUiBrowserTestBase::MahiUiBrowserTestBase() = default;
+MahiUiBrowserTestBase::MahiUiBrowserTestBase() {
+  feature_list_.InitAndEnableFeature(chromeos::features::kMahi);
+}
 
 MahiUiBrowserTestBase::~MahiUiBrowserTestBase() = default;
+
+void MahiUiBrowserTestBase::SetUpCommandLine(base::CommandLine* command_line) {
+  command_line->AppendSwitch(switches::kMahiRestrictionsOverride);
+
+  InProcessBrowserTest::SetUpCommandLine(command_line);
+}
 
 void MahiUiBrowserTestBase::SetUpOnMainThread() {
   SystemWebAppBrowserTestBase::SetUpOnMainThread();

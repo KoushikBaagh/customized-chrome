@@ -4,9 +4,12 @@
 
 #include "chrome/browser/ai/ai_text_session.h"
 
+#include <memory>
 #include <optional>
 
+#include "base/check_op.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_forward.h"
 #include "base/strings/stringprintf.h"
 #include "chrome/browser/ai/ai_manager_keyed_service.h"
 #include "chrome/browser/ai/ai_manager_keyed_service_factory.h"
@@ -17,8 +20,8 @@
 #include "components/optimization_guide/core/optimization_guide_util.h"
 #include "components/optimization_guide/proto/common_types.pb.h"
 #include "components/optimization_guide/proto/string_value.pb.h"
-#include "mojo/public/cpp/bindings/remote_set.h"
-#include "third_party/blink/public/mojom/ai/ai_text_session.mojom-shared.h"
+#include "mojo/public/cpp/bindings/self_owned_receiver.h"
+#include "third_party/blink/public/mojom/ai/model_streaming_responder.mojom.h"
 
 namespace {
 
@@ -26,61 +29,85 @@ namespace {
 // model distinguish the roles in the previous conversation.
 const char kPromptFormat[] = "User: %s\nModel: ";
 const char kContextFormat[] = "%s\n%s\n";
+const char kSystemPromptFormat[] = "%s\n";
 
 }  // namespace
 
 using ModelExecutionError = optimization_guide::
     OptimizationGuideModelExecutionError::ModelExecutionError;
 
-AITextSession::Context::Context(uint32_t max_tokens)
-    : max_tokens_(max_tokens) {}
+AITextSession::Context::Context(uint32_t max_tokens,
+                                std::optional<ContextItem> system_prompt)
+    : max_tokens_(max_tokens), system_prompt_(system_prompt) {
+  if (system_prompt.has_value()) {
+    CHECK_GE(max_tokens_, system_prompt->tokens)
+        << "the caller shouldn't create an AITextSession with the system "
+           "prompt containing more tokens than the limit.";
+    current_tokens_ += system_prompt->tokens;
+  }
+}
 
 AITextSession::Context::Context(const Context& context) = default;
 
 AITextSession::Context::~Context() = default;
 
-void AITextSession::Context::AddContextItem(const std::string& text,
-                                            uint32_t size) {
-  context_item_.emplace_back(text, size);
-  current_tokens_ += size;
+void AITextSession::Context::AddContextItem(ContextItem context_item) {
+  context_items_.emplace_back(context_item);
+  current_tokens_ += context_item.tokens;
   while (current_tokens_ > max_tokens_) {
-    current_tokens_ -= context_item_.begin()->tokens;
-    context_item_.pop_front();
+    current_tokens_ -= context_items_.begin()->tokens;
+    context_items_.pop_front();
   }
 }
 
 std::string AITextSession::Context::GetContextString() {
   std::string context;
-  for (auto& context_item : context_item_) {
+  if (system_prompt_.has_value()) {
+    context =
+        base::StringPrintf(kSystemPromptFormat, system_prompt_->text.c_str());
+  }
+  for (auto& context_item : context_items_) {
     context.append(context_item.text);
   }
   return context;
 }
 
 bool AITextSession::Context::HasContextItem() {
-  return !context_item_.empty();
-}
-
-AITextSession::AITextSession(
-    std::unique_ptr<optimization_guide::OptimizationGuideModelExecutor::Session>
-        session,
-    std::optional<optimization_guide::SamplingParams> sampling_params)
-    : session_(std::move(session)),
-      sampling_params_(sampling_params),
-      context_(
-          optimization_guide::features::GetOnDeviceModelMaxTokensForContext()) {
+  return system_prompt_.has_value() || !context_items_.empty();
 }
 
 AITextSession::AITextSession(
     std::unique_ptr<optimization_guide::OptimizationGuideModelExecutor::Session>
         session,
     std::optional<optimization_guide::SamplingParams> sampling_params,
-    Context context)
+    base::WeakPtr<content::BrowserContext> browser_context,
+    const std::optional<const Context>& context)
     : session_(std::move(session)),
       sampling_params_(sampling_params),
-      context_(context) {}
+      browser_context_(browser_context) {
+  if (context.has_value()) {
+    // If the context is provided, it will be used in this session.
+    context_ = std::make_unique<Context>(context.value());
+    return;
+  }
+
+  // If the context is not provided, initialize a new context with the default
+  // configuration.
+  context_ = std::make_unique<Context>(
+      optimization_guide::features::GetOnDeviceModelMaxTokensForContext(),
+      std::nullopt);
+}
 
 AITextSession::~AITextSession() = default;
+
+void AITextSession::SetSystemPrompt(std::string system_prompt,
+                                    base::OnceCallback<void(bool)> callback) {
+  session_->GetSizeInTokens(
+      system_prompt,
+      base::BindOnce(&AITextSession::InitializeContextWithSystemPrompt,
+                     weak_ptr_factory_.GetWeakPtr(), system_prompt,
+                     std::move(callback)));
+}
 
 blink::mojom::ModelStreamingResponseStatus ConvertModelExecutionError(
     ModelExecutionError error) {
@@ -112,23 +139,41 @@ blink::mojom::ModelStreamingResponseStatus ConvertModelExecutionError(
   }
 }
 
-void AITextSession::GetContextSizeInTokensCallback(const std::string& text,
-                                                   uint32_t size) {
+void AITextSession::InitializeContextWithSystemPrompt(
+    const std::string& text,
+    base::OnceCallback<void(bool)> callback,
+    uint32_t size) {
+  // If the on device model service fails to get the size, it will be 0.
+  // TODO(crbug.com/351935691): make sure the error is explicitly returned and
+  // handled accordingly.
+  if (!size) {
+    std::move(callback).Run(false);
+    return;
+  }
+
+  uint32_t max_token =
+      optimization_guide::features::GetOnDeviceModelMaxTokensForContext();
+  if (size > max_token) {
+    // The session cannot be created if the system prompt contains more tokens
+    // than the limit.
+    std::move(callback).Run(false);
+    return;
+  }
+
+  context_ =
+      std::make_unique<Context>(max_token, Context::ContextItem{text, size});
+  std::move(callback).Run(true);
+}
+
+// Adds the text into context. If the number of tokens in the current context
+// exceeds the limit, remove the oldest ones to reduce the context size.
+void AITextSession::AppendContextItem(const std::string& text, uint32_t size) {
   // If the on device model service fails to get the size, it will be 0.
   // TODO(crbug.com/351935691): make sure the error is explicitly returned and
   // handled accordingly.
   if (size) {
-    context_.AddContextItem(text, size);
+    context_->AddContextItem({text, size});
   }
-}
-
-void AITextSession::AppendContext(std::string& text) {
-  // TODO(crbug.com/351935390): instead of calculating this from the
-  // AITextSession, it should be returned by the model since the token should be
-  // calculated during the execution.
-  session_->GetSizeInTokens(
-      text, base::BindOnce(&AITextSession::GetContextSizeInTokensCallback,
-                           weak_ptr_factory_.GetWeakPtr(), text));
 }
 
 void AITextSession::ModelExecutionCallback(
@@ -157,7 +202,13 @@ void AITextSession::ModelExecutionCallback(
   if (result.response->is_complete) {
     std::string new_context = base::StringPrintf(kContextFormat, input.c_str(),
                                                  response->value().c_str());
-    AppendContext(new_context);
+    // TODO(crbug.com/351935390): instead of calculating this from the
+    // AITextSession, it should be returned by the model since the token should
+    // be calculated during the execution.
+    session_->GetSizeInTokens(
+        new_context,
+        base::BindOnce(&AITextSession::AppendContextItem,
+                       weak_ptr_factory_.GetWeakPtr(), new_context));
     responder->OnResponse(blink::mojom::ModelStreamingResponseStatus::kComplete,
                           std::nullopt);
   }
@@ -176,14 +227,11 @@ void AITextSession::Prompt(
     return;
   }
 
-  // TODO(crbug.com/342069219): un-comment this when the model proto is updated,
-  // and add the logic to determine if context handling is supported in the
-  // current version of the model.
-  // if (context_.HasContextItem()) {
-  //   optimization_guide::proto::StringValue context;
-  //   context.set_value(context_.GetContextString());
-  //   session_->AddContext(context);
-  // }
+  if (context_->HasContextItem()) {
+    optimization_guide::proto::StringValue context;
+    context.set_value(context_->GetContextString());
+    session_->AddContext(context);
+  }
 
   mojo::RemoteSetElementId responder_id =
       responder_set_.Add(std::move(pending_responder));
@@ -195,6 +243,29 @@ void AITextSession::Prompt(
       request, base::BindRepeating(&AITextSession::ModelExecutionCallback,
                                    weak_ptr_factory_.GetWeakPtr(),
                                    formatted_input, responder_id));
+}
+
+void AITextSession::Fork(
+    mojo::PendingReceiver<blink::mojom::AITextSession> session,
+    ForkCallback callback) {
+  if (!browser_context_) {
+    // The `browser_context_` is already destroyed before the renderer owner is
+    // gone.
+    std::move(callback).Run(/*success=*/false);
+    return;
+  }
+
+  AIManagerKeyedService* service =
+      AIManagerKeyedServiceFactory::GetAIManagerKeyedService(
+          browser_context_.get());
+  blink::mojom::AITextSessionSamplingParamsPtr sampling_params;
+  if (sampling_params_.has_value()) {
+    sampling_params = blink::mojom::AITextSessionSamplingParams::New(
+        sampling_params_->top_k, sampling_params_->temperature);
+  }
+  service->CreateTextSessionForCloning(
+      base::PassKey<AITextSession>(), std::move(session),
+      std::move(sampling_params), *context_, std::move(callback));
 }
 
 void AITextSession::Destroy() {

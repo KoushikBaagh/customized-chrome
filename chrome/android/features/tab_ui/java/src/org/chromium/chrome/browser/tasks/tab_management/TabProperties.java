@@ -139,6 +139,11 @@ public class TabProperties {
     public static final WritableIntPropertyKey QUICK_DELETE_ANIMATION_STATUS =
             new WritableIntPropertyKey();
 
+    public static final WritableIntPropertyKey VISIBILITY = new WritableIntPropertyKey();
+
+    public static final WritableBooleanPropertyKey USE_SHRINK_CLOSE_ANIMATION =
+            new WritableBooleanPropertyKey();
+
     /** The {@link TabGroupColorId} for a tab group representation's color in TabListMode only. */
     public static final WritableIntPropertyKey TAB_GROUP_COLOR_ID = new WritableIntPropertyKey();
 
@@ -177,7 +182,9 @@ public class TabProperties {
                 SHOULD_SHOW_PRICE_DROP_TOOLTIP,
                 QUICK_DELETE_ANIMATION_STATUS,
                 TAB_GROUP_COLOR_ID,
-                TAB_GROUP_INFO
+                TAB_GROUP_INFO,
+                VISIBILITY,
+                USE_SHRINK_CLOSE_ANIMATION,
             };
 
     public static final PropertyKey[] ALL_KEYS_TAB_STRIP =

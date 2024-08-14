@@ -19,6 +19,7 @@
 #include "ash/capture_mode/normal_capture_bar_view.h"
 #include "ash/constants/ash_features.h"
 #include "ash/projector/projector_controller_impl.h"
+#include "ash/session/session_controller_impl.h"
 #include "ash/shelf/shelf.h"
 #include "ash/shelf/shelf_layout_manager.h"
 #include "ash/shell.h"
@@ -297,6 +298,24 @@ class GameDashboardBehavior : public CaptureModeBehavior,
   base::WeakPtrFactory<GameDashboardBehavior> weak_ptr_factory_{this};
 };
 
+// -----------------------------------------------------------------------------
+// SunfishBehavior:
+// Implements the `CaptureModeBehavior` interface with behavior defined for the
+// sunfish capture mode.
+class SunfishBehavior : public CaptureModeBehavior {
+ public:
+  SunfishBehavior()
+      : CaptureModeBehavior(
+            {CaptureModeType::kImage, CaptureModeSource::kRegion,
+             RecordingType::kWebM, AudioRecordingMode::kOff,
+             /*demo_tools_enabled=*/false},
+            BehaviorType::kSunfish) {}
+
+  SunfishBehavior(const SunfishBehavior&) = delete;
+  SunfishBehavior& operator=(const SunfishBehavior&) = delete;
+  ~SunfishBehavior() override = default;
+};
+
 }  // namespace
 
 // -----------------------------------------------------------------------------
@@ -317,6 +336,8 @@ std::unique_ptr<CaptureModeBehavior> CaptureModeBehavior::Create(
       return std::make_unique<GameDashboardBehavior>();
     case BehaviorType::kDefault:
       return std::make_unique<DefaultBehavior>();
+    case BehaviorType::kSunfish:
+      return std::make_unique<SunfishBehavior>();
   }
 }
 

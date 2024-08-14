@@ -42,6 +42,9 @@ static constexpr char kAnswerJsonNumLines[] = "ln";
 static constexpr char kAnswerJsonImage[] = "i";
 static constexpr char kAnswerJsonImageData[] = "d";
 
+constexpr char kAnswerUsedUmaHistogramName[] =
+    "Omnibox.SuggestionUsed.AnswerInSuggest";
+
 void AppendWithSpace(const SuggestionAnswer::TextField* text,
                      std::u16string* output) {
   if (!text) {
@@ -202,6 +205,11 @@ bool ParseJsonToAnswerData(const base::Value::Dict& answer_json,
     answer_data->mutable_image()->set_url(*image_url);
   }
   return true;
+}
+
+void LogAnswerUsed(omnibox::AnswerType answer_type) {
+  UMA_HISTOGRAM_ENUMERATION(kAnswerUsedUmaHistogramName, answer_type,
+                            omnibox::AnswerType_MAX);
 }
 
 }  // namespace omnibox::answer_data_parser
@@ -452,15 +460,8 @@ SuggestionAnswer::~SuggestionAnswer() = default;
 
 // static
 bool SuggestionAnswer::ParseAnswer(const base::Value::Dict& answer_json,
-                                   const std::u16string& answer_type_str,
+                                   omnibox::AnswerType answer_type,
                                    SuggestionAnswer* result) {
-  int answer_type = 0;
-  if (!base::StringToInt(answer_type_str, &answer_type)) {
-    return false;
-  }
-
-  result->set_type(answer_type);
-
   const base::Value::List* lines_json = answer_json.FindList(kAnswerJsonLines);
   if (!lines_json || lines_json->size() != 2) {
     return false;
@@ -485,23 +486,14 @@ bool SuggestionAnswer::ParseAnswer(const base::Value::Dict& answer_json,
   } else {
     result->image_url_ = result->second_line_.image_url();
   }
-  result->InterpretTextTypes();
+  result->InterpretTextTypes(answer_type);
   return true;
 }
 
 bool SuggestionAnswer::Equals(const SuggestionAnswer& answer) const {
-  return type_ == answer.type_ && image_url_ == answer.image_url_ &&
+  return image_url_ == answer.image_url_ &&
          first_line_.Equals(answer.first_line_) &&
          second_line_.Equals(answer.second_line_);
-}
-
-void SuggestionAnswer::AddImageURLsTo(URLs* urls) const {
-  // Note: first_line_.image_url() is not used in practice (so it's ignored).
-  if (image_url_.is_valid()) {
-    urls->push_back(image_url_);
-  } else if (second_line_.image_url().is_valid()) {
-    urls->push_back(second_line_.image_url());
-  }
 }
 
 size_t SuggestionAnswer::EstimateMemoryUsage() const {
@@ -514,8 +506,8 @@ size_t SuggestionAnswer::EstimateMemoryUsage() const {
   return res;
 }
 
-void SuggestionAnswer::InterpretTextTypes() {
-  switch (type()) {
+void SuggestionAnswer::InterpretTextTypes(omnibox::AnswerType answer_type) {
+  switch (answer_type) {
     case omnibox::ANSWER_TYPE_WEATHER: {
       second_line_.SetTextStyles(omnibox::answer_data_parser::TOP_ALIGNED,
                                  TextStyle::SUPERIOR);
@@ -539,7 +531,7 @@ void SuggestionAnswer::InterpretTextTypes() {
 
   // Most answers uniformly apply different styling for each answer line.
   // Any old styles not replaced above will get these by default.
-  if (IsExceptedFromLineReversal()) {
+  if (IsExceptedFromLineReversal(answer_type)) {
     first_line_.SetTextStyles(0, TextStyle::NORMAL);
     second_line_.SetTextStyles(0, TextStyle::NORMAL_DIM);
   } else {
@@ -548,25 +540,10 @@ void SuggestionAnswer::InterpretTextTypes() {
   }
 }
 
-bool SuggestionAnswer::IsExceptedFromLineReversal() const {
-  return type() == omnibox::ANSWER_TYPE_DICTIONARY;
+bool SuggestionAnswer::IsExceptedFromLineReversal(
+    omnibox::AnswerType answer_type) const {
+  return answer_type == omnibox::ANSWER_TYPE_DICTIONARY;
 }
-
-// static
-void SuggestionAnswer::LogAnswerUsed(
-    const std::optional<SuggestionAnswer>& answer) {
-  auto answer_type = omnibox::ANSWER_TYPE_UNSPECIFIED;
-  if (answer) {
-    answer_type = static_cast<omnibox::AnswerType>(answer->type());
-  }
-  DCHECK_NE(-1, answer_type);  // just in case; |type_| is init'd to -1
-  UMA_HISTOGRAM_ENUMERATION(kAnswerUsedUmaHistogramName, answer_type,
-                            omnibox::AnswerType_MAX);
-}
-
-// static
-const char SuggestionAnswer::kAnswerUsedUmaHistogramName[] =
-    "Omnibox.SuggestionUsed.AnswerInSuggest";
 
 #if BUILDFLAG(IS_ANDROID)
 namespace {
@@ -613,10 +590,11 @@ ScopedJavaLocalRef<jobject> CreateJavaImageLine(
 
 }  // namespace
 
-ScopedJavaLocalRef<jobject> SuggestionAnswer::CreateJavaObject() const {
+ScopedJavaLocalRef<jobject> SuggestionAnswer::CreateJavaObject(
+    omnibox::AnswerType answer_type) const {
   JNIEnv* env = jni_zero::AttachCurrentThread();
   return Java_SuggestionAnswer_createSuggestionAnswer(
-      env, static_cast<int>(type_), CreateJavaImageLine(env, &first_line_),
+      env, answer_type, CreateJavaImageLine(env, &first_line_),
       CreateJavaImageLine(env, &second_line_));
 }
 #endif  // BUILDFLAG(IS_ANDROID)

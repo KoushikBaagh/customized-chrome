@@ -36,10 +36,10 @@ class EchoAIManagerImpl : public blink::mojom::AIManager {
   void CreateTextSession(
       mojo::PendingReceiver<::blink::mojom::AITextSession> receiver,
       blink::mojom::AITextSessionSamplingParamsPtr sampling_params,
+      const std::optional<std::string>& system_prompt,
       CreateTextSessionCallback callback) override;
 
-  void GetDefaultTextSessionSamplingParams(
-      GetDefaultTextSessionSamplingParamsCallback callback) override;
+  void GetTextModelInfo(GetTextModelInfoCallback callback) override;
 
   mojo::ReceiverSet<blink::mojom::AIManager> receivers_;
 };

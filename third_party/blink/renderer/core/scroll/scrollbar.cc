@@ -142,6 +142,9 @@ bool Scrollbar::IsLeftSideVerticalScrollbar() const {
 }
 
 int Scrollbar::Maximum() const {
+  if (!scrollable_area_) {
+    return 0;
+  }
   gfx::Vector2d max_offset = scrollable_area_->MaximumScrollOffsetInt() -
                              scrollable_area_->MinimumScrollOffsetInt();
   return orientation_ == kHorizontalScrollbar ? max_offset.x() : max_offset.y();
@@ -190,11 +193,6 @@ void Scrollbar::SetProportion(int visible_size, int total_size) {
   }
 
   SetNeedsPaintInvalidation(kAllParts);
-}
-
-void Scrollbar::Paint(GraphicsContext& context,
-                      const gfx::Vector2d& paint_offset) const {
-  GetTheme().Paint(*this, context, paint_offset);
 }
 
 void Scrollbar::AutoscrollTimerFired(TimerBase*) {
@@ -710,6 +708,7 @@ void Scrollbar::InjectScrollGesture(WebInputEvent::Type gesture_type,
 }
 
 bool Scrollbar::DeltaWillScroll(ScrollOffset delta) const {
+  CHECK(scrollable_area_);
   ScrollOffset current_offset = scrollable_area_->GetScrollOffset();
   ScrollOffset target_offset = current_offset + delta;
   ScrollOffset clamped_offset =
@@ -750,10 +749,6 @@ bool Scrollbar::IsOverlayScrollbar() const {
   return theme_.UsesOverlayScrollbars();
 }
 
-bool Scrollbar::IsFluentScrollbar() const {
-  return theme_.UsesFluentScrollbars();
-}
-
 bool Scrollbar::IsFluentOverlayScrollbarMinimalMode() const {
   return theme_.UsesFluentOverlayScrollbars() && hovered_part_ == kNoPart &&
          pressed_part_ != kThumbPart;
@@ -761,7 +756,7 @@ bool Scrollbar::IsFluentOverlayScrollbarMinimalMode() const {
 
 bool Scrollbar::UsesNinePatchTrackAndCanSkipRepaint(
     const gfx::Rect& new_frame_rect) const {
-  if (!uses_nine_patch_track_and_buttons_) {
+  if (!theme_.UsesNinePatchTrackAndButtonsResource()) {
     return false;
   }
   // If the scrollbar's thickness is being changed, then a new bitmap needs to
@@ -779,6 +774,7 @@ bool Scrollbar::UsesNinePatchTrackAndCanSkipRepaint(
 }
 
 bool Scrollbar::ShouldParticipateInHitTesting() {
+  CHECK(scrollable_area_);
   // Non-overlay scrollbars should always participate in hit testing.
   if (!IsOverlayScrollbar())
     return true;
@@ -863,22 +859,18 @@ float Scrollbar::ScrollableAreaTargetPos() const {
 
 void Scrollbar::SetNeedsPaintInvalidation(ScrollbarPart invalid_parts) {
   needs_update_display_ = true;
-  if (theme_.ShouldRepaintAllPartsOnInvalidation())
+  if (theme_.ShouldRepaintAllPartsOnInvalidation()) {
     invalid_parts = kAllParts;
-  if (invalid_parts & ~kThumbPart)
-    track_needs_repaint_ = true;
-  if (invalid_parts & kThumbPart)
+  }
+  if (invalid_parts & ~kThumbPart) {
+    track_and_buttons_need_repaint_ = true;
+  }
+  if (invalid_parts & kThumbPart) {
     thumb_needs_repaint_ = true;
-  if (scrollable_area_)
+  }
+  if (scrollable_area_) {
     scrollable_area_->SetScrollbarNeedsPaintInvalidation(Orientation());
-}
-
-bool Scrollbar::UsesNinePatchTrackAndButtonsResource() const {
-  return uses_nine_patch_track_and_buttons_;
-}
-
-void Scrollbar::SetUsesNinePatchTrackAndButtonsResource(bool supports) {
-  uses_nine_patch_track_and_buttons_ = supports;
+  }
 }
 
 CompositorElementId Scrollbar::GetElementId() const {
@@ -950,6 +942,9 @@ bool Scrollbar::IsOpaque() const {
 }
 
 mojom::blink::ColorScheme Scrollbar::UsedColorScheme() const {
+  if (!scrollable_area_) {
+    return mojom::blink::ColorScheme::kLight;
+  }
   return IsOverlayScrollbar()
              ? scrollable_area_->GetOverlayScrollbarColorScheme()
              : scrollable_area_->UsedColorSchemeScrollbars();

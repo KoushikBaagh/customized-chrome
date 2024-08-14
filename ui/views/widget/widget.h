@@ -336,10 +336,6 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
     // area. Only used on some platforms (Windows and Linux).
     bool remove_standard_frame = false;
 
-    // Only used by ShellWindow on Windows. Specifies that the default icon of
-    // packaged app should be the system default icon.
-    bool use_system_default_icon = false;
-
     // Whether the widget should be maximized or minimized.
     ui::WindowShowState show_state = ui::SHOW_STATE_DEFAULT;
 
@@ -479,6 +475,13 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
     // notifications of theme changes.
     // A value of null results in the default theme being used.
     raw_ptr<ui::NativeTheme> native_theme = nullptr;
+
+#if BUILDFLAG(IS_MAC)
+    // If set to true, tags the widget as an invisible overlay widget that
+    // allows the Views tree to be broken up into distinct NSViews for use by
+    // immersive fullscreen. Not for general use.
+    bool is_overlay = false;
+#endif
   };
 
   // Represents a lock held on the widget's ShouldPaintAsActive() state. As

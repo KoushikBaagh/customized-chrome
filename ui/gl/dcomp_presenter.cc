@@ -76,7 +76,8 @@ bool DCompPresenter::Resize(const gfx::Size& size,
     return false;
   }
 
-  return child_window_.Resize(size);
+  child_window_.Resize(size);
+  return true;
 }
 
 gfx::VSyncProvider* DCompPresenter::GetVSyncProvider() {
@@ -94,6 +95,15 @@ void DCompPresenter::OnVSync(base::TimeTicks vsync_time,
 void DCompPresenter::ScheduleDCLayer(
     std::unique_ptr<DCLayerOverlayParams> params) {
   pending_overlays_.push_back(std::move(params));
+}
+
+void DCompPresenter::SetFrameRate(float frame_rate) {
+  // Only try to reduce vsync frequency through the video swap chain.
+  // This allows us to experiment UseSetPresentDuration optimization to
+  // fullscreen video overlays only and avoid compromising
+  // UsePreferredIntervalForVideo optimization where we skip compositing
+  // every other frame when fps <= half the vsync frame rate.
+  layer_tree_->SetFrameRate(frame_rate);
 }
 
 void DCompPresenter::Present(SwapCompletionCallback completion_callback,

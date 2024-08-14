@@ -358,8 +358,6 @@ void SetRuntimeFeaturesFromChromiumFeatures() {
           {"AttributionReportingCrossAppWeb",
            raw_ref(features::kPrivacySandboxAdsAPIsOverride),
            kSetOnlyIfOverridden},
-          {"AttributionReportingCrossAppWeb",
-           raw_ref(features::kAttributionReportingCrossAppWebOverride)},
           {"AndroidDownloadableFontsMatching",
            raw_ref(features::kAndroidDownloadableFontsMatching)},
 #if BUILDFLAG(IS_ANDROID)
@@ -391,7 +389,8 @@ void SetRuntimeFeaturesFromChromiumFeatures() {
           {"LegacyWindowsDWriteFontFallback",
            raw_ref(features::kLegacyWindowsDWriteFontFallback)},
           {"MachineLearningNeuralNetwork",
-           raw_ref(webnn::mojom::features::kWebMachineLearningNeuralNetwork)},
+           raw_ref(webnn::mojom::features::kWebMachineLearningNeuralNetwork),
+           kSetOnlyIfOverridden},
           {"OriginIsolationHeader", raw_ref(features::kOriginIsolationHeader)},
           {"ReduceAcceptLanguage",
            raw_ref(network::features::kReduceAcceptLanguage)},
@@ -414,6 +413,10 @@ void SetRuntimeFeaturesFromChromiumFeatures() {
            raw_ref(features::kMediaStreamTrackTransfer)},
           {"PrivateNetworkAccessPermissionPrompt",
            raw_ref(network::features::kPrivateNetworkAccessPermissionPrompt),
+           kSetOnlyIfOverridden},
+          {"ExperimentalMachineLearningNeuralNetwork",
+           raw_ref(webnn::mojom::features::
+                       kExperimentalWebMachineLearningNeuralNetwork),
            kSetOnlyIfOverridden}};
   for (const auto& mapping : runtimeFeatureNameToChromiumFeatureMapping) {
     SetRuntimeFeatureFromChromiumFeature(

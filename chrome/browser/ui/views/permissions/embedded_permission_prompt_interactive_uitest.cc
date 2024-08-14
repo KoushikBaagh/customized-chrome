@@ -169,7 +169,7 @@ class EmbeddedPermissionPromptInteractiveTest : public InteractiveBrowserTest {
       permissions::ElementAnchoredBubbleAction action,
       permissions::ElementAnchoredBubbleVariant variant,
       int screen_counter) {
-    return Steps(Do([=] {
+    return Steps(Do([=, this] {
       auto entries = ukm_recorder_->GetEntriesByName(UkmEntry::kEntryName);
       CHECK_EQ(entries.size(), 1U);
 
@@ -285,7 +285,10 @@ class EmbeddedPermissionPromptInteractiveTest : public InteractiveBrowserTest {
         Do([this]() {
           browser()->tab_strip_model()->GetActiveWebContents()->Close();
         }),
-        CheckContentSettingsValue(content_settings_types, CONTENT_SETTING_ASK));
+        // This has to be immediate, because otherwise closing the browser will
+        // detach the profile.
+        WithoutDelay(CheckContentSettingsValue(content_settings_types,
+                                               CONTENT_SETTING_ASK)));
   }
 
   void TestPromptElementText(
@@ -727,12 +730,12 @@ IN_PROC_BROWSER_TEST_F(EmbeddedPermissionPromptInteractiveTest,
         auto* scrim_view =
             static_cast<EmbeddedPermissionPromptContentScrimView*>(
                 waiter.WaitIfNeededAndGet()->GetContentsView());
-        scrim_view->OnMousePressed(
-            ui::MouseEvent(ui::ET_MOUSE_PRESSED, gfx::Point(), gfx::Point(),
-                           ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON, 0));
-        scrim_view->OnMouseReleased(
-            ui::MouseEvent(ui::ET_MOUSE_RELEASED, gfx::Point(), gfx::Point(),
-                           ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON, 0));
+        scrim_view->OnMousePressed(ui::MouseEvent(
+            ui::EventType::kMousePressed, gfx::Point(), gfx::Point(),
+            ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON, 0));
+        scrim_view->OnMouseReleased(ui::MouseEvent(
+            ui::EventType::kMouseReleased, gfx::Point(), gfx::Point(),
+            ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON, 0));
       }),
       CheckEntrySinceLastCheck(
           permissions::RequestTypeForUma::MULTIPLE_AUDIO_AND_VIDEO_CAPTURE,

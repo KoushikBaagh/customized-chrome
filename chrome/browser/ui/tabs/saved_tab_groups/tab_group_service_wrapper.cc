@@ -11,16 +11,43 @@
 #include "base/notimplemented.h"
 #include "base/observer_list.h"
 #include "chrome/browser/favicon/favicon_utils.h"
+#include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/sync/sync_service_factory.h"
+#include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_service_factory.h"
+#include "chrome/browser/ui/tabs/saved_tab_groups/tab_group_action_context_desktop.h"
 #include "chrome/browser/ui/views/bookmarks/saved_tab_groups/saved_tab_group_everything_menu.h"
 #include "components/saved_tab_groups/features.h"
 #include "components/saved_tab_groups/saved_tab_group.h"
 #include "components/saved_tab_groups/saved_tab_group_tab.h"
 #include "components/saved_tab_groups/types.h"
+#include "components/sync/base/user_selectable_type.h"
+#include "components/sync/service/sync_service.h"
+#include "components/sync/service/sync_user_settings.h"
 
 class Profile;
 
 namespace tab_groups {
+
+// static
+std::unique_ptr<TabGroupServiceWrapper> TabGroupServiceWrapper::GetForProfile(
+    Profile* profile) {
+  DCHECK(profile);
+
+  if (profile->IsOffTheRecord()) {
+    return nullptr;
+  }
+
+  if (tab_groups::IsTabGroupSyncServiceDesktopMigrationEnabled()) {
+    return std::make_unique<TabGroupServiceWrapper>(
+        tab_groups::TabGroupSyncServiceFactory::GetForProfile(profile),
+        /*saved_tab_group_keyed_service=*/nullptr);
+  }
+
+  return std::make_unique<TabGroupServiceWrapper>(
+      /*tab_group_sync_service=*/nullptr,
+      tab_groups::SavedTabGroupServiceFactory::GetForProfile(profile));
+}
 
 TabGroupServiceWrapper::TabGroupServiceWrapper(
     TabGroupSyncService* tab_group_sync_service,
@@ -68,6 +95,28 @@ void TabGroupServiceWrapper::UpdateVisualData(
   std::optional<SavedTabGroup> group = GetGroup(local_group_id);
   CHECK(group.has_value());
   OnTabGroupVisualsChanged(group->saved_guid());
+}
+
+void TabGroupServiceWrapper::UpdateGroupPosition(const base::Uuid& sync_id,
+                                                 std::optional<bool> is_pinned,
+                                                 std::optional<int> new_index) {
+  if (ShouldUseSyncService()) {
+    sync_service_->UpdateGroupPosition(sync_id, is_pinned, new_index);
+  } else {
+    std::optional<SavedTabGroup> group = GetGroup(sync_id);
+    if (!group.has_value()) {
+      return;
+    }
+
+    if (is_pinned.has_value() && group->is_pinned() != is_pinned) {
+      saved_keyed_service_->model()->TogglePinState(sync_id);
+    }
+
+    if (new_index.has_value()) {
+      saved_keyed_service_->model()->ReorderGroupLocally(sync_id,
+                                                         new_index.value());
+    }
+  }
 }
 
 void TabGroupServiceWrapper::AddTab(const LocalTabGroupID& group_id,
@@ -180,6 +229,18 @@ void TabGroupServiceWrapper::OnTabSelected(const LocalTabGroupID& group_id,
   NOTIMPLEMENTED();
 }
 
+void TabGroupServiceWrapper::MakeTabGroupShared(
+    const LocalTabGroupID& local_group_id,
+    std::string_view collaboration_id) {
+  if (ShouldUseSyncService()) {
+    sync_service_->MakeTabGroupShared(local_group_id,
+                                      std::string(collaboration_id));
+  } else {
+    saved_keyed_service_->model()->MakeTabGroupShared(
+        local_group_id, std::string(collaboration_id));
+  }
+}
+
 std::vector<SavedTabGroup> TabGroupServiceWrapper::GetAllGroups() {
   if (ShouldUseSyncService()) {
     return sync_service_->GetAllGroups();
@@ -216,11 +277,15 @@ std::vector<LocalTabGroupID> TabGroupServiceWrapper::GetDeletedGroupIds() {
 void TabGroupServiceWrapper::OpenTabGroup(
     const base::Uuid& sync_group_id,
     std::unique_ptr<TabGroupActionContext> context) {
-  NOTIMPLEMENTED();
-
-  // TODO(crbug.com/348486163): Call TGSS::OpenTabGroup or
-  // STGKS::OpenSavedTabGroupInBrowser. But hold off until the bookmarks bar
-  // implementation to do this.
+  if (ShouldUseSyncService()) {
+    sync_service_->OpenTabGroup(sync_group_id, std::move(context));
+  } else {
+    TabGroupActionContextDesktop* desktop_context =
+        static_cast<TabGroupActionContextDesktop*>(context.get());
+    saved_keyed_service_->OpenSavedTabGroupInBrowser(
+        desktop_context->browser, sync_group_id,
+        desktop_context->opening_source);
+  }
 }
 
 void TabGroupServiceWrapper::UpdateLocalTabGroupMapping(
@@ -256,6 +321,16 @@ void TabGroupServiceWrapper::UpdateLocalTabId(
   }
 }
 
+void TabGroupServiceWrapper::ConnectLocalTabGroup(
+    const base::Uuid& sync_id,
+    const LocalTabGroupID& local_id) {
+  if (ShouldUseSyncService()) {
+    sync_service_->ConnectLocalTabGroup(sync_id, local_id);
+  } else {
+    saved_keyed_service_->ConnectLocalTabGroup(local_id, sync_id);
+  }
+}
+
 bool TabGroupServiceWrapper::IsRemoteDevice(
     const std::optional<std::string>& cache_guid) const {
   NOTIMPLEMENTED();
@@ -267,12 +342,12 @@ void TabGroupServiceWrapper::RecordTabGroupEvent(
   NOTIMPLEMENTED();
 }
 
-base::WeakPtr<syncer::ModelTypeControllerDelegate>
+base::WeakPtr<syncer::DataTypeControllerDelegate>
 TabGroupServiceWrapper::GetSavedTabGroupControllerDelegate() {
   return sync_service_->GetSavedTabGroupControllerDelegate();
 }
 
-base::WeakPtr<syncer::ModelTypeControllerDelegate>
+base::WeakPtr<syncer::DataTypeControllerDelegate>
 TabGroupServiceWrapper::GetSharedTabGroupControllerDelegate() {
   return sync_service_->GetSharedTabGroupControllerDelegate();
 }
@@ -282,16 +357,41 @@ TabGroupServiceWrapper::CreateScopedLocalObserverPauser() {
   if (ShouldUseSyncService()) {
     return sync_service_->CreateScopedLocalObserverPauser();
   } else {
-    return nullptr;
+    return saved_keyed_service_->CreateScopedLocalObserverPauser();
   }
 }
 
 void TabGroupServiceWrapper::AddObserver(Observer* observer) {
-  NOTIMPLEMENTED();
+  if (ShouldUseSyncService()) {
+    sync_service_->AddObserver(observer);
+  }
 }
 
 void TabGroupServiceWrapper::RemoveObserver(Observer* observer) {
-  NOTIMPLEMENTED();
+  if (ShouldUseSyncService()) {
+    sync_service_->RemoveObserver(observer);
+  }
+}
+
+void TabGroupServiceWrapper::AddWrapperObserver(
+    Observer* tab_group_sync_observer,
+    SavedTabGroupModelObserver* saved_tab_group_model_observer) {
+  if (ShouldUseSyncService()) {
+    AddObserver(tab_group_sync_observer);
+  } else {
+    saved_keyed_service_->model()->AddObserver(saved_tab_group_model_observer);
+  }
+}
+
+void TabGroupServiceWrapper::RemoveWrapperObserver(
+    Observer* tab_group_sync_observer,
+    SavedTabGroupModelObserver* saved_tab_group_model_observer) {
+  if (ShouldUseSyncService()) {
+    RemoveObserver(tab_group_sync_observer);
+  } else {
+    saved_keyed_service_->model()->RemoveObserver(
+        saved_tab_group_model_observer);
+  }
 }
 
 void TabGroupServiceWrapper::OnTabAddedToGroupLocally(
@@ -338,6 +438,19 @@ void TabGroupServiceWrapper::OnTabGroupVisualsChanged(
   }
 
   saved_keyed_service_->OnTabGroupVisualsChanged(group_guid);
+}
+
+bool TabGroupServiceWrapper::AreSavedTabGroupsSyncedForProfile(
+    Profile* profile) {
+  const syncer::SyncService* const sync_service =
+      SyncServiceFactory::GetForProfile(profile);
+
+  if (!sync_service->IsSyncFeatureEnabled()) {
+    return false;
+  }
+
+  return sync_service->GetUserSettings()->GetSelectedTypes().Has(
+      syncer::UserSelectableType::kSavedTabGroups);
 }
 
 bool TabGroupServiceWrapper::ShouldUseSyncService() {

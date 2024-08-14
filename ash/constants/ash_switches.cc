@@ -5,6 +5,7 @@
 #include "ash/constants/ash_switches.h"
 
 #include <algorithm>
+#include <optional>
 #include <string>
 
 #include "base/auto_reset.h"
@@ -727,6 +728,11 @@ const char kGrowthCampaigns[] = "growth-campaigns";
 // downloading from Omaha).
 const char kGrowthCampaignsPath[] = "growth-campaigns-path";
 
+// Specifies the device registered time in `SecondsSinceUnixEpoch` format for
+// testing.
+const char kGrowthCampaignsRegisteredTimeSecondsSinceUnixEpoch[] =
+    "growth-campaigns-registered-time";
+
 // Indicates that the browser is in "browse without sign-in" (Guest session)
 // mode. Should completely disable extensions, sync and bookmarks.
 const char kGuestSession[] = "bwsi";
@@ -903,11 +909,24 @@ const char kDisallowLacros[] = "disallow-lacros";
 // used, event if --disallow-lacros is set.
 const char kDisableDisallowLacros[] = "disable-disallow-lacros";
 
+// This flag is a replacement for
+// `features::kLacrosOnly` during the in-between phase where users should not be
+// able to enable Lacros but developers should for debugging. Just like
+// `features::kLacrosOnly`, passing the flag alone does not guarantee that
+// Lacros is enabled and other conditions like whether Lacros is allowed to be
+// enabled i.e. `standalone_browser::BrowserSupport::IsAllowed()` still apply.
+const char kEnableLacrosForTesting[] = "enable-lacros-for-testing";
+
 // Supply secret key for the mahi feature.
 const char kMahiFeatureKey[] = "mahi-feature-key";
 
+const char kMahiRestrictionsOverride[] = "mahi-restrictions-override";
+
 // Supply secret key for the sparky feature.
 const char kSparkyFeatureKey[] = "sparky-feature-key";
+
+// Supply server url for the sparky feature.
+const char kSparkyServerUrl[] = "sparky-server-url";
 
 // Specifies the user that the browser data migration should happen for.
 const char kBrowserDataMigrationForUser[] = "browser-data-migration-for-user";
@@ -1474,6 +1493,19 @@ bool IsModifierSplitSecretKeyMatched() {
 
 base::AutoReset<bool> SetIgnoreModifierSplitSecretKeyForTest() {
   return {&g_ignore_modifier_split_secret_key, true};
+}
+
+std::optional<std::string> ObtainSparkyServerUrl() {
+  // Commandline looks like:
+  //  out/Default/chrome --user-data-dir=/tmp/tmp123
+  //  --sparky-server-url="INSERT KEY HERE"
+  //  --enable-features=Sparky
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kSparkyServerUrl)) {
+    return std::make_optional(
+        base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+            kSparkyServerUrl));
+  }
+  return std::nullopt;
 }
 
 }  // namespace ash::switches

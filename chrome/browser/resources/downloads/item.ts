@@ -1062,6 +1062,10 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
         this.isReviewable_;      // review-dangerous
   }
 
+  private computeShowCopyDownloadLink_(): boolean {
+    return !!(this.data && this.data.url);
+  }
+
   private computeShowQuickRemove_(): boolean {
     return this.isReviewable_ || this.computeShowRemove_() ||
         this.computeShowControlsForDangerous_();
@@ -1129,6 +1133,11 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
     }
   }
 
+  private shouldShowReferrerUrl_(): boolean {
+    return loadTimeData.getBoolean('showReferrerUrl') &&
+        this.data.displayReferrerUrl.data.length > 0;
+  }
+
   getReferrerUrlAnchorElement(): HTMLAnchorElement|null {
     return this.$['referrer-url'].querySelector('a') || null;
   }
@@ -1160,14 +1169,11 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
       return;
     }
 
-    // Else clause is not optional. We must clear the innerHTML if no displayReferrerUrl is
-    // present for the current download because this downloads-item may be reused.
+    // "else" case already handled by `shouldShowReferrerUrl_`.
     if (this.data.displayReferrerUrl.data.length > 0) {
       const referrerLine = loadTimeData.getStringF(
           'referrerLine', mojoString16ToString(this.data.displayReferrerUrl));
       this.$['referrer-url'].innerHTML = sanitizeInnerHtml(referrerLine);
-    } else {
-      this.$['referrer-url'].innerHTML = window.trustedTypes!.emptyHTML;
     }
 
     // Returns whether to use the file icon, and additionally clears file url
@@ -1219,6 +1225,14 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
     this.mojoHandler_.openEsbSettings();
   }
   // </if>
+
+  private onCopyDownloadLinkClick_(e: Event) {
+    if (!this.data.url) {
+      return;
+    }
+    navigator.clipboard.writeText(this.data.url.url);
+    this.displayCopyToast_(e);
+  }
 
   private onMoreActionsClick_() {
     const button = this.getMoreActionsButton();
@@ -1319,6 +1333,24 @@ export class DownloadsItemElement extends DownloadsItemElementBase {
       this.doResume_();
     }
     this.getMoreActionsMenu().close();
+  }
+
+  private displayCopyToast_(e: Event) {
+    if (!this.data.url) {
+      return;
+    }
+
+    const pieces = loadTimeData.getSubstitutedStringPieces(
+                       loadTimeData.getString('toastCopiedDownloadLink'),
+                       this.data.url.url) as unknown as
+        Array<{collapsible: boolean, value: string, arg: string}>;
+    pieces.forEach(p => {
+      p.collapsible = !!p.arg;
+    });
+    getToastManager().showForStringPieces(pieces, /*hideSlotted=*/ true);
+
+    e.stopPropagation();
+    e.preventDefault();
   }
 
   private displayRemovedToast_(canUndo: boolean, e: Event) {

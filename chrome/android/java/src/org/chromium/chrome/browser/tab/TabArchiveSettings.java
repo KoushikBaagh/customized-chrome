@@ -11,10 +11,13 @@ import androidx.annotation.VisibleForTesting;
 import org.chromium.base.ContextUtils;
 import org.chromium.base.ObserverList;
 import org.chromium.base.shared_preferences.SharedPreferencesManager;
+import org.chromium.base.task.PostTask;
+import org.chromium.base.task.TaskTraits;
 import org.chromium.build.BuildConfig;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /** Class to manage reading/writing preferences related to tab declutter. */
@@ -24,23 +27,32 @@ public class TabArchiveSettings {
         void onSettingChanged();
     }
 
-    @VisibleForTesting static final boolean ARCHIVE_ENABLED_DEFAULT = true;
-    @VisibleForTesting static final boolean AUTO_DELETE_ENABLED_DEFAULT = true;
+    private static boolean sIphShownThisSession;
+
+    /** Sets whether the iph was shown this session. */
+    public static void setIphShownThisSession(boolean iphShownThisSession) {
+        sIphShownThisSession = iphShownThisSession;
+    }
+
+    /** Returns whether the iph was shown this session. */
+    public static boolean getIphShownThisSession() {
+        return sIphShownThisSession;
+    }
+
     @VisibleForTesting static final boolean DIALOG_IPH_DEFAULT = true;
+    private static final Set<String> PREF_KEYS_FOR_NOTIFICATIONS =
+            Set.of(
+                    ChromePreferenceKeys.TAB_DECLUTTER_ARCHIVE_ENABLED,
+                    ChromePreferenceKeys.TAB_DECLUTTER_ARCHIVE_TIME_DELTA_HOURS,
+                    ChromePreferenceKeys.TAB_DECLUTTER_AUTO_DELETE_ENABLED,
+                    ChromePreferenceKeys.TAB_DECLUTTER_AUTO_DELETE_TIME_DELTA_HOURS);
 
     private SharedPreferences.OnSharedPreferenceChangeListener mPrefsListener =
             new SharedPreferences.OnSharedPreferenceChangeListener() {
                 @Override
                 public void onSharedPreferenceChanged(SharedPreferences sharedPrefs, String key) {
-                    if (key.equals(ChromePreferenceKeys.TAB_DECLUTTER_ARCHIVE_ENABLED)
-                            || key.equals(
-                                    ChromePreferenceKeys.TAB_DECLUTTER_ARCHIVE_TIME_DELTA_HOURS)
-                            || key.equals(ChromePreferenceKeys.TAB_DECLUTTER_AUTO_DELETE_ENABLED)
-                            || key.equals(
-                                    ChromePreferenceKeys
-                                            .TAB_DECLUTTER_AUTO_DELETE_TIME_DELTA_HOURS)) {
-                        notifyObservers();
-                    }
+
+                    PostTask.postTask(TaskTraits.UI_DEFAULT, () -> maybeNotifyObservers(key));
                 }
             };
 
@@ -81,7 +93,9 @@ public class TabArchiveSettings {
         // this will need to be turned on manually.
         return mPrefsManager.readBoolean(
                 ChromePreferenceKeys.TAB_DECLUTTER_ARCHIVE_ENABLED,
-                BuildConfig.IS_FOR_TEST ? false : ARCHIVE_ENABLED_DEFAULT);
+                BuildConfig.IS_FOR_TEST
+                        ? false
+                        : ChromeFeatureList.sAndroidTabDeclutterArchiveEnabled.getValue());
     }
 
     /** Sets whether archive is enabled in settings. */
@@ -119,9 +133,10 @@ public class TabArchiveSettings {
 
     /** Returns whether auto-deletion of archived tabs is enabled. */
     public boolean isAutoDeleteEnabled() {
-        return mPrefsManager.readBoolean(
-                ChromePreferenceKeys.TAB_DECLUTTER_AUTO_DELETE_ENABLED,
-                AUTO_DELETE_ENABLED_DEFAULT);
+        return getArchiveEnabled()
+                && mPrefsManager.readBoolean(
+                        ChromePreferenceKeys.TAB_DECLUTTER_AUTO_DELETE_ENABLED,
+                        ChromeFeatureList.sAndroidTabDeclutterAutoDeleteEnabled.getValue());
     }
 
     /** Sets whether auto deletion for archived tabs is enabled in settings. */
@@ -172,7 +187,9 @@ public class TabArchiveSettings {
 
     // Private methods.
 
-    private void notifyObservers() {
+    private void maybeNotifyObservers(String key) {
+        if (!PREF_KEYS_FOR_NOTIFICATIONS.contains(key)) return;
+
         for (Observer obs : mObservers) {
             obs.onSettingChanged();
         }

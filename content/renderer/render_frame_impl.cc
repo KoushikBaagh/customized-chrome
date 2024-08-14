@@ -1195,7 +1195,9 @@ void CallClientDeferMediaLoad(base::WeakPtr<RenderFrameImpl> frame,
       frame.get(), has_played_media_before, std::move(closure));
 }
 
-void LogCommitHistograms(base::TimeTicks commit_sent, bool is_main_frame) {
+void LogCommitHistograms(base::TimeTicks commit_sent,
+                         bool is_main_frame,
+                         const GURL& new_page_url) {
   if (!base::TimeTicks::IsConsistentAcrossProcesses())
     return;
 
@@ -1222,6 +1224,29 @@ void LogCommitHistograms(base::TimeTicks commit_sent, bool is_main_frame) {
     base::UmaHistogramTimes(
         base::StrCat({"Navigation.RendererCommitProcessWaitTime.", frame_type}),
         run_loop_start_time - commit_sent);
+  }
+
+  // We want to record the following metric just one time per process.
+  static bool is_first_commit = true;
+  if (is_first_commit) {
+    is_first_commit = false;
+    if (run_loop_start_time <= now && new_page_url.is_valid() &&
+        new_page_url.SchemeIsHTTPOrHTTPS()) {
+      const char* const name =
+          is_main_frame
+              ? "Navigation.RendererRunLoopStartToFirstCommitNavigation2."
+                "MainFrame"
+              : "Navigation.RendererRunLoopStartToFirstCommitNavigation2."
+                "Subframe";
+      const auto trace_id = TRACE_ID_WITH_SCOPE(
+          name, TRACE_ID_LOCAL(RenderThreadImpl::current()));
+      TRACE_EVENT_NESTABLE_ASYNC_BEGIN_WITH_TIMESTAMP1(
+          "navigation", name, trace_id, run_loop_start_time, "url",
+          new_page_url);
+      TRACE_EVENT_NESTABLE_ASYNC_END_WITH_TIMESTAMP0("navigation", name,
+                                                     trace_id, now);
+      base::UmaHistogramLongTimes(name, now - run_loop_start_time);
+    }
   }
 }
 
@@ -2221,6 +2246,7 @@ void RenderFrameImpl::Delete(mojom::FrameDeleteIntention intent) {
         auto* data = event->set_render_frame_impl_deletion();
         data->set_intent(FrameDeleteIntentionToProto(intent));
       });
+  base::ScopedUmaHistogramTimer histogram_timer("Navigation.RenderFrameDelete");
   // The main frame (when not provisional) is owned by the renderer's frame tree
   // via WebViewImpl. When a provisional main frame is swapped in, the ownership
   // moves from the browser to the renderer, but this happens in the renderer
@@ -2675,6 +2701,7 @@ void RenderFrameImpl::CommitNavigation(
     mojom::CookieManagerInfoPtr cookie_manager_info,
     mojom::StorageInfoPtr storage_info,
     mojom::NavigationClient::CommitNavigationCallback commit_callback) {
+  base::ScopedUmaHistogramTimer histogram_timer("Navigation.CommitRenderFrame");
   TRACE_EVENT_WITH_FLOW0("navigation", "RenderFrameImpl::CommitNavigation",
                          TRACE_ID_LOCAL(this),
                          TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT);
@@ -2685,7 +2712,8 @@ void RenderFrameImpl::CommitNavigation(
   // navigations.
   CHECK(!commit_params->origin_to_commit ||
         common_params->url.SchemeIs(url::kDataScheme));
-  LogCommitHistograms(commit_params->commit_sent, is_main_frame_);
+  LogCommitHistograms(commit_params->commit_sent, is_main_frame_,
+                      common_params->url);
 
   AssertNavigationCommits assert_navigation_commits(
       this, kMayReplaceInitialEmptyDocument);
@@ -3264,6 +3292,8 @@ void RenderFrameImpl::CommitSameDocumentNavigation(
         navigation_state->common_params().has_user_gesture;
     bool is_browser_initiated =
         navigation_state->commit_params().is_browser_initiated;
+    bool has_ua_visual_transition =
+        navigation_state->commit_params().has_ua_visual_transition;
     std::optional<blink::scheduler::TaskAttributionId>
         soft_navigation_heuristics_task_id =
             navigation_state->commit_params()
@@ -3279,7 +3309,8 @@ void RenderFrameImpl::CommitSameDocumentNavigation(
     commit_status = frame_->CommitSameDocumentNavigation(
         url, load_type, item_for_history_navigation, is_client_redirect,
         started_with_transient_activation, initiator_origin,
-        is_browser_initiated, soft_navigation_heuristics_task_id);
+        is_browser_initiated, has_ua_visual_transition,
+        soft_navigation_heuristics_task_id);
 
     // If `commit_status` is Ok, RunCommitSameDocumentNavigationCallback() was
     // called in DidCommitNavigationInternal() or the NavigationApi deferred the
@@ -3373,6 +3404,10 @@ bool RenderFrameImpl::IsPluginHandledExternally(
 #else
   return false;
 #endif
+}
+
+bool RenderFrameImpl::IsDomStorageDisabled() const {
+  return GetContentClient()->renderer()->IsDomStorageDisabled();
 }
 
 v8::Local<v8::Object> RenderFrameImpl::GetScriptableObject(
@@ -4822,6 +4857,13 @@ void RenderFrameImpl::WasShown() {
 #endif  // BUILDFLAG(ENABLE_PPAPI)
 }
 
+void RenderFrameImpl::OnFrameVisibilityChanged(
+    blink::mojom::FrameVisibility render_status) {
+  for (auto& observer : observers_) {
+    observer.OnFrameVisibilityChanged(render_status);
+  }
+}
+
 bool RenderFrameImpl::IsMainFrame() {
   return is_main_frame_;
 }
@@ -5052,6 +5094,7 @@ RenderFrameImpl::MakeDidCommitProvisionalLoadParams(
       GetWebFrame()->PerformanceMetricsForNestedContexts().UnloadStart();
   params->unload_end =
       GetWebFrame()->PerformanceMetricsForNestedContexts().UnloadEnd();
+  params->commit_navigation_start = navigation_state->commit_start_time();
   params->commit_navigation_end = GetWebFrame()
                                       ->PerformanceMetricsForNestedContexts()
                                       .CommitNavigationEnd();

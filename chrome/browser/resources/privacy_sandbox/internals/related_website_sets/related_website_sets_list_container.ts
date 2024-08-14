@@ -9,7 +9,7 @@ import type {CrButtonElement} from '//resources/cr_elements/cr_button/cr_button.
 import {CrLitElement} from '//resources/lit/v3_0/lit.rollup.js';
 import type {PropertyValues} from '//resources/lit/v3_0/lit.rollup.js';
 
-import type {RelatedWebsiteSet} from './related_website_sets.mojom-webui.js';
+import type {Member, RelatedWebsiteSet} from './related_website_sets.mojom-webui.js';
 import {getCss} from './related_website_sets_list_container.css.js';
 import {getHtml} from './related_website_sets_list_container.html.js';
 
@@ -35,14 +35,18 @@ export class RelatedWebsiteSetsListContainerElement extends CrLitElement {
   static override get properties() {
     return {
       relatedWebsiteSets: {type: Array},
+      filteredItems: {type: Array},
       isAnyRowCollapsed: {type: Boolean},
       errorMessage: {type: String},
+      query: {type: String},
     };
   }
 
   relatedWebsiteSets: RelatedWebsiteSet[] = [];
-  protected isAnyRowCollapsed: boolean = true;
+  query: string = '';
   errorMessage: string = '';
+  protected isAnyRowCollapsed: boolean = true;
+  filteredItems: RelatedWebsiteSet[] = [];
 
   private rowExpandedStates_: Map<string, boolean> = new Map();
 
@@ -51,6 +55,29 @@ export class RelatedWebsiteSetsListContainerElement extends CrLitElement {
 
     this.isAnyRowCollapsed = Array.from(this.rowExpandedStates_.values())
                                  .some(expanded => !expanded);
+
+    if (changedProperties.has('query') ||
+        changedProperties.has('relatedWebsiteSets')) {
+      this.filteredItems =
+          this.relatedWebsiteSets.filter(set => this.hasMatch_(set));
+
+      this.errorMessage =
+          this.filteredItems.length === 0 ? 'No items match' : '';
+    }
+  }
+
+  private hasMatch_(set: RelatedWebsiteSet): boolean {
+    const normalizedQuery = this.query.toLowerCase().trim();
+    if (set.primarySite.toLowerCase().includes(normalizedQuery)) {
+      return true;
+    }
+
+    for (const member of set.memberSites) {
+      if (member.site.toLowerCase().includes(normalizedQuery)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   protected onClick_() {
@@ -75,6 +102,10 @@ export class RelatedWebsiteSetsListContainerElement extends CrLitElement {
 
   protected getDisplayedError(): string {
     return this.errorMessage.replace('Error', '');
+  }
+
+  protected getMemberSites_(item: RelatedWebsiteSet): Member[] {
+    return item.memberSites.filter(ms => ms.site !== item.primarySite);
   }
 }
 

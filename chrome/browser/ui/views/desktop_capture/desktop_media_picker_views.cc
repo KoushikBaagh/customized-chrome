@@ -49,6 +49,7 @@
 #include "media/base/media_switches.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/mojom/ui_base_types.mojom-shared.h"
 #include "ui/base/ui_base_features.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/canvas.h"
@@ -467,7 +468,8 @@ DesktopMediaPickerDialogView::DesktopMediaPickerDialogView(
         const bool supports_reselect_button =
             list_controller->SupportsReselectButton();
         screen_scroll_view->SetContents(list_controller->CreateView(
-            kGenericScreenStyle, kSingleScreenStyle, screen_title_text));
+            kGenericScreenStyle, kSingleScreenStyle, screen_title_text,
+            DesktopMediaList::Type::kScreen));
         // If the DisplayMediaPickerRedesign flag is active, clip max height to
         // 1.5 item heights to allow space for the audio-toggle controller.
         screen_scroll_view->ClipHeightTo(
@@ -505,7 +507,8 @@ DesktopMediaPickerDialogView::DesktopMediaPickerDialogView(
         const bool supports_reselect_button =
             list_controller->SupportsReselectButton();
         window_scroll_view->SetContents(list_controller->CreateView(
-            kWindowStyle, kWindowStyle, window_title_text));
+            kWindowStyle, kWindowStyle, window_title_text,
+            DesktopMediaList::Type::kWindow));
         window_scroll_view->ClipHeightTo(kWindowStyle.item_size.height(),
                                          kWindowStyle.item_size.height() * 2);
         window_scroll_view->SetHorizontalScrollBarMode(
@@ -560,7 +563,8 @@ DesktopMediaPickerDialogView::DesktopMediaPickerDialogView(
         const bool supports_reselect_button =
             list_controller->SupportsReselectButton();
         window_scroll_view->SetContents(list_controller->CreateView(
-            kCurrentTabStyle, kCurrentTabStyle, title));
+            kCurrentTabStyle, kCurrentTabStyle, title,
+            DesktopMediaList::Type::kCurrentTab));
         window_scroll_view->ClipHeightTo(
             kCurrentTabStyle.item_size.height(),
             kCurrentTabStyle.item_size.height() * 2);
@@ -639,9 +643,9 @@ DesktopMediaPickerDialogView::DesktopMediaPickerDialogView(
         constrained_window::ShowWebModalDialogViews(this, params.web_contents);
   } else {
 #if BUILDFLAG(IS_MAC)
-    // On Mac, MODAL_TYPE_CHILD with a null parent isn't allowed - fall back to
-    // MODAL_TYPE_WINDOW.
-    SetModalType(ui::MODAL_TYPE_WINDOW);
+    // On Mac, ModalType::kChild with a null parent isn't allowed - fall back to
+    // ModalType::kWindow.
+    SetModalType(ui::mojom::ModalType::kWindow);
 #endif
     widget = CreateDialogWidget(this, params.context, nullptr);
     widget->Show();
@@ -1059,7 +1063,7 @@ void DesktopMediaPickerDialogView::OnSourceListLayoutChanged() {
   // BubbleDialogDelegateView::SizeToContents() instead of implementing sizing
   // logic in-place.
   const gfx::Size new_size = GetWidget()->GetRootView()->GetPreferredSize();
-  if (GetModalType() == ui::ModalType::MODAL_TYPE_CHILD) {
+  if (GetModalType() == ui::mojom::ModalType::kChild) {
     // For the web-modal dialog resize the dialog in place.
     // TODO(pbos): This should ideally use UpdateWebContentsModalDialogPosition
     // to keep the widget centered horizontally. As this dialog is fixed-width

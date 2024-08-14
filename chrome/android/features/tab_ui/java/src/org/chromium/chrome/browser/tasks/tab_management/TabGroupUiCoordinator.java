@@ -16,9 +16,11 @@ import org.chromium.base.Callback;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.supplier.LazyOneshotSupplierImpl;
 import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.OneshotSupplier;
 import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
+import org.chromium.chrome.browser.data_sharing.DataSharingTabManager;
 import org.chromium.chrome.browser.layouts.LayoutStateProvider;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
@@ -49,6 +51,11 @@ public class TabGroupUiCoordinator
                 TabGroupUi,
                 TabGroupUiMediator.TabGroupUiController {
     static final String COMPONENT_NAME = "TabStrip";
+
+    /** Set by {@code mMediator}, but owned by the coordinator so access is safe pre-native. */
+    private final ObservableSupplierImpl<Boolean> mHandleBackPressChangedSupplier =
+            new ObservableSupplierImpl<>();
+
     private final Activity mActivity;
     private final Context mContext;
     private final BrowserControlsStateProvider mBrowserControlsStateProvider;
@@ -59,6 +66,7 @@ public class TabGroupUiCoordinator
     private final ScrimCoordinator mScrimCoordinator;
     private final ObservableSupplier<Boolean> mOmniboxFocusStateSupplier;
     private final BottomSheetController mBottomSheetController;
+    private final DataSharingTabManager mDataSharingTabManager;
     private final ViewGroup mRootView;
     private final TabModelSelector mTabModelSelector;
     private final OneshotSupplier<LayoutStateProvider> mLayoutStateProviderSupplier;
@@ -82,6 +90,7 @@ public class TabGroupUiCoordinator
             @NonNull ScrimCoordinator scrimCoordinator,
             @NonNull ObservableSupplier<Boolean> omniboxFocusStateSupplier,
             @NonNull BottomSheetController bottomSheetController,
+            @NonNull DataSharingTabManager dataSharingTabManager,
             @NonNull TabModelSelector tabModelSelector,
             @NonNull TabContentManager tabContentManager,
             @NonNull ViewGroup rootView,
@@ -103,6 +112,7 @@ public class TabGroupUiCoordinator
                                     .inflate(R.layout.bottom_tab_strip_toolbar, parentView, false);
             mTabListContainerView = mToolbarView.getViewContainer();
             mBottomSheetController = bottomSheetController;
+            mDataSharingTabManager = dataSharingTabManager;
             mTabModelSelector = tabModelSelector;
             mLayoutStateProviderSupplier = layoutStateProviderSupplier;
             mRootView = rootView;
@@ -130,6 +140,7 @@ public class TabGroupUiCoordinator
                         mActivity,
                         mBrowserControlsStateProvider,
                         mBottomSheetController,
+                        mDataSharingTabManager,
                         currentTabModelFilterSupplier,
                         mTabContentManager,
                         mTabCreatorManager,
@@ -140,7 +151,8 @@ public class TabGroupUiCoordinator
                         mScrimCoordinator,
                         mTabStripCoordinator.getTabGroupTitleEditor(),
                         mRootView,
-                        actionConfirmationManager);
+                        actionConfirmationManager,
+                        mModalDialogManager);
         mTabGridDialogControllerSupplier.set(mTabGridDialogCoordinator);
     }
 
@@ -158,6 +170,7 @@ public class TabGroupUiCoordinator
                             TabListCoordinator.TabListMode.STRIP,
                             mContext,
                             mBrowserControlsStateProvider,
+                            mModalDialogManager,
                             currentTabModelFilterSupplier,
                             /* thumbnailProvider= */ null,
                             /* actionOnRelatedTabs= */ false,
@@ -198,9 +211,11 @@ public class TabGroupUiCoordinator
                     new TabGroupUiMediator(
                             mActivity,
                             visibilityController,
+                            mHandleBackPressChangedSupplier,
                             this,
                             mModel,
                             mTabModelSelector,
+                            mTabContentManager,
                             mTabCreatorManager,
                             mLayoutStateProviderSupplier,
                             mIncognitoStateProvider,
@@ -254,17 +269,19 @@ public class TabGroupUiCoordinator
     /** TabGroupUi implementation. */
     @Override
     public boolean onBackPressed() {
+        if (mMediator == null) return false;
         return mMediator.onBackPressed();
     }
 
     @Override
     public @BackPressResult int handleBackPress() {
+        if (mMediator == null) return BackPressResult.FAILURE;
         return mMediator.handleBackPress();
     }
 
     @Override
     public ObservableSupplier<Boolean> getHandleBackPressChangedSupplier() {
-        return mMediator.getHandleBackPressChangedSupplier();
+        return mHandleBackPressChangedSupplier;
     }
 
     /** Destroy any members that needs clean up. */
@@ -279,17 +296,21 @@ public class TabGroupUiCoordinator
             mTabGridDialogCoordinator.destroy();
         }
         mModelChangeProcessor.destroy();
-        mMediator.destroy();
+        if (mMediator != null) {
+            mMediator.destroy();
+        }
     }
 
     // TabGroupUiController implementation.
     @Override
     public void setupLeftButtonDrawable(int drawableId) {
+        assert mMediator != null;
         mMediator.setupLeftButtonDrawable(drawableId);
     }
 
     @Override
     public void setupLeftButtonOnClickListener(View.OnClickListener listener) {
+        assert mMediator != null;
         mMediator.setupLeftButtonOnClickListener(listener);
     }
 }

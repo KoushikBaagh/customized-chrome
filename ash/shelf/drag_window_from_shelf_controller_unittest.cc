@@ -39,6 +39,7 @@
 #include "chromeos/constants/chromeos_features.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/client/window_parenting_client.h"
+#include "ui/base/mojom/ui_base_types.mojom-shared.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
 #include "ui/compositor/scoped_animation_duration_scale_mode.h"
@@ -154,7 +155,7 @@ class DragWindowFromShelfControllerTest : public AshTestBase {
                                           bounds, display::kInvalidDisplayId);
     child->Show();
 
-    child->SetProperty(aura::client::kModalKey, ui::MODAL_TYPE_WINDOW);
+    child->SetProperty(aura::client::kModalKey, ui::mojom::ModalType::kWindow);
     wm::SetModalParent(child.get(), transient_parent);
     return child;
   }
@@ -1324,11 +1325,11 @@ TEST_F(DragWindowFromShelfControllerTest,
       overview_controller->overview_session()->GetGridWithRootWindow(
           Shell::GetPrimaryRootWindow());
   EXPECT_TRUE(overview_grid);
-  ASSERT_EQ(1u, overview_grid->window_list().size());
-
-  auto* overview_item = overview_grid->window_list()[0].get();
+  const auto& overview_items = overview_grid->item_list();
+  ASSERT_EQ(1u, overview_items.size());
 
   // Press on `overview_item` to exit overview mode and show windows.
+  auto* overview_item = overview_items[0].get();
   auto* event_generator = GetEventGenerator();
   event_generator->set_current_screen_location(
       gfx::ToRoundedPoint(overview_item->GetTransformedBounds().CenterPoint()));

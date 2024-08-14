@@ -751,12 +751,6 @@ interface LocalFrameHost {
   // browser to send private aggregation requests associated with `event_type`.
   SendPrivateAggregationRequestsForFencedFrameEvent(string event_type);
 
-  // Indicates whether the Attribution Reporting API's runtime features are
-  // enabled or not for this document, and are required for integration of
-  // fenced frames (and URN iframes) with the Attribution Reporting API.
-  SetAttributionReportingRuntimeFeatures(
-      network.mojom.AttributionReportingRuntimeFeatures features);
-
   // Sent by the frame in a renderer process that hosts/owns a <fencedframe>
   // element, to the browser process requesting the creation of a new fenced
   // frame tree that will host the contents of the <fencedframe> element.
@@ -989,6 +983,12 @@ interface LocalFrame {
   // Notifies the frame that its parent has changed the frame's sandbox flags or
   // container policy.
   DidUpdateFramePolicy(blink.mojom.FramePolicy frame_policy);
+
+  // Notifies the renderer process that the associated frame has changed its
+  // visibility status. Visibility status changes occur when the frame moves
+  // in/out of the viewport, or when the render status of the object changes,
+  // e.g. if the frame gets set a "display: none" or "visibility: hidden" style.
+  OnFrameVisibilityChanged(blink.mojom.FrameVisibility visibility);
 
   // Posts a message from a frame in another process to the current renderer.
   // |source_frame_token| is the frame token of the RemoteFrame in the current

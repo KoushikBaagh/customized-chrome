@@ -17,6 +17,10 @@
   std::vector<const TabGroup*> _groups;
 }
 
+- (void)setTabGridMode:(TabGridMode)mode {
+  self.mode = mode;
+}
+
 - (const std::vector<web::WebStateID>&)items {
   return _items;
 }
@@ -91,6 +95,10 @@
   } else {
     _items.push_back(moved_id);
   }
+}
+
+- (void)bringItemIntoView:(GridItemIdentifier*)item animated:(BOOL)animated {
+  // No-op.
 }
 
 - (void)dismissModals {

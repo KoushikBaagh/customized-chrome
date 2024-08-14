@@ -6,5 +6,6 @@
 
 validateInputFromAnotherBuilder('hardSwish');
 
-validateUnaryOperation(
-    'hardSwish', floatingPointTypes, /*alsoBuildActivation=*/ true);
+const label = 'hard_swish';
+const regrexp = new RegExp('\\[' + label + '\\]');
+validateUnaryOperation('hardSwish', floatingPointTypes, label, regrexp);

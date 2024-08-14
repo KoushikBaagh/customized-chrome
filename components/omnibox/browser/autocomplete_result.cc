@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/check.h"
 #include "base/check_op.h"
 #include "base/command_line.h"
 #include "base/containers/adapters.h"
@@ -415,14 +416,11 @@ void AutocompleteResult::SortAndCull(
       } else if (omnibox::IsNTPPage(page_classification)) {
         // IPH is shown for NTP ZPS in the Omnibox only.  If it is shown, reduce
         // the limit of the normal NTP ZPS Section to make room for the IPH.
-        auto has_iph_match = [](auto matches) {
-          return base::ranges::any_of(
-              matches, [](auto match) { return match.IsIPHSuggestion(); });
-        };
+        bool has_iph_match = base::ranges::any_of(
+            matches_, [](auto match) { return match.IsIPHSuggestion(); });
         bool add_iph_section =
-            OmniboxFieldTrial::IsFeaturedSearchIPHEnabled() &&
             page_classification != OmniboxEventProto::NTP_REALBOX &&
-            has_iph_match(matches_);
+            has_iph_match;
         sections.push_back(std::make_unique<DesktopNTPZpsSection>(
             suggestion_groups_map_, add_iph_section ? 7u : 8u));
         if (add_iph_section) {
@@ -807,6 +805,7 @@ void AutocompleteResult::ConvertOpenTabMatches(
       }
 
       auto tab_info = batch_lookup_map.find(match.destination_url);
+      // DCHECK ok as loop is exited if tab_info at .end().
       DCHECK(tab_info != batch_lookup_map.end());
       if (tab_info == batch_lookup_map.end()) {
         continue;
@@ -907,9 +906,9 @@ ACMatches::iterator AutocompleteResult::FindTopMatch(
   // fakebox/realbox, which is intended to work more like a search-only box.
   // Unless the user's input is a URL in which case we still want to ensure they
   // can get a URL as the default match.
-  if ((input.current_page_classification() !=
-           OmniboxEventProto::INSTANT_NTP_WITH_FAKEBOX_AS_STARTING_FOCUS &&
-       input.current_page_classification() != OmniboxEventProto::NTP_REALBOX) ||
+  omnibox::CheckObsoletePageClass(input.current_page_classification());
+
+  if (input.current_page_classification() != OmniboxEventProto::NTP_REALBOX ||
       input.type() == metrics::OmniboxInputType::URL) {
     auto best = matches->end();
     for (auto it = matches->begin(); it != matches->end(); ++it) {
@@ -1214,10 +1213,12 @@ std::u16string AutocompleteResult::GetCommonPrefix() {
   for (const auto& match : matches_) {
     if (match.type == ACMatchType::SEARCH_SUGGEST_TAIL) {
       int common_length;
-      base::StringToInt(
-          match.GetAdditionalInfo(kACMatchPropertyContentsStartIndex),
-          &common_length);
-      common_prefix = base::UTF8ToUTF16(match.GetAdditionalInfo(
+      // TODO (manukh): `GetAdditionalInfoForDebugging()` shouldn't be used for
+      //   non-debugging purposes.
+      base::StringToInt(match.GetAdditionalInfoForDebugging(
+                            kACMatchPropertyContentsStartIndex),
+                        &common_length);
+      common_prefix = base::UTF8ToUTF16(match.GetAdditionalInfoForDebugging(
                                             kACMatchPropertySuggestionText))
                           .substr(0, common_length);
       break;

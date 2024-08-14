@@ -19,6 +19,7 @@
 #include "chrome/browser/ui/lens/lens_overlay_proto_converter.h"
 #include "chrome/browser/ui/lens/lens_overlay_url_builder.h"
 #include "chrome/common/channel_info.h"
+#include "components/endpoint_fetcher/endpoint_fetcher.h"
 #include "components/lens/lens_features.h"
 #include "components/lens/proto/server/lens_overlay_response.pb.h"
 #include "components/metrics_services_manager/metrics_services_manager.h"
@@ -56,7 +57,10 @@ namespace lens {
 
 namespace {
 
-const int64_t kMaxDownloadBytes = 1024 * 1024;
+const int kMaxDownloadBytes = 1024 * 1024;
+const int kTranslateTaskCompletionID = 198158;
+const int kCopyTextTaskCompletionID = 198153;
+const int kSelectTextTaskCompletionID = 198157;
 
 // The name string for the header for variations information.
 constexpr char kClientDataHeader[] = "X-Client-Data";
@@ -396,19 +400,64 @@ void LensOverlayQueryController::SendLatencyGen204IfEnabled(
                          .Resolve(query);
     auto request = std::make_unique<network::ResourceRequest>();
     request->url = fetch_url;
-    gen204_loader_ = network::SimpleURLLoader::Create(std::move(request),
-                                                      kTrafficAnnotationTag);
-    gen204_loader_->DownloadToString(
+    latency_gen204_loader_ = network::SimpleURLLoader::Create(
+        std::move(request), kTrafficAnnotationTag);
+    latency_gen204_loader_->DownloadToString(
         profile_->GetURLLoaderFactory().get(),
-        base::BindOnce(&LensOverlayQueryController::OnGen204LoaderComplete,
-                       weak_ptr_factory_.GetWeakPtr()),
+        base::BindOnce(
+            &LensOverlayQueryController::OnLatencyGen204LoaderComplete,
+            base::Unretained(this)),
         kMaxDownloadBytes);
   }
 }
 
-void LensOverlayQueryController::OnGen204LoaderComplete(
+void LensOverlayQueryController::OnLatencyGen204LoaderComplete(
     std::unique_ptr<std::string> response_body) {
-  gen204_loader_.reset();
+  latency_gen204_loader_.reset();
+}
+
+void LensOverlayQueryController::SendTaskCompletionGen204IfEnabled(
+    lens::mojom::UserAction user_action) {
+  if (lens::features::GetLensOverlaySendTaskCompletionGen204() &&
+      g_browser_process->GetMetricsServicesManager()->IsMetricsConsentGiven()) {
+    int task_id;
+    switch (user_action) {
+      case mojom::UserAction::kTextSelection:
+        task_id = kSelectTextTaskCompletionID;
+        break;
+      case mojom::UserAction::kCopyText:
+        task_id = kCopyTextTaskCompletionID;
+        break;
+      case mojom::UserAction::kTranslateText:
+        task_id = kTranslateTaskCompletionID;
+        break;
+      default:
+        // Other user actions should not send an associated gen204 ping.
+        return;
+    }
+    std::string query = base::StringPrintf(
+        "gen_204?uact=4&rcid=%d&cad=%s", task_id,
+        request_id_generator_->GetBase32EncodedAnalyticsId().c_str());
+    auto fetch_url = GURL(TemplateURLServiceFactory::GetForProfile(profile_)
+                              ->search_terms_data()
+                              .GoogleBaseURLValue())
+                         .Resolve(query);
+    auto request = std::make_unique<network::ResourceRequest>();
+    request->url = fetch_url;
+    task_completion_gen204_loader_ = network::SimpleURLLoader::Create(
+        std::move(request), kTrafficAnnotationTag);
+    task_completion_gen204_loader_->DownloadToString(
+        profile_->GetURLLoaderFactory().get(),
+        base::BindOnce(
+            &LensOverlayQueryController::OnTaskCompletionGen204LoaderComplete,
+            base::Unretained(this)),
+        kMaxDownloadBytes);
+  }
+}
+
+void LensOverlayQueryController::OnTaskCompletionGen204LoaderComplete(
+    std::unique_ptr<std::string> response_body) {
+  task_completion_gen204_loader_.reset();
 }
 
 void LensOverlayQueryController::RunFullImageCallbackForError() {
@@ -449,15 +498,15 @@ void LensOverlayQueryController::SendMultimodalRequest(
     lens::mojom::CenterRotatedBoxPtr region,
     const std::string& query_text,
     lens::LensOverlaySelectionType multimodal_selection_type,
-    std::map<std::string, std::string> additional_search_query_params) {
+    std::map<std::string, std::string> additional_search_query_params,
+    std::optional<SkBitmap> region_bytes) {
   if (base::TrimWhitespaceASCII(query_text, base::TRIM_ALL).empty()) {
     return;
   }
   SendInteraction(/*region=*/std::move(region),
                   /*query_text=*/std::make_optional<std::string>(query_text),
                   /*object_id=*/std::nullopt, multimodal_selection_type,
-                  additional_search_query_params,
-                  /*region_bytes*/ std::nullopt);
+                  additional_search_query_params, region_bytes);
 }
 
 void LensOverlayQueryController::SendTextOnlyQuery(
@@ -661,9 +710,10 @@ void LensOverlayQueryController::
   // Generate and send the Lens search url.
   lens::proto::LensOverlayUrlResponse lens_overlay_url_response;
   lens_overlay_url_response.set_url(
-      lens::BuildLensSearchURL(
-          query_text, request_id_generator_->GetNextRequestId(), cluster_info,
-          additional_search_query_params, invocation_source_, use_dark_mode_)
+      lens::BuildLensSearchURL(query_text, page_url_, page_title_,
+                               request_id_generator_->GetNextRequestId(),
+                               cluster_info, additional_search_query_params,
+                               invocation_source_, use_dark_mode_)
           .spec());
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(url_callback_, lens_overlay_url_response));
@@ -796,9 +846,11 @@ void LensOverlayQueryController::FetchEndpoint(
           /*post_data=*/request_data_string,
           /*headers=*/headers,
           /*cors_exempt_headers=*/cors_exempt_headers,
-          /*annotation_tag=*/kTrafficAnnotationTag,
-          /*is_stable_channel=*/chrome::GetChannel() ==
-              version_info::Channel::STABLE);
+          /*annotation_tag=*/kTrafficAnnotationTag, chrome::GetChannel(),
+          /*request_params=*/
+          EndpointFetcher::RequestParams::Builder()
+              .SetCredentialsMode(CredentialsMode::kInclude)
+              .Build());
   EndpointFetcher* fetcher = endpoint_fetcher.get();
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(std::move(fetcher_created_callback),

@@ -1186,7 +1186,7 @@ IN_PROC_BROWSER_TEST_P(PDFExtensionAccessibilityNavigationTest,
 
 // TODO(crbug.com/289010799): Revisit using `crosapi` in `PdfOcrUmaTest` for
 // Lacros.
-#if BUILDFLAG(ENABLE_SCREEN_AI_SERVICE) && !BUILDFLAG(IS_CHROMEOS_LACROS)
+#if !BUILDFLAG(IS_CHROMEOS_LACROS)
 // This test suite contains simple tests for the PDF OCR feature.
 class PdfOcrUmaTest : public PDFExtensionAccessibilityTest,
                       public ::testing::WithParamInterface<bool> {
@@ -1279,6 +1279,35 @@ IN_PROC_BROWSER_TEST_P(PdfOcrUmaTest, CheckOpenedWithSelectToSpeak) {
       "Accessibility.PDF.OpenedWithSelectToSpeak.PdfOcr", true,
       /*expected_bucket_count=*/1);
 }
+
+IN_PROC_BROWSER_TEST_P(PdfOcrUmaTest,
+                       CheckSelectToSpeakPagesOcredWithAccessiblePdf) {
+  // TODO(crbug.com/289010799): Remove this once the metrics are added for OOPIF
+  // PDF.
+  if (UseOopif()) {
+    GTEST_SKIP();
+  }
+
+  ::ash::AccessibilityManager::Get()->SetSelectToSpeakEnabled(true);
+
+  base::HistogramTester histograms;
+  histograms.ExpectTotalCount(
+      "Accessibility.PdfOcr.CrosSelectToSpeak.PagesOcred",
+      /*expected_count=*/0);
+
+  ASSERT_TRUE(LoadPdf(embedded_test_server()->GetURL("/pdf/test.pdf")));
+
+  WebContents* contents = GetActiveWebContents();
+  content::RenderFrameHost* extension_host =
+      pdf_extension_test_util::GetOnlyPdfExtensionHost(contents);
+  ASSERT_TRUE(extension_host);
+
+  metrics::SubprocessMetricsProvider::MergeHistogramDeltasForTesting();
+  // The metric should record nothing for accessible PDFs.
+  histograms.ExpectTotalCount(
+      "Accessibility.PdfOcr.CrosSelectToSpeak.PagesOcred",
+      /*expected_count=*/0);
+}
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 INSTANTIATE_TEST_SUITE_P(All,
@@ -1288,7 +1317,7 @@ INSTANTIATE_TEST_SUITE_P(All,
                            return base::StringPrintf(
                                "OOPIF_%s", info.param ? "Enabled" : "Disabled");
                          });
-#endif  // BUILDFLAG(ENABLE_SCREEN_AI_SERVICE) && !BUILDFLAG(IS_CHROMEOS_LACROS)
+#endif  // !BUILDFLAG(IS_CHROMEOS_LACROS)
 
 // TODO(crbug.com/40268279): Stop testing both modes after OOPIF PDF viewer
 // launches.

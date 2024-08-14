@@ -129,7 +129,7 @@ void AnnotationTray::OnGestureEvent(ui::GestureEvent* event) {
   // only available way to show the bubble.
   // TODO(crbug.com/40242435): Put this where we handle other button
   // activations, once the `views::Button` code allows it.
-  if (event->details().type() != ui::ET_GESTURE_LONG_PRESS) {
+  if (event->details().type() != ui::EventType::kGestureLongPress) {
     TrayBackgroundView::OnGestureEvent(event);
     return;
   }
@@ -164,7 +164,7 @@ void AnnotationTray::HideBubbleWithView(
     CloseBubble();
 }
 
-void AnnotationTray::CloseBubble() {
+void AnnotationTray::CloseBubbleInternal() {
   pen_view_ = nullptr;
   bubble_.reset();
   // Annotator can be enabled after closing the bubble so set the activity state

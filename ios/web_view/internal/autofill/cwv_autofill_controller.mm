@@ -338,9 +338,9 @@ using UserDecision = autofill::AutofillClient::AddressPromptUserDecision;
     confirmSaveCreditCardToCloud:(const autofill::CreditCard&)creditCard
                legalMessageLines:(autofill::LegalMessageLines)legalMessageLines
            saveCreditCardOptions:
-               (autofill::AutofillClient::SaveCreditCardOptions)
-                   saveCreditCardOptions
-                        callback:(autofill::AutofillClient::
+               (autofill::payments::PaymentsAutofillClient::
+                    SaveCreditCardOptions)saveCreditCardOptions
+                        callback:(autofill::payments::PaymentsAutofillClient::
                                       UploadSaveCardPromptCallback)callback {
   if (![_delegate respondsToSelector:@selector(autofillController:
                                           saveCreditCardWithSaver:)]) {

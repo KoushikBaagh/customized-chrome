@@ -19,6 +19,9 @@ import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProp
 import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.DIALOG_UNGROUP_BAR_HOVERED_TEXT_COLOR;
 import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.DIALOG_UNGROUP_BAR_TEXT;
 import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.DIALOG_UNGROUP_BAR_TEXT_COLOR;
+import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.FORCE_ANIMATION_TO_FINISH;
+import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.HAIRLINE_COLOR;
+import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.HAIRLINE_VISIBILITY;
 import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.HEADER_TITLE;
 import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.INITIAL_SCROLL_INDEX;
 import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.IS_DIALOG_VISIBLE;
@@ -33,8 +36,6 @@ import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProp
 import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.SCRIMVIEW_CLICK_RUNNABLE;
 import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.SHARE_BUTTON_CLICK_LISTENER;
 import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.SHARE_IMAGE_TILES_CLICK_LISTENER;
-import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.SHARE_MANAGE_ADD_CLICK_LISTENER;
-import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.SHOULD_SHOW_SHARE;
 import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.TAB_GROUP_COLOR_ID;
 import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.TINT;
 import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.TITLE_CURSOR_VISIBILITY;
@@ -159,6 +160,14 @@ class TabGridDialogViewBinder {
                 viewHolder.dialogView.updateDialogContainerBackgroundColor(backgroundColorInt);
                 viewHolder.toolbarView.setBackgroundColorTint(backgroundColorInt);
             }
+        } else if (HAIRLINE_COLOR == propertyKey) {
+            if (viewHolder.dialogView != null) {
+                viewHolder.dialogView.updateHairlineColor(model.get(HAIRLINE_COLOR));
+            }
+        } else if (HAIRLINE_VISIBILITY == propertyKey) {
+            if (viewHolder.dialogView != null) {
+                viewHolder.dialogView.setHairlineVisibility(model.get(HAIRLINE_VISIBILITY));
+            }
         } else if (DIALOG_UNGROUP_BAR_BACKGROUND_COLOR == propertyKey) {
             if (viewHolder.dialogView != null) {
                 viewHolder.dialogView.updateUngroupBarBackgroundColor(
@@ -221,23 +230,19 @@ class TabGridDialogViewBinder {
         } else if (COLLAPSE_BUTTON_CONTENT_DESCRIPTION == propertyKey) {
             viewHolder.toolbarView.setLeftButtonContentDescription(
                     model.get(COLLAPSE_BUTTON_CONTENT_DESCRIPTION));
-        } else if (SHOULD_SHOW_SHARE == propertyKey) {
-            viewHolder.dialogView.updateShouldShowShare(model.get(SHOULD_SHOW_SHARE));
         } else if (SHARE_BUTTON_CLICK_LISTENER == propertyKey) {
             viewHolder.toolbarView.setShareButtonClickListener(
                     model.get(SHARE_BUTTON_CLICK_LISTENER));
         } else if (SHARE_IMAGE_TILES_CLICK_LISTENER == propertyKey) {
-            viewHolder.dialogView.setShareImageTilesOnClickListener(
+            viewHolder.toolbarView.setImageTilesClickListener(
                     model.get(SHARE_IMAGE_TILES_CLICK_LISTENER));
-        } else if (SHARE_MANAGE_ADD_CLICK_LISTENER == propertyKey) {
-            viewHolder.dialogView.setShareManageAddOnClickListener(
-                    model.get(SHARE_MANAGE_ADD_CLICK_LISTENER));
         } else if (IS_TAB_GROUP_SHARED == propertyKey) {
             boolean isTabGroupShared = model.get(IS_TAB_GROUP_SHARED);
             boolean isIncognito = model.get(IS_INCOGNITO);
             boolean showShareButton = !isTabGroupShared && !isIncognito;
+            boolean showImageTiles = isTabGroupShared && !isIncognito;
             viewHolder.toolbarView.setShareButtonVisibility(showShareButton);
-            viewHolder.dialogView.refreshShareBar(isTabGroupShared);
+            viewHolder.toolbarView.setImageTilesVisibility(showImageTiles);
         } else if (TAB_GROUP_COLOR_ID == propertyKey) {
             viewHolder.toolbarView.setColorIconColor(
                     model.get(TAB_GROUP_COLOR_ID), model.get(IS_INCOGNITO));
@@ -256,6 +261,10 @@ class TabGridDialogViewBinder {
             if (model.get(ANIMATION_BACKGROUND_COLOR) != null) {
                 viewHolder.dialogView.updateAnimationBackgroundColor(
                         model.get(ANIMATION_BACKGROUND_COLOR));
+            }
+        } else if (FORCE_ANIMATION_TO_FINISH == propertyKey) {
+            if (model.get(FORCE_ANIMATION_TO_FINISH)) {
+                viewHolder.dialogView.forceAnimationToFinish();
             }
         }
     }

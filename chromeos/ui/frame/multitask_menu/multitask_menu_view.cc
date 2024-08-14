@@ -104,12 +104,12 @@ class MultitaskMenuView::MenuPreTargetHandler : public ui::EventHandler {
       return;
     }
 
-    if (event->type() == ui::ET_MOUSE_PRESSED) {
+    if (event->type() == ui::EventType::kMousePressed) {
       ProcessPressedEvent(*event);
       return;
     }
 
-    if (event->type() == ui::ET_MOUSE_MOVED && anchor_view_) {
+    if (event->type() == ui::EventType::kMouseMoved && anchor_view_) {
       const gfx::Point screen_location =
           event->target()->GetScreenLocation(*event);
       // Stop the existing timer if either the anchor or the menu contain the
@@ -131,7 +131,7 @@ class MultitaskMenuView::MenuPreTargetHandler : public ui::EventHandler {
       return;
     }
 
-    if (event->type() == ui::ET_TOUCH_PRESSED) {
+    if (event->type() == ui::EventType::kTouchPressed) {
       ProcessPressedEvent(*event);
     }
   }
@@ -432,18 +432,22 @@ void MultitaskMenuView::HalfButtonPressed(SnapDirection direction) {
 
 void MultitaskMenuView::PartialButtonPressed(SnapDirection direction) {
   wm::GetActivationClient(window_->GetRootWindow())->ActivateWindow(window_);
+  const bool is_primary_display_layout = chromeos::IsDisplayLayoutPrimary(
+      display::Screen::GetScreen()->GetDisplayNearestWindow(window_));
+  const bool is_primary_partial_split =
+      (is_primary_display_layout && direction == SnapDirection::kPrimary) ||
+      (!is_primary_display_layout && direction == SnapDirection::kSecondary);
   SnapController::Get()->CommitSnap(
       window_, direction,
-      direction == SnapDirection::kPrimary
-          ? (is_reversed_ ? chromeos::kOneThirdSnapRatio
-                          : chromeos::kTwoThirdSnapRatio)
-          : (is_reversed_ ? chromeos::kTwoThirdSnapRatio
-                          : chromeos::kOneThirdSnapRatio),
+      is_primary_partial_split ? (is_reversed_ ? chromeos::kOneThirdSnapRatio
+                                               : chromeos::kTwoThirdSnapRatio)
+                               : (is_reversed_ ? chromeos::kTwoThirdSnapRatio
+                                               : chromeos::kOneThirdSnapRatio),
       SnapController::SnapRequestSource::kWindowLayoutMenu);
   close_callback_.Run();
   base::RecordAction(base::UserMetricsAction(
-      direction == SnapDirection::kPrimary ? kPartialSplitTwoThirdsUserAction
-                                           : kPartialSplitOneThirdUserAction));
+      is_primary_partial_split ? kPartialSplitTwoThirdsUserAction
+                               : kPartialSplitOneThirdUserAction));
   RecordMultitaskMenuActionType(MultitaskMenuActionType::kPartialSplitButton);
 }
 

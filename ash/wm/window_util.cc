@@ -17,6 +17,7 @@
 #include "ash/public/mojom/input_device_settings.mojom.h"
 #include "ash/root_window_controller.h"
 #include "ash/screen_util.h"
+#include "ash/session/session_controller_impl.h"
 #include "ash/shelf/shelf.h"
 #include "ash/shell.h"
 #include "ash/shell_delegate.h"
@@ -58,6 +59,7 @@
 #include "ui/aura/window_event_dispatcher.h"
 #include "ui/aura/window_targeter.h"
 #include "ui/base/hit_test.h"
+#include "ui/base/mojom/ui_base_types.mojom-shared.h"
 #include "ui/base/ui_base_types.h"
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/layer.h"
@@ -87,7 +89,7 @@ bool ContainsSystemModalWindow(const aura::Window* window) {
   }
 
   if (window->GetProperty(aura::client::kModalKey) ==
-      ui::ModalType::MODAL_TYPE_SYSTEM) {
+      ui::mojom::ModalType::kSystem) {
     return true;
   }
 
@@ -237,7 +239,9 @@ bool IsStackedBelow(aura::Window* win1, aura::Window* win2) {
 
 aura::Window* GetTopMostWindow(const aura::Window::Windows& windows) {
   aura::Window* lowest_common_parent = FindLowestCommonParent(windows);
-  CHECK(lowest_common_parent);
+  if (!lowest_common_parent) {
+    return nullptr;
+  }
 
   return FindTopMostChild(lowest_common_parent, windows);
 }
@@ -676,11 +680,11 @@ void SendBackKeyEvent(aura::Window* root_window) {
   // Send up event as well as down event as ARC++ clients expect this
   // sequence.
   // TODO: Investigate if we should be using the current modifiers.
-  ui::KeyEvent press_key_event(ui::ET_KEY_PRESSED, ui::VKEY_BROWSER_BACK,
-                               ui::EF_NONE);
+  ui::KeyEvent press_key_event(ui::EventType::kKeyPressed,
+                               ui::VKEY_BROWSER_BACK, ui::EF_NONE);
   std::ignore = root_window->GetHost()->SendEventToSink(&press_key_event);
-  ui::KeyEvent release_key_event(ui::ET_KEY_RELEASED, ui::VKEY_BROWSER_BACK,
-                                 ui::EF_NONE);
+  ui::KeyEvent release_key_event(ui::EventType::kKeyReleased,
+                                 ui::VKEY_BROWSER_BACK, ui::EF_NONE);
   std::ignore = root_window->GetHost()->SendEventToSink(&release_key_event);
 }
 
@@ -749,6 +753,16 @@ views::BubbleDialogDelegate* AsBubbleDialogDelegate(
     return nullptr;
   }
   return widget->widget_delegate()->AsBubbleDialogDelegate();
+}
+
+views::DialogDelegate* AsDialogDelegate(aura::Window* transient_window) {
+  views::Widget* widget =
+      views::Widget::GetWidgetForNativeWindow(transient_window);
+  if (!widget || !widget->widget_delegate()) {
+    return nullptr;
+  }
+
+  return widget->widget_delegate()->AsDialogDelegate();
 }
 
 bool ShouldShowForCurrentUser(aura::Window* window) {

@@ -59,6 +59,7 @@ using internal::ChildProcessLauncherHelper;
 
 void RenderProcessPriority::WriteIntoTrace(
     perfetto::TracedProto<TraceProto> proto) const {
+  // TODO(pmonette): Migrate is_background() to GetProcessPriority().
   proto->set_is_backgrounded(is_background());
   proto->set_has_pending_views(boost_for_pending_views);
 
@@ -272,11 +273,21 @@ ChildProcessLauncher::Client* ChildProcessLauncher::ReplaceClientForTest(
 }
 
 bool RenderProcessPriority::is_background() const {
+#if !BUILDFLAG(IS_ANDROID)
+  if (priority_override) {
+    return *priority_override == base::Process::Priority::kBestEffort;
+  }
+#endif
   return !visible && !has_media_stream && !boost_for_pending_views &&
          !has_foreground_service_worker && !boost_for_loading;
 }
 
 base::Process::Priority RenderProcessPriority::GetProcessPriority() const {
+#if !BUILDFLAG(IS_ANDROID)
+  if (priority_override) {
+    return *priority_override;
+  }
+#endif
   return is_background() ? base::Process::Priority::kBestEffort
                          : base::Process::Priority::kUserBlocking;
 }

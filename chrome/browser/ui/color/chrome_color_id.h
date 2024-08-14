@@ -43,6 +43,8 @@
   E_CPONLY(kColorAvatarButtonIncognitoHover) \
   E_CPONLY(kColorAvatarButtonNormalRipple) \
   E_CPONLY(kColorAvatarStrokeLight) \
+  E_CPONLY(kColorAvatarStroke) \
+  E_CPONLY(kColorAvatarFillForContrast) \
   /* Bookmark bar colors. */ \
   E_CPONLY(kColorBookmarkBarBackground) \
   E_CPONLY(kColorBookmarkBarForeground) \
@@ -172,6 +174,7 @@
   E_CPONLY(kColorIntentPickerItemBackgroundSelected) \
   /* Lens overlay colors. */ \
   E_CPONLY(kColorLensOverlayToastBackground) \
+  E_CPONLY(kColorLensOverlayToastButtonText) \
   /* Location bar colors. */ \
   E_CPONLY(kColorLocationBarBackground) \
   E_CPONLY(kColorLocationBarBackgroundHovered) \
@@ -247,6 +250,8 @@
   E_CPONLY(kColorNewTabPageModuleContextMenuDivider) \
   E_CPONLY(kColorNewTabPageModuleBackground) \
   E_CPONLY(kColorNewTabPageModuleCalendarEventTimeStatusBackground) \
+  E_CPONLY(kColorNewTabPageModuleCalendarAttachmentScrollbarThumb) \
+  E_CPONLY(kColorNewTabPageModuleCalendarDividerColor) \
   E_CPONLY(kColorNewTabPageModuleIconBackground) \
   E_CPONLY(kColorNewTabPageModuleElementDivider) \
   E_CPONLY(kColorNewTabPageModuleIconContainerBackground) \
@@ -389,7 +394,15 @@
   E_CPONLY(kColorPipWindowSkipAdButtonBorder) \
   /* Product Specifications colors */ \
   E_CPONLY(kColorProductSpecificationsButtonBackground) \
+  E_CPONLY(kColorProductSpecificationsCitationBackground) \
+  E_CPONLY(kColorProductSpecificationsDetailChipBackground) \
+  E_CPONLY(kColorProductSpecificationsDisclosureBackground) \
+  E_CPONLY(kColorProductSpecificationsDisclosureForeground) \
+  E_CPONLY(kColorProductSpecificationsDisclosureGradientEnd) \
+  E_CPONLY(kColorProductSpecificationsDisclosureGradientStart) \
+  E_CPONLY(kColorProductSpecificationsDisclosureSummaryBackground) \
   E_CPONLY(kColorProductSpecificationsDivider) \
+  E_CPONLY(kColorProductSpecificationsHorizontalCarouselScrollbarThumb) \
   E_CPONLY(kColorProductSpecificationsIcon) \
   E_CPONLY(kColorProductSpecificationsPageBackground) \
   E_CPONLY(kColorProductSpecificationsPrimaryTitle) \

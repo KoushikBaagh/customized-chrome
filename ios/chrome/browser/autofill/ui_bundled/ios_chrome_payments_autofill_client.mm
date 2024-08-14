@@ -23,6 +23,7 @@
 #import "components/autofill/core/browser/payments/credit_card_risk_based_authenticator.h"
 #import "components/autofill/core/browser/payments/otp_unmask_delegate.h"
 #import "components/autofill/core/browser/payments/otp_unmask_result.h"
+#import "components/autofill/core/browser/payments/payments_autofill_client.h"
 #import "components/autofill/core/browser/payments/payments_network_interface.h"
 #import "components/autofill/core/browser/payments/virtual_card_enroll_metrics_logger.h"
 #import "components/autofill/core/browser/payments/virtual_card_enrollment_manager.h"
@@ -84,7 +85,7 @@ void IOSChromePaymentsAutofillClient::LoadRiskData(
 
 void IOSChromePaymentsAutofillClient::ConfirmSaveCreditCardLocally(
     const CreditCard& card,
-    AutofillClient::SaveCreditCardOptions options,
+    SaveCreditCardOptions options,
     LocalSaveCardPromptCallback callback) {
   DCHECK(options.show_prompt);
   infobar_manager_->AddInfoBar(CreateSaveCardInfoBarMobile(
@@ -97,8 +98,8 @@ void IOSChromePaymentsAutofillClient::ConfirmSaveCreditCardLocally(
 void IOSChromePaymentsAutofillClient::ConfirmSaveCreditCardToCloud(
     const CreditCard& card,
     const LegalMessageLines& legal_message_lines,
-    AutofillClient::SaveCreditCardOptions options,
-    AutofillClient::UploadSaveCardPromptCallback callback) {
+    SaveCreditCardOptions options,
+    UploadSaveCardPromptCallback callback) {
   DCHECK(options.show_prompt);
 
   AccountInfo account_info =
@@ -128,6 +129,11 @@ void IOSChromePaymentsAutofillClient::CreditCardUploadCompleted(
         card_saved, std::move(on_confirmation_closed_callback));
   }
   if (!card_saved) {
+    // At this point, infobar would be dismissed but the omnibox icon could
+    // still be tapped to re-show the infobar. Since the card upload has
+    // failed, the save card infobar should not be re-shown, so the infobar is
+    // removed here to remove the associated omnibox icon.
+    client_->RemoveAutofillSaveCardInfoBar();
     autofill_metrics::LogCreditCardUploadConfirmationViewShownMetric(
         /*is_shown=*/true, /*is_card_uploaded=*/false);
     AutofillErrorDialogContext error_context;
@@ -178,13 +184,21 @@ void IOSChromePaymentsAutofillClient::ShowVirtualCardEnrollDialog(
 
 void IOSChromePaymentsAutofillClient::VirtualCardEnrollCompleted(
     bool is_vcn_enrolled) {
-  if (virtual_card_enroll_ui_model_ &&
-      base::FeatureList::IsEnabled(
+  if (!base::FeatureList::IsEnabled(
           features::kAutofillEnableVcnEnrollLoadingAndConfirmation)) {
+    return;
+  }
+  if (virtual_card_enroll_ui_model_) {
     virtual_card_enroll_ui_model_->SetEnrollmentProgress(
         is_vcn_enrolled
             ? VirtualCardEnrollUiModel::EnrollmentProgress::kEnrolled
             : VirtualCardEnrollUiModel::EnrollmentProgress::kFailed);
+  }
+  if (!is_vcn_enrolled) {
+    AutofillErrorDialogContext autofill_error_dialog_context;
+    autofill_error_dialog_context.type =
+        AutofillErrorDialogType::kVirtualCardEnrollmentTemporaryError;
+    ShowAutofillErrorDialog(std::move(autofill_error_dialog_context));
   }
 }
 

@@ -272,11 +272,10 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
     private final Supplier<ShareDelegate> mShareDelegateSupplier;
     // Should only be used after inflation.
     private final Lazy<BottomSheetController> mBottomSheetController;
-    private final boolean mContextMenuEnabled;
 
     private TabWebContentsDelegateAndroid mWebContentsDelegateAndroid;
     private ExternalNavigationDelegateImpl mNavigationDelegate;
-    private Lazy<EphemeralTabCoordinator> mEphemeralTabCoordinator;
+    private Supplier<EphemeralTabCoordinator> mEphemeralTabCoordinatorSupplier;
 
     /**
      * @param activity {@link Activity} instance.
@@ -292,8 +291,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
      * @param authUtils To determine whether apps are Google signed.
      * @param multiWindowUtils To use to determine which ChromeTabbedActivity to open new tabs in.
      * @param verifier Decides how to handle navigation to a new URL.
-     * @param ephemeralTabCoordinatorSupplier A provider of {@link EphemeralTabCoordinator} that
-     *     shows preview tab.
      * @param chromeActivityNativeDelegate Delegate for native initialziation.
      * @param browserControlsStateProvider Provides state of the browser controls.
      * @param fullscreenManager Manages the fullscreen state.
@@ -305,7 +302,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
      * @param shareDelegateSupplier Supplies the share delegate.
      * @param activityType The type of the current activity.
      * @param bottomSheetController Controls the bottom sheet.
-     * @param contextMenuEnabled Whether the context menu will be enabled.
      * @param browserControlsManager Manages the browser controls.
      */
     private CustomTabDelegateFactory(
@@ -320,7 +316,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
             ExternalAuthUtils authUtils,
             MultiWindowUtils multiWindowUtils,
             Verifier verifier,
-            Lazy<EphemeralTabCoordinator> ephemeralTabCoordinator,
             ChromeActivityNativeDelegate chromeActivityNativeDelegate,
             BrowserControlsStateProvider browserControlsStateProvider,
             FullscreenManager fullscreenManager,
@@ -332,7 +327,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
             Supplier<ShareDelegate> shareDelegateSupplier,
             @Named(ACTIVITY_TYPE) @ActivityType int activityType,
             Lazy<BottomSheetController> bottomSheetController,
-            boolean contextMenuEnabled,
             BrowserControlsManager browserControlsManager) {
         mActivity = activity;
         mShouldHideBrowserControls = shouldHideBrowserControls;
@@ -345,7 +339,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
         mExternalAuthUtils = authUtils;
         mMultiWindowUtils = multiWindowUtils;
         mVerifier = verifier;
-        mEphemeralTabCoordinator = ephemeralTabCoordinator;
         mChromeActivityNativeDelegate = chromeActivityNativeDelegate;
         mBrowserControlsStateProvider = browserControlsStateProvider;
         mFullscreenManager = fullscreenManager;
@@ -358,7 +351,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
         mActivityType = activityType;
         mBottomSheetController = bottomSheetController;
         mBrowserControlsManager = browserControlsManager;
-        mContextMenuEnabled = contextMenuEnabled;
     }
 
     @Inject
@@ -369,7 +361,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
             ExternalAuthUtils authUtils,
             MultiWindowUtils multiWindowUtils,
             Verifier verifier,
-            Lazy<EphemeralTabCoordinator> ephemeralTabCoordinator,
             ChromeActivityNativeDelegate chromeActivityNativeDelegate,
             BrowserControlsStateProvider browserControlsStateProvider,
             FullscreenManager fullscreenManager,
@@ -394,7 +385,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
                 authUtils,
                 multiWindowUtils,
                 verifier,
-                ephemeralTabCoordinator,
                 chromeActivityNativeDelegate,
                 browserControlsStateProvider,
                 fullscreenManager,
@@ -406,7 +396,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
                 shareDelegateSupplier,
                 activityType,
                 bottomSheetController,
-                !intentDataProvider.isAuthView(),
                 browserControlsManager);
     }
 
@@ -427,7 +416,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
                 null,
                 null,
                 null,
-                () -> null,
                 null,
                 null,
                 null,
@@ -439,7 +427,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
                 null,
                 ActivityType.CUSTOM_TAB,
                 null,
-                false,
                 null);
     }
 
@@ -509,7 +496,7 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
                 mActivity,
                 tab,
                 tabModelSelector,
-                EphemeralTabCoordinator.isSupported() ? mEphemeralTabCoordinator::get : () -> null,
+                mEphemeralTabCoordinatorSupplier,
                 () -> {},
                 () -> mSnackbarManager.get(),
                 () -> mBottomSheetController.get(),
@@ -518,8 +505,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
 
     @Override
     public ContextMenuPopulatorFactory createContextMenuPopulatorFactory(Tab tab) {
-        if (!mContextMenuEnabled) return null;
-
         @ChromeContextMenuPopulator.ContextMenuMode
         int contextMenuMode = getContextMenuMode(mActivityType);
         return new ChromeContextMenuPopulatorFactory(
@@ -548,6 +533,10 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
                 mActivity);
     }
 
+    public void setEphemeralTabCoordinatorSupplier(Supplier<EphemeralTabCoordinator> supplier) {
+        mEphemeralTabCoordinatorSupplier = supplier;
+    }
+
     /**
      * @return The {@link CustomTabNavigationDelegate} in this tab. For test purpose only.
      */
@@ -558,10 +547,6 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
 
     public WebContentsDelegateAndroid getWebContentsDelegate() {
         return mWebContentsDelegateAndroid;
-    }
-
-    public EphemeralTabCoordinator getEphemeralTabCoordinator() {
-        return mEphemeralTabCoordinator.get();
     }
 
     /**

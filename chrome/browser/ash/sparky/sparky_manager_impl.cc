@@ -12,6 +12,8 @@
 #include <vector>
 
 #include "ash/constants/ash_pref_names.h"
+#include "ash/constants/ash_switches.h"
+#include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/system/mahi/mahi_panel_widget.h"
 #include "ash/system/mahi/mahi_ui_controller.h"
@@ -26,6 +28,7 @@
 #include "chrome/browser/ash/sparky/sparky_delegate_impl.h"
 #include "chromeos/ash/components/sparky/system_info_delegate_impl.h"
 #include "chromeos/components/mahi/public/cpp/mahi_manager.h"
+#include "chromeos/constants/chromeos_features.h"
 #include "chromeos/strings/grit/chromeos_strings.h"
 #include "components/manta/features.h"
 #include "components/manta/manta_service.h"
@@ -89,17 +92,24 @@ void SparkyManagerImpl::GetOutlines(MahiOutlinesCallback callback) {
 
 void SparkyManagerImpl::GoToOutlineContent(int outline_id) {}
 
-void SparkyManagerImpl::AnswerQuestion(const std::u16string& question,
-                                       bool current_panel_content,
-                                       MahiAnswerQuestionCallback callback) {
+void SparkyManagerImpl::AnswerQuestionRepeating(
+    const std::u16string& question,
+    bool current_panel_content,
+    MahiAnswerQuestionCallbackRepeating callback) {
   if (current_panel_content) {
+    // Add the current question to the dialog.
+    dialog_turns_.emplace_back(base::UTF16ToUTF8(question), manta::Role::kUser);
+
+    auto sparky_context = std::make_unique<manta::SparkyContext>(
+        dialog_turns_, base::UTF16ToUTF8(current_panel_content_->page_content));
+    sparky_context->server_url = ash::switches::ObtainSparkyServerUrl();
+    sparky_context->page_url = current_page_info_->url.spec();
+    sparky_context->files = sparky_provider_->GetFilesSummary();
+
     sparky_provider_->QuestionAndAnswer(
-        std::make_unique<manta::SparkyContext>(
-            dialog_turns_, base::UTF16ToUTF8(question),
-            base::UTF16ToUTF8(current_panel_content_->page_content)),
+        std::move(sparky_context),
         base::BindOnce(&SparkyManagerImpl::OnSparkyProviderQAResponse,
-                       weak_ptr_factory_.GetWeakPtr(), question,
-                       std::move(callback)));
+                       weak_ptr_factory_.GetWeakPtr(), std::move(callback)));
     return;
   }
 
@@ -165,7 +175,8 @@ void SparkyManagerImpl::OnContextMenuClicked(
 
 bool SparkyManagerImpl::IsEnabled() {
   // TODO (b/333479467): Update with new pref for this feature.
-  return IsSupportedWithCorrectFeatureKey() &&
+  return chromeos::features::IsSparkyEnabled() &&
+         ash::switches::IsSparkySecretKeyMatched() &&
          Shell::Get()->session_controller()->GetActivePrefService()->GetBoolean(
              ash::prefs::kHmrEnabled);
 }
@@ -196,11 +207,9 @@ void SparkyManagerImpl::OnGetPageContentForSummary(
 }
 
 void SparkyManagerImpl::OnSparkyProviderQAResponse(
-    const std::u16string& question,
-    MahiAnswerQuestionCallback callback,
+    MahiAnswerQuestionCallbackRepeating callback,
     manta::MantaStatus status,
     manta::DialogTurn* latest_turn) {
-  dialog_turns_.emplace_back(base::UTF16ToUTF8(question), manta::Role::kUser);
   // Currently the history of dialogs will only refresh if the user closes the
   // UI and then reopens it again.
   // TODO (b/352651459): Add a refresh button to reset the dialog.
@@ -213,21 +222,25 @@ void SparkyManagerImpl::OnSparkyProviderQAResponse(
 
   if (latest_turn) {
     latest_response_status_ = MahiResponseStatus::kSuccess;
-    std::move(callback).Run(base::UTF8ToUTF16(latest_turn->message),
-                            latest_response_status_);
+    callback.Run(base::UTF8ToUTF16(latest_turn->message),
+                 latest_response_status_);
 
     dialog_turns_.emplace_back(std::move(*latest_turn));
+
+    auto sparky_context = std::make_unique<manta::SparkyContext>(
+        dialog_turns_, base::UTF16ToUTF8(current_panel_content_->page_content));
+    sparky_context->server_url = ash::switches::ObtainSparkyServerUrl();
+    sparky_context->page_url = current_page_info_->url.spec();
+    sparky_context->files = sparky_provider_->GetFilesSummary();
+
     // If the latest action is not the final action from the server, then an
     // additional request is made to the server.
     if (!latest_turn->actions.empty() &&
         !latest_turn->actions.back().all_done) {
       sparky_provider_->QuestionAndAnswer(
-          std::make_unique<manta::SparkyContext>(
-              dialog_turns_, base::UTF16ToUTF8(question),
-              base::UTF16ToUTF8(current_panel_content_->page_content)),
+          std::move(sparky_context),
           base::BindOnce(&SparkyManagerImpl::OnSparkyProviderQAResponse,
-                         weak_ptr_factory_.GetWeakPtr(), question,
-                         std::move(callback)));
+                         weak_ptr_factory_.GetWeakPtr(), callback));
     }
 
   } else {
@@ -238,7 +251,7 @@ void SparkyManagerImpl::OnSparkyProviderQAResponse(
 
 void SparkyManagerImpl::OnGetPageContentForQA(
     const std::u16string& question,
-    MahiAnswerQuestionCallback callback,
+    MahiAnswerQuestionCallbackRepeating callback,
     crosapi::mojom::MahiPageContentPtr mahi_content_ptr) {
   if (!mahi_content_ptr) {
     std::move(callback).Run(std::nullopt,
@@ -249,13 +262,31 @@ void SparkyManagerImpl::OnGetPageContentForQA(
   // Assign current panel content and clear the current panel QA
   current_panel_content_ = std::move(mahi_content_ptr);
 
+  // Add the current question to the dialog.
+  dialog_turns_.emplace_back(base::UTF16ToUTF8(question), manta::Role::kUser);
+
+  auto sparky_context = std::make_unique<manta::SparkyContext>(
+      dialog_turns_, base::UTF16ToUTF8(current_panel_content_->page_content));
+  sparky_context->server_url = ash::switches::ObtainSparkyServerUrl();
+  sparky_context->page_url = current_page_info_->url.spec();
+  sparky_context->files = sparky_provider_->GetFilesSummary();
+
   sparky_provider_->QuestionAndAnswer(
-      std::make_unique<manta::SparkyContext>(
-          dialog_turns_, base::UTF16ToUTF8(question),
-          base::UTF16ToUTF8(current_panel_content_->page_content)),
+      std::move(sparky_context),
       base::BindOnce(&SparkyManagerImpl::OnSparkyProviderQAResponse,
-                     weak_ptr_factory_.GetWeakPtr(), question,
-                     std::move(callback)));
+                     weak_ptr_factory_.GetWeakPtr(), std::move(callback)));
+}
+
+// This function will never be called as Sparky uses a repeating callback to
+// respond to the question rather than a once callback.
+void SparkyManagerImpl::AnswerQuestion(const std::u16string& question,
+                                       bool current_panel_content,
+                                       MahiAnswerQuestionCallback callback) {}
+
+// Sparky allows for multi consecutive responses back from the server to
+// complete the task requested by the user.
+bool SparkyManagerImpl::AllowRepeatingAnswers() {
+  return true;
 }
 
 void SparkyManagerImpl::OpenFeedbackDialog() {}

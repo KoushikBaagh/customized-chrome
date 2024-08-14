@@ -36,12 +36,13 @@ class CWVCreditCardSaverTest : public TestWithLocaleAndResources {
 // Tests CWVCreditCardSaver properly initializes.
 TEST_F(CWVCreditCardSaverTest, Initialization) {
   autofill::CreditCard credit_card = autofill::test::GetCreditCard();
-  autofill::AutofillClient::SaveCreditCardOptions options;
+  autofill::payments::PaymentsAutofillClient::SaveCreditCardOptions options;
   autofill::LegalMessageLines legal_message_lines = {
       autofill::TestLegalMessageLine("Test line 1",
                                      {autofill::LegalMessageLine::Link(
                                          5, 9, "http://www.chromium.org/")})};
-  autofill::AutofillClient::UploadSaveCardPromptCallback callback;
+  autofill::payments::PaymentsAutofillClient::UploadSaveCardPromptCallback
+      callback;
 
   CWVCreditCardSaver* credit_card_saver =
       [[CWVCreditCardSaver alloc] initWithCreditCard:credit_card
@@ -65,18 +66,19 @@ TEST_F(CWVCreditCardSaverTest, Initialization) {
 // Tests when user ignores credit card save.
 TEST_F(CWVCreditCardSaverTest, Ignore) {
   autofill::CreditCard credit_card = autofill::test::GetCreditCard();
-  autofill::AutofillClient::SaveCreditCardOptions options;
+  autofill::payments::PaymentsAutofillClient::SaveCreditCardOptions options;
 
   BOOL callback_called = NO;
-  autofill::AutofillClient::UploadSaveCardPromptCallback callback =
-      base::BindLambdaForTesting(
-          [&](autofill::AutofillClient::SaveCardOfferUserDecision decision,
+  autofill::payments::PaymentsAutofillClient::UploadSaveCardPromptCallback
+      callback = base::BindLambdaForTesting(
+          [&](autofill::payments::PaymentsAutofillClient::
+                  SaveCardOfferUserDecision decision,
               const autofill::AutofillClient::UserProvidedCardDetails&
                   user_provided_card_details) {
             callback_called = YES;
-            EXPECT_EQ(
-                autofill::AutofillClient::SaveCardOfferUserDecision::kIgnored,
-                decision);
+            EXPECT_EQ(autofill::payments::PaymentsAutofillClient::
+                          SaveCardOfferUserDecision::kIgnored,
+                      decision);
           });
 
   [[maybe_unused]] CWVCreditCardSaver* credit_card_saver =
@@ -93,20 +95,21 @@ TEST_F(CWVCreditCardSaverTest, Ignore) {
 // Tests when user declines a save.
 TEST_F(CWVCreditCardSaverTest, Decline) {
   autofill::CreditCard credit_card = autofill::test::GetCreditCard();
-  autofill::AutofillClient::SaveCreditCardOptions options;
+  autofill::payments::PaymentsAutofillClient::SaveCreditCardOptions options;
   autofill::payments::PaymentsAutofillClient::LocalSaveCardPromptCallback
       local_callback;
 
   BOOL callback_called = NO;
-  autofill::AutofillClient::UploadSaveCardPromptCallback callback =
-      base::BindLambdaForTesting(
-          [&](autofill::AutofillClient::SaveCardOfferUserDecision decision,
+  autofill::payments::PaymentsAutofillClient::UploadSaveCardPromptCallback
+      callback = base::BindLambdaForTesting(
+          [&](autofill::payments::PaymentsAutofillClient::
+                  SaveCardOfferUserDecision decision,
               const autofill::AutofillClient::UserProvidedCardDetails&
                   user_provided_card_details) {
             callback_called = YES;
-            EXPECT_EQ(
-                autofill::AutofillClient::SaveCardOfferUserDecision::kDeclined,
-                decision);
+            EXPECT_EQ(autofill::payments::PaymentsAutofillClient::
+                          SaveCardOfferUserDecision::kDeclined,
+                      decision);
           });
 
   CWVCreditCardSaver* credit_card_saver =
@@ -122,18 +125,19 @@ TEST_F(CWVCreditCardSaverTest, Decline) {
 // Tests when user accepts a save.
 TEST_F(CWVCreditCardSaverTest, Accept) {
   autofill::CreditCard credit_card = autofill::test::GetCreditCard();
-  autofill::AutofillClient::SaveCreditCardOptions options;
+  autofill::payments::PaymentsAutofillClient::SaveCreditCardOptions options;
 
   BOOL callback_called = NO;
-  autofill::AutofillClient::UploadSaveCardPromptCallback callback =
-      base::BindLambdaForTesting(
-          [&](autofill::AutofillClient::SaveCardOfferUserDecision decision,
+  autofill::payments::PaymentsAutofillClient::UploadSaveCardPromptCallback
+      callback = base::BindLambdaForTesting(
+          [&](autofill::payments::PaymentsAutofillClient::
+                  SaveCardOfferUserDecision decision,
               const autofill::AutofillClient::UserProvidedCardDetails&
                   user_provided_card_details) {
             callback_called = YES;
-            EXPECT_EQ(
-                autofill::AutofillClient::SaveCardOfferUserDecision::kAccepted,
-                decision);
+            EXPECT_EQ(autofill::payments::PaymentsAutofillClient::
+                          SaveCardOfferUserDecision::kAccepted,
+                      decision);
             EXPECT_EQ(u"John Doe", user_provided_card_details.cardholder_name);
             EXPECT_EQ(u"08", user_provided_card_details.expiration_date_month);
             EXPECT_EQ(u"2021", user_provided_card_details.expiration_date_year);

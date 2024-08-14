@@ -120,10 +120,6 @@ const char kOmniboxFocusResultedInNavigation[] =
 const char kEnteredKeywordModeHistogram[] = "Omnibox.EnteredKeywordMode2";
 
 // Histogram name which counts the number of milliseconds a user takes
-// between focusing and editing the omnibox.
-const char kFocusToEditTimeHistogram[] = "Omnibox.FocusToEditTime";
-
-// Histogram name which counts the number of milliseconds a user takes
 // between focusing and opening an omnibox match.
 const char kFocusToOpenTimeHistogram[] =
     "Omnibox.FocusToOpenTimeAnyPopupState3";
@@ -263,7 +259,6 @@ OmniboxEditModel::OmniboxEditModel(OmniboxController* controller,
     : controller_(controller),
       view_(view),
       user_input_in_progress_(false),
-      user_input_since_focus_(true),
       focus_resulted_in_navigation_(false),
       just_deleted_text_(false),
       has_temporary_text_(false),
@@ -729,6 +724,10 @@ void OmniboxEditModel::StartAutocomplete(bool has_selected_text,
   input_.set_allow_exact_keyword_match(is_keyword_selected() ||
                                        allow_exact_keyword_match_);
   input_.set_keyword_mode_entry_method(keyword_mode_entry_method_);
+  if (std::optional<lens::proto::LensOverlayInteractionResponse> response =
+          controller_->client()->GetLensOverlayInteractionResponse()) {
+    input_.set_lens_overlay_interaction_response(*response);
+  }
 
   controller_->StartAutocomplete(input_);
 }
@@ -835,6 +834,12 @@ void OmniboxEditModel::OpenSelection(OmniboxPopupSelection selection,
         controller_->IsSuggestionGroupHidden(match.suggestion_group_id.value());
     controller_->SetSuggestionGroupHidden(match.suggestion_group_id.value(),
                                           !current_visibility);
+  } else if (selection.state ==
+             OmniboxPopupSelection::FOCUSED_BUTTON_THUMBS_UP) {
+    UpdateFeedbackOnMatch(selection.line, FeedbackType::kThumbsUp);
+  } else if (selection.state ==
+             OmniboxPopupSelection::FOCUSED_BUTTON_THUMBS_DOWN) {
+    UpdateFeedbackOnMatch(selection.line, FeedbackType::kThumbsDown);
   } else if (selection.state ==
              OmniboxPopupSelection::FOCUSED_BUTTON_REMOVE_SUGGESTION) {
     TryDeletingPopupLine(selection.line);
@@ -1036,7 +1041,6 @@ void OmniboxEditModel::ClearAdditionalText() {
 void OmniboxEditModel::OnSetFocus(bool control_down) {
   TRACE_EVENT0("omnibox", "OmniboxEditModel::OnSetFocus");
   last_omnibox_focus_ = base::TimeTicks::Now();
-  user_input_since_focus_ = false;
   focus_resulted_in_navigation_ = false;
 
   // If the omnibox lost focus while the caret was hidden and then regained
@@ -1926,7 +1930,7 @@ std::u16string OmniboxEditModel::GetPopupAccessibilityLabelForCurrentSelection(
   int additional_message_id = 0;
   std::u16string additional_message;
   // This switch statement should be updated when new selection types are added.
-  static_assert(OmniboxPopupSelection::LINE_STATE_MAX_VALUE == 5);
+  static_assert(OmniboxPopupSelection::LINE_STATE_MAX_VALUE == 7);
   switch (popup_selection_.state) {
     case OmniboxPopupSelection::FOCUSED_BUTTON_HEADER: {
       bool group_hidden = controller_->IsSuggestionGroupHidden(
@@ -1951,6 +1955,24 @@ std::u16string OmniboxEditModel::GetPopupAccessibilityLabelForCurrentSelection(
                                        GetPrefService())) {
         additional_message =
             match.GetActionAt(0u)->GetLabelStrings().accessibility_suffix;
+        available_actions_count++;
+      }
+      if (OmniboxPopupSelection(line,
+                                OmniboxPopupSelection::FOCUSED_BUTTON_THUMBS_UP)
+              .IsControlPresentOnMatch(autocomplete_controller()->result(),
+                                       GetPrefService())) {
+        // No need to set `additional_message_id`. Thumbs up and thumbs down
+        // button are always present together; `additional_message_id` is set to
+        // `IDS_ACC_MULTIPLE_ACTIONS_SUFFIX` further down.
+        available_actions_count++;
+      }
+      if (OmniboxPopupSelection(
+              line, OmniboxPopupSelection::FOCUSED_BUTTON_THUMBS_DOWN)
+              .IsControlPresentOnMatch(autocomplete_controller()->result(),
+                                       GetPrefService())) {
+        // No need to set `additional_message_id`. Thumbs up and thumbs down
+        // button are always present together; `additional_message_id` is set to
+        // `IDS_ACC_MULTIPLE_ACTIONS_SUFFIX` further down.
         available_actions_count++;
       }
       if (OmniboxPopupSelection(
@@ -1982,6 +2004,12 @@ std::u16string OmniboxEditModel::GetPopupAccessibilityLabelForCurrentSelection(
       // read because it's not relevant to the button's action.
       DCHECK(match.GetActionAt(0u));
       return match.GetActionAt(0u)->GetLabelStrings().accessibility_hint;
+    case OmniboxPopupSelection::FOCUSED_BUTTON_THUMBS_UP:
+      additional_message_id = IDS_ACC_THUMBS_UP_SUGGESTION_FOCUSED_PREFIX;
+      break;
+    case OmniboxPopupSelection::FOCUSED_BUTTON_THUMBS_DOWN:
+      additional_message_id = IDS_ACC_THUMBS_DOWN_SUGGESTION_FOCUSED_PREFIX;
+      break;
     case OmniboxPopupSelection::FOCUSED_BUTTON_REMOVE_SUGGESTION:
       additional_message_id = match.IsIPHSuggestion()
                                   ? IDS_ACC_DISMISS_CHROME_TIP_FOCUSED_PREFIX
@@ -2498,7 +2526,7 @@ void OmniboxEditModel::OpenMatch(OmniboxPopupSelection selection,
   OmniboxEventGlobalTracker::GetInstance()->OnURLOpened(&log);
 
   LOCAL_HISTOGRAM_BOOLEAN("Omnibox.EventCount", true);
-  SuggestionAnswer::LogAnswerUsed(match.answer);
+  omnibox::answer_data_parser::LogAnswerUsed(match.answer_type);
   if (!last_omnibox_focus_.is_null()) {
     // Only record focus to open time when a focus actually happened (as
     // opposed to, say, dragging a link onto the omnibox).
@@ -2609,6 +2637,13 @@ void OmniboxEditModel::OpenMatch(OmniboxPopupSelection selection,
       base::UmaHistogramBoolean("Omnibox.Search.OffTheRecord", is_incognito);
     }
 
+    BookmarkModel* bookmark_model = controller_->client()->GetBookmarkModel();
+    if (bookmark_model && bookmark_model->IsBookmarked(destination_url)) {
+      controller_->client()->OnBookmarkLaunched();
+    }
+
+    // This block should be the last call in OpenMatch, because controller_ is
+    // not guaranteed to exist after client()->OnAutocompleteAccept is called.
     if (destination_url.is_valid()) {
       // This calls RevertAll again.
       base::AutoReset<bool> tmp(&in_revert_, true);
@@ -2628,11 +2663,28 @@ void OmniboxEditModel::OpenMatch(OmniboxPopupSelection selection,
               alternate_input, alternate_nav_url, false),
           deviation_char_in_hostname);
     }
+  }
+}
 
-    BookmarkModel* bookmark_model = controller_->client()->GetBookmarkModel();
-    if (bookmark_model && bookmark_model->IsBookmarked(destination_url)) {
-      controller_->client()->OnBookmarkLaunched();
-    }
+void OmniboxEditModel::UpdateFeedbackOnMatch(size_t match_index,
+                                             FeedbackType feedback_type) {
+  if (match_index == OmniboxPopupSelection::kNoMatch ||
+      match_index >= autocomplete_controller()->result().size()) {
+    return;
+  }
+  auto& match = const_cast<AutocompleteMatch&>(
+      autocomplete_controller()->result().match_at(match_index));
+
+  // Set the feedback or reset it if the same feedback is given.
+  match.feedback_type = match.feedback_type == feedback_type
+                            ? FeedbackType::kNone
+                            : feedback_type;
+  // Update the suggestion appearance.
+  popup_view_->UpdatePopupAppearance();
+  // Show the feedback form on negative feedback.
+  if (match.feedback_type == FeedbackType::kThumbsDown) {
+    controller_->client()->ShowFeedbackPage(
+        autocomplete_controller()->input().text(), match.destination_url);
   }
 }
 
@@ -2707,13 +2759,6 @@ void OmniboxEditModel::ClassifyString(const std::u16string& text,
 }
 
 bool OmniboxEditModel::SetInputInProgressNoNotify(bool in_progress) {
-  if (in_progress && !user_input_since_focus_) {
-    base::TimeTicks now = base::TimeTicks::Now();
-    DCHECK(last_omnibox_focus_ <= now);
-    UMA_HISTOGRAM_TIMES(kFocusToEditTimeHistogram, now - last_omnibox_focus_);
-    user_input_since_focus_ = true;
-  }
-
   if (user_input_in_progress_ == in_progress)
     return false;
 

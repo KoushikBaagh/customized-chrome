@@ -25,6 +25,12 @@ const char kProductSpecificationsName[] = "Product Specifications";
 const char kProductSpecificationsDescription[] =
     "Enable the Product Specifications feature.";
 
+const char kProductSpecificationsMultiSpecificsName[] =
+    "Product Specifications Multi Specifics";
+const char kProductSpecificationsMultiSpecificsDescription[] =
+    "Enable the Product Specifications backed by the sync multi specifics "
+    "representation.";
+
 const char kShoppingIconColorVariantName[] =
     "Enable color variant for shopping icons";
 const char kShoppingIconColorVariantDescription[] =
@@ -45,6 +51,10 @@ const char kParcelTrackingTestDataDescription[] =
 
 const char kPriceInsightsName[] = "Price Insights";
 const char kPriceInsightsDescription[] = "Enable price insights experiment.";
+
+const char kDiscountOnShoppyPageName[] = "Discounts on Shoppy page";
+const char kDiscountOnShoppyPageDescription[] =
+    "Enable to show discounts on shoppy page if it's available";
 
 #if BUILDFLAG(IS_IOS)
 extern const char kPriceInsightsIosName[] = "Price Insights";

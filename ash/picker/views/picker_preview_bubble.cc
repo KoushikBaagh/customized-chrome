@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include "ash/bubble/bubble_constants.h"
 #include "ash/bubble/bubble_utils.h"
@@ -32,9 +33,6 @@ constexpr ui::ColorId kBackgroundColor =
     cros_tokens::kCrosSysSystemBaseElevatedOpaque;
 constexpr int kBubbleOverlapOverPicker = 4;
 constexpr int kPickerBubbleCornerRadius = 12;
-// TODO(b/322899031): Translate these strings.
-constexpr std::u16string_view kLinkLabelText = u"Link";
-constexpr std::u16string_view kTitleText = u"Placeholder";
 constexpr gfx::Insets kMargins(8);
 constexpr int kPreviewBackgroundBorderRadius = 8;
 constexpr gfx::Insets kLabelPadding = gfx::Insets::TLBR(8, 8, 0, 8);
@@ -71,13 +69,19 @@ namespace ash {
 
 PickerPreviewBubbleView::PickerPreviewBubbleView(views::View* anchor_view)
     : BubbleDialogDelegateView(anchor_view,
-                               views::BubbleBorder::RIGHT_CENTER,
-                               views::BubbleBorder::STANDARD_SHADOW) {
+                               views::BubbleBorder::LEFT_CENTER,
+                               views::BubbleBorder::STANDARD_SHADOW,
+                               /*autosize=*/true) {
   // Configuration for this view.
   SetLayoutManager(
       std::make_unique<views::BoxLayout>(views::LayoutOrientation::kVertical))
       ->set_cross_axis_alignment(views::LayoutAlignment::kStretch);
   SetCanActivate(false);
+  // Ignore this bubble for accessibility purposes. The contents of the preview
+  // bubble are announced via the item view that triggered the bubble.
+  SetAccessibleWindowRole(ax::mojom::Role::kNone);
+  // Highlighting of the anchor is done by the anchor itself.
+  set_highlight_button_when_shown(false);
 
   views::Builder<PickerPreviewBubbleView>(this)
       .set_margins(kMargins)
@@ -93,24 +97,17 @@ PickerPreviewBubbleView::PickerPreviewBubbleView(views::View* anchor_view)
               .SetCrossAxisAlignment(
                   views::BoxLayout::CrossAxisAlignment::kStart)
               .SetInsideBorderInsets(kLabelPadding)
-              .AddChildren(
-                  views::Builder<views::Label>(ash::bubble_utils::CreateLabel(
-                      TypographyToken::kCrosAnnotation2, kLinkLabelText.data(),
-                      cros_tokens::kCrosSysOnSurfaceVariant)),
-                  views::Builder<views::Label>(ash::bubble_utils::CreateLabel(
-                      TypographyToken::kCrosBody2, kTitleText.data(),
-                      cros_tokens::kCrosSysOnSurface))))
+              .SetVisible(false)
+              .CopyAddressTo(&box_layout_view_)
+              .AddChildren(views::Builder<views::Label>(
+                               ash::bubble_utils::CreateLabel(
+                                   TypographyToken::kCrosBody2, u"",
+                                   cros_tokens::kCrosSysOnSurface))
+                               .CopyAddressTo(&main_label_)))
       .BuildChildren();
 
   // Show the widget.
   views::BubbleDialogDelegateView::CreateBubble(this);
-
-  // We need an anchor_view until show is called, but we actually want to inset
-  // this bubble, so fix the anchor_rect now.
-  auto rect = GetAnchorRect();
-  rect.Inset(kBubbleOverlapOverPicker);
-  SetAnchorView(nullptr);
-  SetAnchorRect(rect);
 }
 
 ui::ImageModel PickerPreviewBubbleView::GetPreviewImage() const {
@@ -121,9 +118,33 @@ void PickerPreviewBubbleView::SetPreviewImage(ui::ImageModel image) {
   image_view_->SetImage(std::move(image));
 }
 
+bool PickerPreviewBubbleView::GetLabelVisibleForTesting() const {
+  return box_layout_view_->GetVisible();
+}
+
+std::u16string_view PickerPreviewBubbleView::GetMainTextForTesting() const {
+  return main_label_->GetText();
+}
+
+void PickerPreviewBubbleView::SetText(const std::u16string& main_text) {
+  main_label_->SetText(main_text);
+  box_layout_view_->SetVisible(true);
+}
+
+void PickerPreviewBubbleView::ClearText() {
+  main_label_->SetText(u"");
+  box_layout_view_->SetVisible(false);
+}
+
 void PickerPreviewBubbleView::OnThemeChanged() {
   BubbleDialogDelegateView::OnThemeChanged();
   set_color(GetColorProvider()->GetColor(kBackgroundColor));
+}
+
+gfx::Rect PickerPreviewBubbleView::GetAnchorRect() const {
+  gfx::Rect rect = BubbleDialogDelegateView::GetAnchorRect();
+  rect.Inset(kBubbleOverlapOverPicker);
+  return rect;
 }
 
 void PickerPreviewBubbleView::Close() {

@@ -158,6 +158,8 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
       const url::Origin& browser_signal_interest_group_owner,
       const std::optional<std::string>&
           browser_signal_buyer_and_seller_reporting_id,
+      const std::optional<std::string>&
+          browser_signal_selected_buyer_and_seller_reporting_id,
       const GURL& browser_signal_render_url,
       double browser_signal_bid,
       const std::optional<blink::AdCurrency>& browser_signal_bid_currency,
@@ -212,6 +214,10 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
     base::TimeDelta wait_trusted_signals;
     base::TimeDelta wait_direct_from_seller_signals;
 
+    // Time where the SellerWorklet finished waiting for ScoreAd dependencies,
+    // used to compute start and end times for latency phase UKMs.
+    base::TimeTicks score_ad_start_time;
+
     mojo::Remote<auction_worklet::mojom::ScoreAdClient> score_ad_client;
 
     std::unique_ptr<TrustedSignalsRequestManager::Request>
@@ -259,6 +265,8 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
     mojom::ComponentAuctionOtherSellerPtr browser_signals_other_seller;
     url::Origin browser_signal_interest_group_owner;
     std::optional<std::string> browser_signal_buyer_and_seller_reporting_id;
+    std::optional<std::string>
+        browser_signal_selected_buyer_and_seller_reporting_id;
     GURL browser_signal_render_url;
     double browser_signal_bid;
     std::optional<blink::AdCurrency> browser_signal_bid_currency;
@@ -390,6 +398,8 @@ class CONTENT_EXPORT SellerWorklet : public mojom::SellerWorklet {
         const url::Origin& browser_signal_interest_group_owner,
         const std::optional<std::string>&
             browser_signal_buyer_and_seller_reporting_id,
+        const std::optional<std::string>&
+            browser_signal_selected_buyer_and_seller_reporting_id,
         const GURL& browser_signal_render_url,
         double browser_signal_bid,
         const std::optional<blink::AdCurrency>& browser_signal_bid_currency,

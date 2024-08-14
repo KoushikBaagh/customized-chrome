@@ -74,6 +74,9 @@ using blink::url_test_helpers::ToKURL;
 
 const char kAttributionReportingSupport[] = "Attribution-Reporting-Support";
 
+const char kAttributionSrcRequestStatusMetric[] =
+    "Conversions.AttributionSrcRequestStatus";
+
 const char kUrl[] = "https://example1.com/foo.html";
 
 ResourceRequest GetAttributionRequest(
@@ -329,38 +332,6 @@ TEST_F(AttributionSrcLoaderTest, RegisterTrigger) {
   }
 }
 
-TEST_F(AttributionSrcLoaderTest, RegisterTriggerOsHeadersIgnored) {
-  KURL test_url = ToKURL("https://example1.com/foo.html");
-
-  ResourceRequest request = GetAttributionRequest(test_url);
-  request.SetAttributionReportingEligibility(
-      AttributionReportingEligibility::kEventSourceOrTrigger);
-  ResourceResponse response(test_url);
-  response.SetHttpStatusCode(200);
-  response.SetHttpHeaderField(
-      http_names::kAttributionReportingRegisterTrigger,
-      AtomicString(R"({"event_trigger_data":[{"trigger_data": "7"}]})"));
-
-  // These should be ignored because the relevant feature is disabled by
-  // default.
-  response.SetHttpHeaderField(http_names::kAttributionReportingRegisterOSSource,
-                              AtomicString(R"("https://r.test/x")"));
-  response.SetHttpHeaderField(
-      http_names::kAttributionReportingRegisterOSTrigger,
-      AtomicString(R"("https://r.test/y")"));
-
-  MockAttributionHost host(
-      GetFrame().GetRemoteNavigationAssociatedInterfaces());
-  attribution_src_loader_->MaybeRegisterAttributionHeaders(request, response);
-  host.WaitUntilBoundAndFlush();
-
-  auto* mock_data_host = host.mock_data_host();
-  ASSERT_TRUE(mock_data_host);
-
-  mock_data_host->Flush();
-  EXPECT_EQ(mock_data_host->trigger_data().size(), 1u);
-}
-
 TEST_F(AttributionSrcLoaderTest, AttributionSrcRequestsIgnored) {
   KURL test_url = ToKURL("https://example1.com/foo.html");
   ResourceRequest request(test_url);
@@ -417,16 +388,15 @@ TEST_F(AttributionSrcLoaderTest, AttributionSrcRequest_HistogramsRecorded) {
   histograms.ExpectBucketCount("Conversions.AllowedByPermissionPolicy", 1, 2);
 
   // kRequested = 0.
-  histograms.ExpectUniqueSample("Conversions.AttributionSrcRequestStatus", 0,
-                                2);
+  histograms.ExpectUniqueSample(kAttributionSrcRequestStatusMetric, 0, 2);
 
   url_test_helpers::ServeAsynchronousRequests();
 
   // kReceived = 1.
-  histograms.ExpectBucketCount("Conversions.AttributionSrcRequestStatus", 1, 1);
+  histograms.ExpectBucketCount(kAttributionSrcRequestStatusMetric, 1, 1);
 
   // kFailed = 2.
-  histograms.ExpectBucketCount("Conversions.AttributionSrcRequestStatus", 2, 1);
+  histograms.ExpectBucketCount(kAttributionSrcRequestStatusMetric, 2, 1);
 }
 
 TEST_F(AttributionSrcLoaderTest, Referrer) {
@@ -516,14 +486,18 @@ TEST_F(AttributionSrcLoaderTest, EagerlyClosesRemote) {
   EXPECT_EQ(mock_data_host->disconnects(), 1u);
 }
 
-TEST_F(AttributionSrcLoaderTest, NoneSupported_CannotRegister) {
+TEST_F(AttributionSrcLoaderTest, NoneSupport_NoAttributionSrcRequest) {
   GetPage().SetAttributionSupport(AttributionSupport::kNone);
 
-  KURL test_url = ToKURL("https://example1.com/foo.html");
+  base::HistogramTester histograms;
 
-  EXPECT_FALSE(
-      attribution_src_loader_->CanRegister(test_url, /*element=*/nullptr,
-                                           /*request_id=*/std::nullopt));
+  KURL url = ToKURL(kUrl);
+  RegisterMockedURLLoad(url, test::CoreTestDataPath("foo.html"));
+
+  attribution_src_loader_->Register(AtomicString(kUrl), /*element=*/nullptr,
+                                    network::mojom::ReferrerPolicy::kDefault);
+
+  histograms.ExpectTotalCount(kAttributionSrcRequestStatusMetric, 0);
 }
 
 TEST_F(AttributionSrcLoaderTest, WebDisabled_TriggerNotRegistered) {
@@ -586,7 +560,10 @@ TEST_F(AttributionSrcLoaderTest, HeadersSize_RecordsMetrics) {
 class AttributionSrcLoaderCrossAppWebRuntimeDisabledTest
     : public AttributionSrcLoaderTest {
  public:
-  AttributionSrcLoaderCrossAppWebRuntimeDisabledTest() = default;
+  AttributionSrcLoaderCrossAppWebRuntimeDisabledTest() {
+    WebRuntimeFeatures::EnableFeatureFromString(
+        /*name=*/"AttributionReportingCrossAppWeb", /*enable=*/false);
+  }
 
  private:
   base::test::ScopedFeatureList scoped_feature_list_{

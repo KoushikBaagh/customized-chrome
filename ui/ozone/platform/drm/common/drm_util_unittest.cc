@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "ui/ozone/platform/drm/common/drm_util.h"
 
 #include <xf86drm.h>
@@ -18,6 +23,7 @@
 #include "ui/display/util/edid_parser.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/ozone/platform/drm/common/hardware_display_controller_info.h"
 #include "ui/ozone/platform/drm/common/scoped_drm_types.h"
 #include "ui/ozone/platform/drm/common/tile_property.h"
 #include "ui/ozone/platform/drm/gpu/fake_drm_device.h"
@@ -701,7 +707,7 @@ TEST(ConsolidateTiledDisplayInfoTest, OnlyNontiled) {
 
   fake_drm->InitializeState(/*use_atomic=*/true);
 
-  HardwareDisplayControllerInfoList infos;
+  std::vector<std::unique_ptr<HardwareDisplayControllerInfo>> infos;
   infos.push_back(std::make_unique<HardwareDisplayControllerInfo>(
       fake_drm->GetConnector(connector_1), fake_drm->GetCrtc(crtc_1),
       /*index=*/0, std::nullopt));
@@ -753,7 +759,7 @@ TEST(ConsolidateTiledDisplayInfoTest, SingleTiled) {
 
   fake_drm->InitializeState(/*use_atomic=*/true);
 
-  HardwareDisplayControllerInfoList infos;
+  std::vector<std::unique_ptr<HardwareDisplayControllerInfo>> infos;
   infos.push_back(std::make_unique<HardwareDisplayControllerInfo>(
       fake_drm->GetConnector(primary_connector_id),
       fake_drm->GetCrtc(primary_crtc_id),
@@ -828,7 +834,7 @@ TEST(ConsolidateTiledDisplayInfoTest, AllTilesPresent) {
 
   fake_drm->InitializeState(/*use_atomic=*/true);
 
-  HardwareDisplayControllerInfoList infos;
+  std::vector<std::unique_ptr<HardwareDisplayControllerInfo>> infos;
   infos.push_back(std::make_unique<HardwareDisplayControllerInfo>(
       fake_drm->GetConnector(primary_connector_id),
       fake_drm->GetCrtc(primary_crtc_id),
@@ -961,7 +967,7 @@ TEST(ConsolidateTiledDisplayInfoTest, AllTilesPresentMultipleGroups) {
 
   fake_drm->InitializeState(/*use_atomic=*/true);
 
-  HardwareDisplayControllerInfoList infos;
+  std::vector<std::unique_ptr<HardwareDisplayControllerInfo>> infos;
   infos.push_back(std::make_unique<HardwareDisplayControllerInfo>(
       fake_drm->GetConnector(group1_primary_connector_id),
       fake_drm->GetCrtc(group1_primary_crtc_id),
@@ -1054,7 +1060,7 @@ TEST(ConsolidateTiledDisplayInfoTest, PreferMoreModes) {
 
   fake_drm->InitializeState(/*use_atomic=*/true);
 
-  HardwareDisplayControllerInfoList infos;
+  std::vector<std::unique_ptr<HardwareDisplayControllerInfo>> infos;
   infos.push_back(std::make_unique<HardwareDisplayControllerInfo>(
       fake_drm->GetConnector(primary_connector_id),
       fake_drm->GetCrtc(primary_crtc_id),
@@ -1137,7 +1143,7 @@ TEST(ConsolidateTiledDisplayInfoTest, PreferScaleToFit) {
 
   fake_drm->InitializeState(/*use_atomic=*/true);
 
-  HardwareDisplayControllerInfoList infos;
+  std::vector<std::unique_ptr<HardwareDisplayControllerInfo>> infos;
   infos.push_back(std::make_unique<HardwareDisplayControllerInfo>(
       fake_drm->GetConnector(primary_connector_id),
       fake_drm->GetCrtc(primary_crtc_id),

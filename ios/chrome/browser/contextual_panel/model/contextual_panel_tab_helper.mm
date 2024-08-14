@@ -5,6 +5,7 @@
 #import "ios/chrome/browser/contextual_panel/model/contextual_panel_tab_helper.h"
 
 #import "base/metrics/histogram_functions.h"
+#import "base/strings/stringprintf.h"
 #import "ios/chrome/browser/contextual_panel/model/contextual_panel_item_configuration.h"
 #import "ios/chrome/browser/contextual_panel/model/contextual_panel_item_type.h"
 #import "ios/chrome/browser/contextual_panel/model/contextual_panel_model.h"
@@ -92,20 +93,23 @@ void ContextualPanelTabHelper::SetLoudMomentEntrypointShown(bool shown) {
   loud_moment_entrypoint_shown_for_curent_page_navigation_ = shown;
 }
 
+std::optional<ContextualPanelTabHelper::EntrypointMetricsData>&
+ContextualPanelTabHelper::GetMetricsData() {
+  return metrics_data_;
+}
+
+void ContextualPanelTabHelper::SetMetricsData(
+    ContextualPanelTabHelper::EntrypointMetricsData data) {
+  metrics_data_ = data;
+}
+
 bool ContextualPanelTabHelper::ShouldRefreshData(
     web::WebState* web_state,
     web::NavigationContext* navigation_context) {
-  // `pushState` from Javascript shows up as this set of parameters, and should
-  // count as a navigation to a new page and thus a data refresh.
-  if (navigation_context->IsSameDocument() &&
-      navigation_context->HasUserGesture() &&
-      ui::PageTransitionCoreTypeIs(navigation_context->GetPageTransition(),
-                                   ui::PAGE_TRANSITION_LINK)) {
-    return true;
-  }
-
-  // Otherwise, refresh the data if the navigation is to a new document.
-  return !navigation_context->IsSameDocument();
+  // Refresh data if navigation is to a new URL (ignoring ref) or a new
+  // document.
+  return previous_url_ != navigation_context->GetUrl().GetWithoutRef() ||
+         !navigation_context->IsSameDocument();
 }
 
 #pragma mark - WebStateObserver
@@ -127,6 +131,7 @@ void ContextualPanelTabHelper::DidStartNavigation(
     CloseContextualPanel();
   }
 
+  metrics_data_ = std::nullopt;
   loud_moment_entrypoint_shown_for_curent_page_navigation_ = false;
 
   // Clear the configs and notify the observers.
@@ -145,6 +150,9 @@ void ContextualPanelTabHelper::DidFinishNavigation(
   if (!ShouldRefreshData(web_state, navigation_context)) {
     return;
   }
+
+  // Don't track the URL's ref.
+  previous_url_ = navigation_context->GetUrl().GetWithoutRef();
 
   QueryModels();
 }
@@ -184,6 +192,8 @@ void ContextualPanelTabHelper::QueryModels() {
 
   responses_.clear();
 
+  request_start_time_ = base::Time::Now();
+
   // First, create all the response objects, to track completed responses
   // correctly if a response returns synchronously.
   for (const auto& [key, model] : models_) {
@@ -210,6 +220,12 @@ void ContextualPanelTabHelper::ModelCallbackReceived(
     DCHECK_EQ(item_type, configuration->item_type);
   }
   responses_[item_type] = ModelResponse(std::move(configuration));
+
+  std::string histogram_name =
+      base::StringPrintf("IOS.ContextualPanel.%s.ModelResponseTime",
+                         StringForItemType(item_type).c_str());
+  base::UmaHistogramTimes(histogram_name,
+                          base::Time::Now() - request_start_time_);
 
   // Check if all models have returned.
   for (const auto& [key, response] : responses_) {

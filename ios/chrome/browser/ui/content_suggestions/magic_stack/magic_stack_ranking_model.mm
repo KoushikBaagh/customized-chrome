@@ -169,7 +169,8 @@
 
 - (void)tabResumptionHelperDidReceiveItem {
   CHECK(IsTabResumptionEnabled());
-  if (tab_resumption_prefs::IsTabResumptionDisabled(_localState)) {
+  if (tab_resumption_prefs::IsTabResumptionDisabled(
+          IsHomeCustomizationEnabled() ? _prefService : _localState)) {
     return;
   }
 
@@ -177,7 +178,8 @@
 }
 
 - (void)tabResumptionHelperDidReconfigureItem {
-  if (tab_resumption_prefs::IsTabResumptionDisabled(_localState)) {
+  if (tab_resumption_prefs::IsTabResumptionDisabled(
+          IsHomeCustomizationEnabled() ? _prefService : _localState)) {
     return;
   }
   TabResumptionItem* item = _tabResumptionMediator.itemConfig;
@@ -315,6 +317,13 @@
       segmentation_platform::kParcelTrackingFreshness,
       segmentation_platform::processing::ProcessedValue::FromFloat(
           parcelTrackingFreshnessImpressionCount));
+  int priceTrackingPromoFreshnessImpressionCount = _localState->GetInteger(
+      prefs::
+          kIosMagicStackSegmentationPriceTrackingPromoImpressionsSinceFreshness);
+  inputContext->metadata_args.emplace(
+      segmentation_platform::kPriceTrackingPromoFreshness,
+      segmentation_platform::processing::ProcessedValue::FromFloat(
+          priceTrackingPromoFreshnessImpressionCount));
   __weak MagicStackRankingModel* weakSelf = self;
   segmentation_platform::PredictionOptions options;
 
@@ -422,7 +431,7 @@
       case ContentSuggestionsModuleType::kSafetyCheck:
         if (!IsSafetyCheckMagicStackEnabled() ||
             safety_check_prefs::IsSafetyCheckInMagicStackDisabled(
-                _localState)) {
+                IsHomeCustomizationEnabled() ? _prefService : _localState)) {
           break;
         }
         // If ShouldHideIrrelevantModules() is enabled and it is not the first
@@ -437,73 +446,10 @@
       case ContentSuggestionsModuleType::kParcelTracking:
         if (IsIOSParcelTrackingEnabled() &&
             !IsParcelTrackingDisabled(
-                GetApplicationContext()->GetLocalState()) &&
+                IsHomeCustomizationEnabled() ? _prefService : _localState) &&
             _parcelTrackingMediator.parcelTrackingItemToShow) {
           [magicStackOrder
               addObject:_parcelTrackingMediator.parcelTrackingItemToShow];
-        }
-        break;
-      default:
-        // These module types should not have been added by the logic
-        // receiving the order list from Segmentation.
-        NOTREACHED_IN_MIGRATION();
-        break;
-    }
-  }
-  return magicStackOrder;
-}
-
-// Construct the Magic Stack module order from fetched results from
-// Segmentation. This method adds on modules not included on the Segmentation
-// side (e.g. Set Up List) and also filters out modules not ready or should not
-// be presented.
-- (NSArray<NSNumber*>*)segmentationMagicStackOrder {
-  NSMutableArray<NSNumber*>* magicStackOrder = [NSMutableArray array];
-  // Always add Set Up List at the front.
-  if ([_setUpListMediator shouldShowSetUpList]) {
-    [self addSetUpListToMagicStackOrder:magicStackOrder];
-  }
-  for (NSNumber* moduleNumber in _magicStackOrderFromSegmentation) {
-    ContentSuggestionsModuleType moduleType =
-        (ContentSuggestionsModuleType)[moduleNumber intValue];
-    switch (moduleType) {
-      case ContentSuggestionsModuleType::kMostVisited:
-        if (ShouldPutMostVisitedSitesInMagicStack()) {
-          [magicStackOrder addObject:moduleNumber];
-        }
-        break;
-      case ContentSuggestionsModuleType::kTabResumption:
-        if (![self shouldShowTabResumption]) {
-          break;
-        }
-        // If ShouldHideIrrelevantModules() is enabled and it is not ranked as
-        // the first two modules, do not add it to the Magic Stack.
-        if (ShouldHideIrrelevantModules() && [magicStackOrder count] > 1) {
-          break;
-        }
-        [magicStackOrder addObject:moduleNumber];
-        break;
-      case ContentSuggestionsModuleType::kSafetyCheck:
-        if (!IsSafetyCheckMagicStackEnabled() ||
-            safety_check_prefs::IsSafetyCheckInMagicStackDisabled(
-                _localState)) {
-          break;
-        }
-        // If ShouldHideIrrelevantModules() is enabled and it is not the first
-        // ranked module, do not add it to the Magic Stack.
-        if (!ShouldHideIrrelevantModules() || [magicStackOrder count] == 0) {
-          [self addSafetyCheckToMagicStackOrder:magicStackOrder];
-        }
-        break;
-      case ContentSuggestionsModuleType::kShortcuts:
-        [magicStackOrder addObject:moduleNumber];
-        break;
-      case ContentSuggestionsModuleType::kParcelTracking:
-        if (IsIOSParcelTrackingEnabled() &&
-            !IsParcelTrackingDisabled(
-                GetApplicationContext()->GetLocalState()) &&
-            _parcelTrackingMediator.parcelTrackingItemToShow) {
-          [magicStackOrder addObject:moduleNumber];
         }
         break;
       default:
@@ -539,7 +485,8 @@
 // Returns YES if the tab resumption module should added into the Magic Stack.
 - (BOOL)shouldShowTabResumption {
   return IsTabResumptionEnabled() &&
-         !tab_resumption_prefs::IsTabResumptionDisabled(_localState) &&
+         !tab_resumption_prefs::IsTabResumptionDisabled(
+             IsHomeCustomizationEnabled() ? _prefService : _localState) &&
          _tabResumptionMediator.itemConfig;
 }
 

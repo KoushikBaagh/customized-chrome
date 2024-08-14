@@ -227,24 +227,6 @@ void ConnectorsManager::OnTabStripModelChanged(
 }
 #endif  // BUILDFLAG(ENTERPRISE_LOCAL_CONTENT_ANALYSIS)
 
-std::optional<AnalysisSettings>
-ConnectorsManager::GetAnalysisSettingsFromConnectorPolicy(
-    const GURL& url,
-    AnalysisConnector connector) {
-  if (analysis_connector_settings_.count(connector) == 0)
-    CacheAnalysisConnectorPolicy(connector);
-
-  // If the connector is still not in memory, it means the pref is set to an
-  // empty list or that it is not a list.
-  if (analysis_connector_settings_.count(connector) == 0)
-    return std::nullopt;
-
-  // While multiple services can be set by the connector policies, only the
-  // first one is considered for now.
-  return analysis_connector_settings_[connector][0].GetAnalysisSettings(
-      url, GetDataRegion());
-}
-
 void ConnectorsManager::CacheAnalysisConnectorPolicy(
     AnalysisConnector connector) const {
   analysis_connector_settings_.erase(connector);
@@ -430,14 +412,13 @@ std::vector<const AnalysisConfig*> ConnectorsManager::GetAnalysisServiceConfigs(
   return {};
 }
 
-safe_browsing::DataRegion ConnectorsManager::GetDataRegion() const {
+DataRegion ConnectorsManager::GetDataRegion() const {
   bool apply_data_region =
       prefs()->HasPrefPath(prefs::kChromeDataRegionSetting) &&
       base::FeatureList::IsEnabled(safe_browsing::kDlpRegionalizedEndpoints);
-  return apply_data_region
-             ? safe_browsing::ChromeDataRegionSettingToEnum(
-                   prefs()->GetInteger(prefs::kChromeDataRegionSetting))
-             : safe_browsing::DataRegion::NO_PREFERENCE;
+  return apply_data_region ? ChromeDataRegionSettingToEnum(prefs()->GetInteger(
+                                 prefs::kChromeDataRegionSetting))
+                           : DataRegion::NO_PREFERENCE;
 }
 
 void ConnectorsManager::StartObservingPrefs(PrefService* pref_service) {

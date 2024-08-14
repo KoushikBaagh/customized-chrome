@@ -17,11 +17,11 @@
 #include "base/check.h"
 #include "base/feature_list.h"
 #include "base/metrics/histogram_macros.h"
-#include "base/not_fatal_until.h"
 #include "base/ranges/algorithm.h"
 #include "base/strings/string_util.h"
 #include "content/services/auction_worklet/auction_v8_helper.h"
 #include "content/services/auction_worklet/auction_v8_logger.h"
+#include "content/services/auction_worklet/public/cpp/private_aggregation_reporting.h"
 #include "content/services/auction_worklet/public/mojom/private_aggregation_request.mojom.h"
 #include "content/services/auction_worklet/webidl_compat.h"
 #include "third_party/abseil-cpp/absl/numeric/int128.h"
@@ -306,7 +306,7 @@ bool GetFilteringId(v8::Isolate* isolate,
 auction_worklet::mojom::AggregatableReportForEventContributionPtr
 ParseForEventContribution(
     v8::Isolate* isolate,
-    const std::string& event_type,
+    auction_worklet::mojom::EventTypePtr event_type,
     absl::variant<PASignalValue, v8::Local<v8::BigInt>> idl_bucket,
     absl::variant<PASignalValue, int32_t> idl_value,
     std::optional<v8::Local<v8::BigInt>> idl_filtering_id,
@@ -348,10 +348,6 @@ std::optional<uint64_t> ParseDebugKey(v8::Local<v8::BigInt> js_debug_key,
 }
 
 }  // namespace
-
-const char kReservedAlways[] = "reserved.always";
-const char kReservedWin[] = "reserved.win";
-const char kReservedLoss[] = "reserved.loss";
 
 PrivateAggregationBindings::PrivateAggregationBindings(
     AuctionV8Helper* v8_helper,
@@ -507,7 +503,7 @@ void PrivateAggregationBindings::ContributeToHistogram(
   std::optional<absl::uint128> maybe_bucket =
       ConvertBigIntToUint128(idl_bucket, &error);
   if (!maybe_bucket.has_value()) {
-    CHECK(base::IsStringUTF8(error), base::NotFatalUntil::M128);
+    CHECK(base::IsStringUTF8(error));
     isolate->ThrowException(v8::Exception::TypeError(
         v8_helper->CreateUtf8String(error).ToLocalChecked()));
     return;
@@ -549,19 +545,17 @@ void PrivateAggregationBindings::ContributeToHistogramOnEvent(
       bindings->private_aggregation_permissions_policy_allowed_);
   if (!bindings->private_aggregation_permissions_policy_allowed_) {
     if (bindings->enforce_permission_policy_for_on_event_) {
-      // TODO(https://crbug.com/346766790) Actually throw the exception when
-      // people are aware of the issue.
-      bindings->v8_logger_->LogConsoleWarning(
-          "The \"private-aggregation\" Permissions Policy denied "
-          "contributeToHistogramOnEvent. Ignoring for backwards "
-          "compatibility but this will eventually throw an exception.");
+      isolate->ThrowException(
+          v8::Exception::TypeError(v8_helper->CreateStringFromLiteral(
+              "The \"private-aggregation\" Permissions Policy denied the "
+              "method contributeToHistogramOnEvent on privateAggregation")));
       return;
     } else {
       bindings->v8_logger_->LogConsoleWarning(
           "privateAggregation.contributeToHistogramOnEvent called without "
           "appropriate \"private-aggregation\" Permissions Policy approval; "
           "accepting for backwards compatibility but this will be shortly "
-          "ignored and eventually will throw an exception");
+          "throwing an exception");
     }
   }
 
@@ -570,8 +564,8 @@ void PrivateAggregationBindings::ContributeToHistogramOnEvent(
       v8_helper, time_limit_scope,
       "privateAggregation.contributeToHistogramOnEvent(): ", &args,
       /*min_required_args=*/2);
-  std::string event_type;
-  args_converter.ConvertArg(0, "event", event_type);
+  std::string event_type_str;
+  args_converter.ConvertArg(0, "event", event_type_str);
 
   // Arg 1 is:
   // https://patcg-individual-drafts.github.io/private-aggregation-api/#dictdef-paextendedhistogramcontribution
@@ -618,17 +612,19 @@ void PrivateAggregationBindings::ContributeToHistogramOnEvent(
     return;
   }
 
-  if (base::StartsWith(event_type, "reserved.") && event_type != kReservedWin &&
-      event_type != kReservedLoss && event_type != kReservedAlways) {
+  std::optional<auction_worklet::mojom::EventTypePtr> event_type =
+      ParsePrivateAggregationEventType(event_type_str);
+  if (!event_type.has_value()) {
     // Don't throw an error if an invalid reserved event type is provided, to
-    // provide forward compatibility with new reserved event types added later.
+    // provide forward compatibility with new reserved event types added
+    // later.
     return;
   }
 
   std::string error;
   auction_worklet::mojom::AggregatableReportForEventContributionPtr
       contribution = ParseForEventContribution(
-          isolate, event_type, std::move(bucket), std::move(value),
+          isolate, std::move(*event_type), std::move(bucket), std::move(value),
           std::move(filtering_id), &error);
 
   if (contribution.is_null()) {
@@ -656,8 +652,7 @@ void PrivateAggregationBindings::EnableDebugMode(
     isolate->ThrowException(
         v8::Exception::TypeError(v8_helper->CreateStringFromLiteral(
             "The \"private-aggregation\" Permissions Policy denied the method "
-            "on "
-            "privateAggregation")));
+            "on privateAggregation")));
     return;
   }
 
@@ -687,7 +682,7 @@ void PrivateAggregationBindings::EnableDebugMode(
     std::optional<uint64_t> maybe_debug_key =
         ParseDebugKey(js_debug_key, &error);
     if (!maybe_debug_key.has_value()) {
-      CHECK(base::IsStringUTF8(error), base::NotFatalUntil::M128);
+      CHECK(base::IsStringUTF8(error));
       isolate->ThrowException(v8::Exception::TypeError(
           v8_helper->CreateUtf8String(error).ToLocalChecked()));
       return;

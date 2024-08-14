@@ -261,7 +261,7 @@ ui::EventDispatchDetails MockInputMethod::DispatchKeyEvent(ui::KeyEvent* key) {
   ClearStates();
   if (handled) {
     DCHECK(!key->is_char());
-    ui::KeyEvent mock_key(ui::ET_KEY_PRESSED, ui::VKEY_PROCESSKEY,
+    ui::KeyEvent mock_key(ui::EventType::kKeyPressed, ui::VKEY_PROCESSKEY,
                           key->flags());
     dispatch_details = DispatchKeyEventPostIME(&mock_key);
   } else {
@@ -282,7 +282,7 @@ ui::EventDispatchDetails MockInputMethod::DispatchKeyEvent(ui::KeyEvent* key) {
         client->SetCompositionText(composition_);
       else
         client->ClearCompositionText();
-    } else if (key->type() == ui::ET_KEY_PRESSED) {
+    } else if (key->type() == ui::EventType::kKeyPressed) {
       char16_t ch = key->GetCharacter();
       if (ch)
         client->InsertChar(*key);
@@ -415,8 +415,9 @@ class TestTextfield : public views::Textfield {
     key_handled_ = event->handled();
 
     // Currently, Textfield::OnKeyReleased always returns false.
-    if (event->type() == ui::ET_KEY_RELEASED)
+    if (event->type() == ui::EventType::kKeyReleased) {
       EXPECT_FALSE(key_handled_);
+    }
   }
 
   bool key_handled_ = false;
@@ -736,11 +737,11 @@ gfx::Rect TextfieldTest::GetCursorViewRect() {
 // |x_offset| and y-axis is in the middle of |bound|'s vertical range.
 void TextfieldTest::MouseClick(const gfx::Rect bound, int x_offset) {
   gfx::Point point(bound.x() + x_offset, bound.y() + bound.height() / 2);
-  ui::MouseEvent click(ui::ET_MOUSE_PRESSED, point, point,
+  ui::MouseEvent click(ui::EventType::kMousePressed, point, point,
                        ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
                        ui::EF_LEFT_MOUSE_BUTTON);
   event_target_->OnMousePressed(click);
-  ui::MouseEvent release(ui::ET_MOUSE_RELEASED, point, point,
+  ui::MouseEvent release(ui::EventType::kMouseReleased, point, point,
                          ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
                          ui::EF_LEFT_MOUSE_BUTTON);
   event_target_->OnMouseReleased(release);
@@ -748,13 +749,13 @@ void TextfieldTest::MouseClick(const gfx::Rect bound, int x_offset) {
 
 // This is to avoid double/triple click.
 void TextfieldTest::NonClientMouseClick() {
-  ui::MouseEvent click(ui::ET_MOUSE_PRESSED, gfx::Point(), gfx::Point(),
+  ui::MouseEvent click(ui::EventType::kMousePressed, gfx::Point(), gfx::Point(),
                        ui::EventTimeForNow(),
                        int{ui::EF_LEFT_MOUSE_BUTTON} | ui::EF_IS_NON_CLIENT,
                        ui::EF_LEFT_MOUSE_BUTTON);
   event_target_->OnMousePressed(click);
-  ui::MouseEvent release(ui::ET_MOUSE_RELEASED, gfx::Point(), gfx::Point(),
-                         ui::EventTimeForNow(),
+  ui::MouseEvent release(ui::EventType::kMouseReleased, gfx::Point(),
+                         gfx::Point(), ui::EventTimeForNow(),
                          int{ui::EF_LEFT_MOUSE_BUTTON} | ui::EF_IS_NON_CLIENT,
                          ui::EF_LEFT_MOUSE_BUTTON);
   event_target_->OnMouseReleased(release);
@@ -796,14 +797,14 @@ void TextfieldTest::VerifyTextfieldContextMenuContents(
 }
 
 void TextfieldTest::PressMouseButton(ui::EventFlags mouse_button_flags) {
-  ui::MouseEvent press(ui::ET_MOUSE_PRESSED, mouse_position_, mouse_position_,
-                       ui::EventTimeForNow(), mouse_button_flags,
-                       mouse_button_flags);
+  ui::MouseEvent press(ui::EventType::kMousePressed, mouse_position_,
+                       mouse_position_, ui::EventTimeForNow(),
+                       mouse_button_flags, mouse_button_flags);
   event_target_->OnMousePressed(press);
 }
 
 void TextfieldTest::ReleaseMouseButton(ui::EventFlags mouse_button_flags) {
-  ui::MouseEvent release(ui::ET_MOUSE_RELEASED, mouse_position_,
+  ui::MouseEvent release(ui::EventType::kMouseReleased, mouse_position_,
                          mouse_position_, ui::EventTimeForNow(),
                          mouse_button_flags, mouse_button_flags);
   event_target_->OnMouseReleased(release);
@@ -829,8 +830,8 @@ void TextfieldTest::ClickRightMouseButton() {
 
 void TextfieldTest::DragMouseTo(const gfx::Point& where) {
   mouse_position_ = where;
-  ui::MouseEvent drag(ui::ET_MOUSE_DRAGGED, where, where, ui::EventTimeForNow(),
-                      ui::EF_LEFT_MOUSE_BUTTON, 0);
+  ui::MouseEvent drag(ui::EventType::kMouseDragged, where, where,
+                      ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON, 0);
   event_target_->OnMouseDragged(drag);
 }
 
@@ -840,13 +841,13 @@ void TextfieldTest::MoveMouseTo(const gfx::Point& where) {
 
 // Taps on the textfield.
 void TextfieldTest::TapAtCursor(ui::EventPointerType pointer_type) {
-  ui::GestureEventDetails tap_down_details(ui::ET_GESTURE_TAP_DOWN);
+  ui::GestureEventDetails tap_down_details(ui::EventType::kGestureTapDown);
   tap_down_details.set_primary_pointer_type(pointer_type);
   ui::GestureEvent tap_down =
       CreateTestGestureEvent(GetCursorPositionX(0), 0, tap_down_details);
   textfield_->OnGestureEvent(&tap_down);
 
-  ui::GestureEventDetails tap_up_details(ui::ET_GESTURE_TAP);
+  ui::GestureEventDetails tap_up_details(ui::EventType::kGestureTap);
   tap_up_details.set_primary_pointer_type(pointer_type);
   ui::GestureEvent tap_up =
       CreateTestGestureEvent(GetCursorPositionX(0), 0, tap_up_details);
@@ -962,6 +963,39 @@ TEST_F(TextfieldTest, Scroll) {
   textfield_->Scroll({20});
   textfield_->SetSelectedRange({30, 20});
   EXPECT_EQ(GetTextfieldTestApi().GetDisplayOffsetX(), -100);
+}
+
+TEST_F(TextfieldTest, ScrollUpdatesScrollXAccessibilityAttribute) {
+  InitTextfield();
+  // Size the textfield wide enough to hold 10 characters.
+  gfx::test::RenderTextTestApi render_text_test_api(
+      GetTextfieldTestApi().GetRenderText());
+  constexpr int kGlyphWidth = 10;
+  render_text_test_api.SetGlyphWidth(kGlyphWidth);
+  constexpr int kCursorWidth = 1;
+  GetTextfieldTestApi().GetRenderText()->SetDisplayRect(
+      gfx::Rect(kGlyphWidth * 10 + kCursorWidth, 20));
+  textfield_->SetTextWithoutCaretBoundsChangeNotification(
+      u"0123456789_123456789_123456789", 0);
+  GetTextfieldTestApi().SetDisplayOffsetX(0);
+
+  ui::AXNodeData textfield_node_data;
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(
+      &textfield_node_data);
+  int scroll_x =
+      textfield_node_data.GetIntAttribute(ax::mojom::IntAttribute::kScrollX);
+  EXPECT_EQ(GetTextfieldTestApi().GetDisplayOffsetX(), scroll_x);
+
+  textfield_->SetSelectedRange({0, 20});
+  textfield_->Scroll({20});
+  textfield_node_data = ui::AXNodeData();
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(
+      &textfield_node_data);
+  EXPECT_EQ(
+      GetTextfieldTestApi().GetDisplayOffsetX(),
+      textfield_node_data.GetIntAttribute(ax::mojom::IntAttribute::kScrollX));
+  EXPECT_NE(scroll_x, textfield_node_data.GetIntAttribute(
+                          ax::mojom::IntAttribute::kScrollX));
 }
 
 TEST_F(TextfieldTest,
@@ -3440,15 +3474,15 @@ TEST_F(TextfieldTest, SelectionClipboard) {
   gfx::Point point_4(GetCursorPositionX(4), cursor_y);
 
   // Text selected by the mouse should be placed on the selection clipboard.
-  ui::MouseEvent press(ui::ET_MOUSE_PRESSED, point_1, point_1,
+  ui::MouseEvent press(ui::EventType::kMousePressed, point_1, point_1,
                        ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
                        ui::EF_LEFT_MOUSE_BUTTON);
   textfield_->OnMousePressed(press);
-  ui::MouseEvent drag(ui::ET_MOUSE_DRAGGED, point_3, point_3,
+  ui::MouseEvent drag(ui::EventType::kMouseDragged, point_3, point_3,
                       ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
                       ui::EF_LEFT_MOUSE_BUTTON);
   textfield_->OnMouseDragged(drag);
-  ui::MouseEvent release(ui::ET_MOUSE_RELEASED, point_3, point_3,
+  ui::MouseEvent release(ui::EventType::kMouseReleased, point_3, point_3,
                          ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
                          ui::EF_LEFT_MOUSE_BUTTON);
   textfield_->OnMouseReleased(release);
@@ -3463,12 +3497,12 @@ TEST_F(TextfieldTest, SelectionClipboard) {
 
   // Shift-click selection modifications should update the clipboard.
   NonClientMouseClick();
-  ui::MouseEvent press_2(ui::ET_MOUSE_PRESSED, point_2, point_2,
+  ui::MouseEvent press_2(ui::EventType::kMousePressed, point_2, point_2,
                          ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
                          ui::EF_LEFT_MOUSE_BUTTON);
   press_2.SetFlags(press_2.flags() | ui::EF_SHIFT_DOWN);
   textfield_->OnMousePressed(press_2);
-  ui::MouseEvent release_2(ui::ET_MOUSE_RELEASED, point_2, point_2,
+  ui::MouseEvent release_2(ui::EventType::kMouseReleased, point_2, point_2,
                            ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
                            ui::EF_LEFT_MOUSE_BUTTON);
   textfield_->OnMouseReleased(release_2);
@@ -3495,7 +3529,7 @@ TEST_F(TextfieldTest, SelectionClipboard) {
 
   // Middle clicking should paste at the mouse (not cursor) location.
   // The cursor should be placed at the end of the pasted text.
-  ui::MouseEvent middle(ui::ET_MOUSE_PRESSED, point_4, point_4,
+  ui::MouseEvent middle(ui::EventType::kMousePressed, point_4, point_4,
                         ui::EventTimeForNow(), ui::EF_MIDDLE_MOUSE_BUTTON,
                         ui::EF_MIDDLE_MOUSE_BUTTON);
   textfield_->OnMousePressed(middle);
@@ -3535,15 +3569,15 @@ TEST_F(TextfieldTest, SelectionClipboard) {
   // Double and triple clicking should update the clipboard contents.
   textfield_->SetText(u"ab cd ef");
   gfx::Point word(GetCursorPositionX(4), cursor_y);
-  ui::MouseEvent press_word(ui::ET_MOUSE_PRESSED, word, word,
+  ui::MouseEvent press_word(ui::EventType::kMousePressed, word, word,
                             ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
                             ui::EF_LEFT_MOUSE_BUTTON);
   textfield_->OnMousePressed(press_word);
-  ui::MouseEvent release_word(ui::ET_MOUSE_RELEASED, word, word,
+  ui::MouseEvent release_word(ui::EventType::kMouseReleased, word, word,
                               ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
                               ui::EF_LEFT_MOUSE_BUTTON);
   textfield_->OnMouseReleased(release_word);
-  ui::MouseEvent double_click(ui::ET_MOUSE_PRESSED, word, word,
+  ui::MouseEvent double_click(ui::EventType::kMousePressed, word, word,
                               ui::EventTimeForNow(),
                               ui::EF_LEFT_MOUSE_BUTTON | ui::EF_IS_DOUBLE_CLICK,
                               ui::EF_LEFT_MOUSE_BUTTON);
@@ -3628,7 +3662,7 @@ TEST_F(TextfieldTest, TestLongPressInitiatesDragDrop) {
   // Create a long press event in the selected region should start a drag.
   ui::GestureEvent long_press = CreateTestGestureEvent(
       kStringPoint.x(), kStringPoint.y(),
-      ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+      ui::GestureEventDetails(ui::EventType::kGestureLongPress));
   textfield_->OnGestureEvent(&long_press);
   EXPECT_TRUE(
       textfield_->CanStartDragForView(nullptr, kStringPoint, kStringPoint));
@@ -3834,7 +3868,7 @@ TEST_F(TextfieldTest, LongPressSelection) {
       textfield_, {GetCursorPositionX(2), GetCursorYForTesting()});
   ui::GestureEvent long_press = CreateTestGestureEvent(
       kLongPressPoint.x(), kLongPressPoint.y(),
-      ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+      ui::GestureEventDetails(ui::EventType::kGestureLongPress));
   event_generator_->Dispatch(&long_press);
 
   // Check that the nearest word is selected, but that the touch selection
@@ -3846,9 +3880,9 @@ TEST_F(TextfieldTest, LongPressSelection) {
   EXPECT_FALSE(GetTextfieldTestApi().touch_selection_controller());
 
   // Check that touch selection is activated after the long press is released.
-  ui::GestureEvent long_tap =
-      CreateTestGestureEvent(kLongPressPoint.x(), kLongPressPoint.y(),
-                             ui::GestureEventDetails(ui::ET_GESTURE_LONG_TAP));
+  ui::GestureEvent long_tap = CreateTestGestureEvent(
+      kLongPressPoint.x(), kLongPressPoint.y(),
+      ui::GestureEventDetails(ui::EventType::kGestureLongTap));
   event_generator_->Dispatch(&long_tap);
   EXPECT_TRUE(GetTextfieldTestApi().touch_selection_controller());
 }
@@ -3868,7 +3902,7 @@ TEST_F(TextfieldTest, LongPressDragSelectionLTRForward) {
   event_generator_->PressTouch(kLongPressPoint);
   ui::GestureEvent long_press = CreateTestGestureEvent(
       kLongPressPoint.x(), kLongPressPoint.y(),
-      ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+      ui::GestureEventDetails(ui::EventType::kGestureLongPress));
   event_generator_->Dispatch(&long_press);
   event_generator_->MoveTouchBy(25, 0);
   event_generator_->ReleaseTouch();
@@ -3896,7 +3930,7 @@ TEST_F(TextfieldTest, LongPressDragSelectionLTRBackward) {
   event_generator_->PressTouch(kLongPressPoint);
   ui::GestureEvent long_press = CreateTestGestureEvent(
       kLongPressPoint.x(), kLongPressPoint.y(),
-      ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+      ui::GestureEventDetails(ui::EventType::kGestureLongPress));
   event_generator_->Dispatch(&long_press);
   event_generator_->MoveTouchBy(-25, 0);
   event_generator_->ReleaseTouch();
@@ -3925,7 +3959,7 @@ TEST_F(TextfieldTest, LongPressDragSelectionRTLForward) {
   event_generator_->PressTouch(kLongPressPoint);
   ui::GestureEvent long_press = CreateTestGestureEvent(
       kLongPressPoint.x(), kLongPressPoint.y(),
-      ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+      ui::GestureEventDetails(ui::EventType::kGestureLongPress));
   event_generator_->Dispatch(&long_press);
   event_generator_->MoveTouchBy(-25, 0);
   event_generator_->ReleaseTouch();
@@ -3953,7 +3987,7 @@ TEST_F(TextfieldTest, LongPressDragSelectionRTLBackward) {
   event_generator_->PressTouch(kLongPressPoint);
   ui::GestureEvent long_press = CreateTestGestureEvent(
       kLongPressPoint.x(), kLongPressPoint.y(),
-      ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+      ui::GestureEventDetails(ui::EventType::kGestureLongPress));
   event_generator_->Dispatch(&long_press);
   event_generator_->MoveTouchBy(25, 0);
   event_generator_->ReleaseTouch();
@@ -4072,7 +4106,7 @@ TEST_F(TextfieldTest, TouchSelectionDraggingMetrics) {
   event_generator_->PressTouch(kDragStart);
   ui::GestureEvent long_press = CreateTestGestureEvent(
       kDragStart.x(), kDragStart.y(),
-      ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+      ui::GestureEventDetails(ui::EventType::kGestureLongPress));
   event_generator_->Dispatch(&long_press);
   event_generator_->MoveTouchBy(25, 0);
   event_generator_->ReleaseTouch();
@@ -4216,6 +4250,75 @@ TEST_F(TextfieldTest, AccessiblePlaceholderTest) {
   textfield_->GetViewAccessibility().GetAccessibleNodeData(&data);
   EXPECT_EQ(data.GetString16Attribute(ax::mojom::StringAttribute::kPlaceholder),
             u"Updated placeholder");
+}
+
+TEST_F(TextfieldTest, AccessibleTextSelectBound) {
+  InitTextfield();
+  ui::AXNodeData data;
+  gfx::Range range(4, 8);
+
+  textfield_->SetText(u"SettingText");
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelStart), 11);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelEnd), 11);
+
+  textfield_->SetSelectedRange(range);
+  data = ui::AXNodeData();
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelStart), 4);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelEnd), 8);
+
+  textfield_->ExtendSelectionAndDelete(2, 1);
+  textfield_->SelectAll(false);
+  data = ui::AXNodeData();
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelStart), 0);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelEnd), 4);
+
+  textfield_->SetText(u"SettingText");
+  textfield_->SetSelectedRange(range);
+  SendAlternateCut();
+  data = ui::AXNodeData();
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelEnd), 4);
+
+  textfield_->SetText(u"SettingText");
+  textfield_->SetSelectedRange(range);
+  SendAlternateCopy();
+  SendAlternatePaste();
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelStart), 4);
+
+  textfield_->SetText(u"Setting text for test");
+  textfield_->SetEditableSelectionRange(gfx::Range(0));
+  textfield_->SelectWord();
+  data = ui::AXNodeData();
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(u"Setting", textfield_->GetSelectedText());
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelStart), 0);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelEnd), 7);
+
+  textfield_->DeleteRange(textfield_->GetSelectedRange());
+  data = ui::AXNodeData();
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelStart), 0);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelEnd), 0);
+
+  textfield_->SetText(u"SettingText : ");
+  ui::KeyEvent key_event = ui::KeyEvent::FromCharacter(
+      0x5A, ui::VKEY_Z, ui::DomCode::NONE, ui::EF_NONE);
+  textfield_->InsertChar(key_event);
+  data = ui::AXNodeData();
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelStart), 15);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelEnd), 15);
+
+  textfield_->SetText(u"0123456789");
+  textfield_->SetSelectedRange(gfx::Range(3, 5));
+  textfield_->AddSecondarySelectedRange(gfx::Range(7, 9));
+  data = ui::AXNodeData();
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelStart), 3);
+  EXPECT_EQ(data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelEnd), 5);
 }
 
 TEST_F(TextfieldTest, AccessibleNameFromLabel) {
@@ -4363,7 +4466,7 @@ TEST_F(TextfieldTest, LongPressOnSelection) {
   event_generator_->PressTouch(kLongPressPoint);
   ui::GestureEvent long_press = CreateTestGestureEvent(
       kLongPressPoint.x(), kLongPressPoint.y(),
-      ui::GestureEventDetails(ui::ET_GESTURE_LONG_PRESS));
+      ui::GestureEventDetails(ui::EventType::kGestureLongPress));
   event_generator_->Dispatch(&long_press);
 
   // Check that the selection has not changed and that touch selection is not
@@ -5286,6 +5389,26 @@ TEST_F(TextfieldTest, AccessibleTextDirectionRTL) {
   textfield_->GetViewAccessibility().GetAccessibleNodeData(&node_data);
   EXPECT_EQ(node_data.GetIntAttribute(ax::mojom::IntAttribute::kTextDirection),
             static_cast<int32_t>(ax::mojom::WritingDirection::kRtl));
+}
+
+TEST_F(TextfieldTest, AccessibleDefaultActionVerb) {
+  InitTextfield();
+  ui::AXNodeData data;
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetDefaultActionVerb(),
+            ax::mojom::DefaultActionVerb::kActivate);
+
+  data = ui::AXNodeData();
+  textfield_->SetEnabled(false);
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_FALSE(
+      data.HasIntAttribute(ax::mojom::IntAttribute::kDefaultActionVerb));
+
+  data = ui::AXNodeData();
+  textfield_->SetEnabled(true);
+  textfield_->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.GetDefaultActionVerb(),
+            ax::mojom::DefaultActionVerb::kActivate);
 }
 
 #if BUILDFLAG(SUPPORTS_AX_TEXT_OFFSETS)

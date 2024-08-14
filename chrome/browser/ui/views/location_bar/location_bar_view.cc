@@ -30,9 +30,7 @@
 #include "chrome/browser/extensions/tab_helper.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
-#include "chrome/browser/sharing/sms/sms_flags.h"
 #include "chrome/browser/sharing_hub/sharing_hub_features.h"
-#include "chrome/browser/ssl/security_state_tab_helper.h"
 #include "chrome/browser/themes/theme_properties.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
@@ -43,10 +41,11 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/content_settings/content_setting_bubble_model.h"
 #include "chrome/browser/ui/layout_constants.h"
-#include "chrome/browser/ui/lens/lens_overlay_controller.h"
+#include "chrome/browser/ui/lens/lens_overlay_entry_point_controller.h"
 #include "chrome/browser/ui/omnibox/chrome_omnibox_client.h"
 #include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
 #include "chrome/browser/ui/side_search/side_search_utils.h"
@@ -98,6 +97,7 @@
 #include "components/safe_browsing/core/common/features.h"
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_service.h"
+#include "components/security_state/content/security_state_tab_helper.h"
 #include "components/security_state/core/security_state.h"
 #include "components/sharing_message/features.h"
 #include "components/strings/grit/components_strings.h"
@@ -139,6 +139,7 @@
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/text_utils.h"
 #include "ui/gfx/vector_icon_types.h"
+#include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
 #include "ui/views/button_drag_utils.h"
@@ -223,6 +224,7 @@ LocationBarView::LocationBarView(Browser* browser,
       AppShimRegistry::Get()->RegisterAppChangedCallback(base::BindRepeating(
           &LocationBarView::OnAppShimChanged, base::Unretained(this)));
 #endif
+  GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
 }
 
 LocationBarView::~LocationBarView() = default;
@@ -358,8 +360,7 @@ void LocationBarView::Init() {
     }
 
     params.types_enabled.push_back(PageActionIconType::kClickToCall);
-    if (base::FeatureList::IsEnabled(kWebOTPCrossDevice))
-      params.types_enabled.push_back(PageActionIconType::kSmsRemoteFetcher);
+    params.types_enabled.push_back(PageActionIconType::kSmsRemoteFetcher);
     params.types_enabled.push_back(PageActionIconType::kManagePasswords);
     if (!apps::features::ShouldShowLinkCapturingUX()) {
       params.types_enabled.push_back(PageActionIconType::kIntentPicker);
@@ -387,8 +388,7 @@ void LocationBarView::Init() {
   // mocks.
   params.types_enabled.push_back(PageActionIconType::kAutofillAddress);
 
-  if (browser_ && LensOverlayController::IsEnabled(browser_) &&
-      lens::features::IsOmniboxEntryPointEnabled()) {
+  if (browser_ && lens::features::IsOmniboxEntryPointEnabled()) {
     // The persistent compact entrypoint should be positioned directly before
     // the star icon and the prominent expanding entrypoint should be
     // positioned in the leading position.
@@ -540,8 +540,8 @@ OmniboxView* LocationBarView::GetOmniboxView() {
 }
 
 void LocationBarView::AddedToWidget() {
-  if (lens::features::IsOmniboxEntryPointEnabled() &&
-      LensOverlayController::IsEnabled(browser_) && GetFocusManager()) {
+  if (lens::features::IsOmniboxEntryPointEnabled() && browser_ &&
+      GetFocusManager()) {
     CHECK(!focus_manager_);
     focus_manager_ = GetFocusManager();
     focus_manager_->AddFocusChangeListener(this);
@@ -589,10 +589,6 @@ void LocationBarView::OnDidChangeFocus(views::View* before, views::View* now) {
 
 bool LocationBarView::HasFocus() const {
   return omnibox_view_ && omnibox_view_->model()->has_focus();
-}
-
-void LocationBarView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  node_data->role = ax::mojom::Role::kGroup;
 }
 
 gfx::Size LocationBarView::GetMinimumSize() const {
@@ -941,6 +937,10 @@ void LocationBarView::OnThemeChanged() {
 void LocationBarView::ChildPreferredSizeChanged(views::View* child) {
   InvalidateLayout();
   SchedulePaint();
+}
+
+bool LocationBarView::HasSecurityStateChanged() {
+  return location_icon_view_->HasSecurityStateChanged();
 }
 
 void LocationBarView::Update(WebContents* contents) {
@@ -1303,10 +1303,6 @@ void LocationBarView::SaveStateToContents(WebContents* contents) {
   omnibox_view_->SaveStateToTab(contents);
 }
 
-const OmniboxView* LocationBarView::GetOmniboxView() const {
-  return omnibox_view_;
-}
-
 LocationBarTesting* LocationBarView::GetLocationBarForTesting() {
   return this;
 }
@@ -1320,9 +1316,9 @@ bool LocationBarView::TestContentSettingImagePressed(size_t index) {
     return false;
 
   image_view->OnKeyPressed(
-      ui::KeyEvent(ui::ET_KEY_PRESSED, ui::VKEY_SPACE, ui::EF_NONE));
+      ui::KeyEvent(ui::EventType::kKeyPressed, ui::VKEY_SPACE, ui::EF_NONE));
   image_view->OnKeyReleased(
-      ui::KeyEvent(ui::ET_KEY_RELEASED, ui::VKEY_SPACE, ui::EF_NONE));
+      ui::KeyEvent(ui::EventType::kKeyReleased, ui::VKEY_SPACE, ui::EF_NONE));
   return true;
 }
 

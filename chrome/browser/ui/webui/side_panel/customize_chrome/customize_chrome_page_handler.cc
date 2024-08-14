@@ -14,10 +14,13 @@
 #include "base/metrics/user_metrics.h"
 #include "base/metrics/user_metrics_action.h"
 #include "base/strings/escape.h"
+#include "base/strings/utf_string_conversions.h"
+#include "chrome/browser/extensions/settings_api_helpers.h"
 #include "chrome/browser/new_tab_page/modules/new_tab_page_modules.h"
 #include "chrome/browser/new_tab_page/new_tab_page_util.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search/background/ntp_background_service_factory.h"
+#include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser_navigator.h"
@@ -29,17 +32,31 @@
 #include "chrome/browser/ui/webui/new_tab_page/ntp_pref_names.h"
 #include "chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_section.h"
 #include "chrome/common/pref_names.h"
+#include "chrome/common/url_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
 #include "components/search/ntp_features.h"
+#include "components/search_engines/template_url_service.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/common/extension.h"
+#include "net/base/url_util.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/color/color_provider.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/shell_dialogs/selected_file_info.h"
+
+namespace {
+
+void OpenWebPage(Profile* profile, const GURL& url) {
+  NavigateParams navigate_params(profile, url, ui::PAGE_TRANSITION_LINK);
+  navigate_params.window_action = NavigateParams::WindowAction::SHOW_WINDOW;
+  navigate_params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+  Navigate(&navigate_params);
+}
+
+}  // namespace
 
 CustomizeChromePageHandler::CustomizeChromePageHandler(
     mojo::PendingReceiver<side_panel::mojom::CustomizeChromePageHandler>
@@ -47,16 +64,21 @@ CustomizeChromePageHandler::CustomizeChromePageHandler(
     mojo::PendingRemote<side_panel::mojom::CustomizeChromePage> pending_page,
     NtpCustomBackgroundService* ntp_custom_background_service,
     content::WebContents* web_contents,
-    const std::vector<std::pair<const std::string, int>> module_id_names)
+    const std::vector<std::pair<const std::string, int>> module_id_names,
+    std::optional<base::RepeatingCallback<void(const GURL&)>> open_url_callback)
     : ntp_custom_background_service_(ntp_custom_background_service),
       profile_(Profile::FromBrowserContext(web_contents->GetBrowserContext())),
       web_contents_(web_contents),
       ntp_background_service_(
           NtpBackgroundServiceFactory::GetForProfile(profile_)),
+      template_url_service_(TemplateURLServiceFactory::GetForProfile(profile_)),
       theme_service_(ThemeServiceFactory::GetForProfile(profile_)),
       module_id_names_(module_id_names),
       page_(std::move(pending_page)),
-      receiver_(this, std::move(pending_page_handler)) {
+      receiver_(this, std::move(pending_page_handler)),
+      open_url_callback_(open_url_callback.has_value()
+                             ? open_url_callback.value()
+                             : base::BindRepeating(&OpenWebPage, profile_)) {
   CHECK(ntp_custom_background_service_);
   CHECK(theme_service_);
   CHECK(ntp_background_service_);
@@ -86,12 +108,21 @@ CustomizeChromePageHandler::CustomizeChromePageHandler(
 
   ntp_custom_background_service_observation_.Observe(
       ntp_custom_background_service_.get());
+
+  if (template_url_service_) {
+    template_url_service_->AddObserver(this);
+  }
 }
 
 CustomizeChromePageHandler::~CustomizeChromePageHandler() {
-  ntp_background_service_->RemoveObserver(this);
+  if (ntp_background_service_) {
+    ntp_background_service_->RemoveObserver(this);
+  }
   if (select_file_dialog_) {
     select_file_dialog_->ListenerDestroyed();
+  }
+  if (template_url_service_) {
+    template_url_service_->RemoveObserver(this);
   }
 }
 
@@ -121,6 +152,19 @@ void CustomizeChromePageHandler::ScrollToSection(
       break;
   }
   page_->ScrollToSection(mojo_section);
+}
+
+void CustomizeChromePageHandler::AttachedTabStateUpdated(
+    bool is_source_tab_first_party_ntp) {
+  last_is_source_tab_first_party_ntp_ = is_source_tab_first_party_ntp;
+  page_->AttachedTabStateUpdated(is_source_tab_first_party_ntp);
+}
+
+bool CustomizeChromePageHandler::IsNtpManagedByThirdPartySearchEngine() const {
+  return template_url_service_ &&
+         template_url_service_->GetDefaultSearchProvider() &&
+         !template_url_service_->GetDefaultSearchProvider()->HasGoogleBaseURLs(
+             template_url_service_->search_terms_data());
 }
 
 void CustomizeChromePageHandler::SetDefaultColor() {
@@ -286,26 +330,16 @@ void CustomizeChromePageHandler::UpdateTheme() {
 }
 
 void CustomizeChromePageHandler::OpenChromeWebStore() {
-  NavigateParams navigate_params(
-      profile_, GURL("https://chrome.google.com/webstore?category=theme"),
-      ui::PAGE_TRANSITION_LINK);
-  navigate_params.window_action = NavigateParams::WindowAction::SHOW_WINDOW;
-  navigate_params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
-  Navigate(&navigate_params);
+  open_url_callback_.Run(
+      GURL("https://chrome.google.com/webstore?category=theme"));
   UMA_HISTOGRAM_ENUMERATION("NewTabPage.ChromeWebStoreOpen",
                             NtpChromeWebStoreOpen::kAppearance);
 }
 
 void CustomizeChromePageHandler::OpenThirdPartyThemePage(
     const std::string& theme_id) {
-  NavigateParams navigate_params(
-      profile_,
-      GURL("https://chrome.google.com/webstore/detail/" +
-           base::EscapePath(theme_id)),
-      ui::PAGE_TRANSITION_LINK);
-  navigate_params.window_action = NavigateParams::WindowAction::SHOW_WINDOW;
-  navigate_params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
-  Navigate(&navigate_params);
+  open_url_callback_.Run(GURL("https://chrome.google.com/webstore/detail/" +
+                              base::EscapePath(theme_id)));
   UMA_HISTOGRAM_ENUMERATION("NewTabPage.ChromeWebStoreOpen",
                             NtpChromeWebStoreOpen::kCollections);
 }
@@ -325,14 +359,9 @@ void CustomizeChromePageHandler::OpenChromeWebStoreCategoryPage(
       break;
   }
 
-  NavigateParams navigate_params(
-      profile_,
-      GURL("https://chromewebstore.google.com/category/" + path +
-           "?utm_source=chromeSidebarExtensionCards"),
-      ui::PAGE_TRANSITION_LINK);
-  navigate_params.window_action = NavigateParams::WindowAction::SHOW_WINDOW;
-  navigate_params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
-  Navigate(&navigate_params);
+  open_url_callback_.Run(GURL("https://chromewebstore.google.com/category/" +
+                              path +
+                              "?utm_source=chromeSidebarExtensionCards"));
   UMA_HISTOGRAM_ENUMERATION("NewTabPage.ChromeWebStoreOpen", page);
 }
 
@@ -347,28 +376,31 @@ void CustomizeChromePageHandler::OpenChromeWebStoreCollectionPage(
       break;
   }
 
-  NavigateParams navigate_params(
-      profile_,
-      GURL("https://chromewebstore.google.com/collection/" + path +
-           "?utm_source=chromeSidebarExtensionCards"),
-      ui::PAGE_TRANSITION_LINK);
-  navigate_params.window_action = NavigateParams::WindowAction::SHOW_WINDOW;
-  navigate_params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
-  Navigate(&navigate_params);
+  open_url_callback_.Run(GURL("https://chromewebstore.google.com/collection/" +
+                              path +
+                              "?utm_source=chromeSidebarExtensionCards"));
   UMA_HISTOGRAM_ENUMERATION("NewTabPage.ChromeWebStoreOpen", page);
 }
 
 void CustomizeChromePageHandler::OpenChromeWebStoreHomePage() {
-  NavigateParams navigate_params(
-      profile_,
-      GURL("https://"
-           "chromewebstore.google.com/?utm_source=chromeSidebarExtensionCards"),
-      ui::PAGE_TRANSITION_LINK);
-  navigate_params.window_action = NavigateParams::WindowAction::SHOW_WINDOW;
-  navigate_params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
-  Navigate(&navigate_params);
+  open_url_callback_.Run(
+      GURL("https://chromewebstore.google.com/"
+           "?utm_source=chromeSidebarExtensionCards"));
   UMA_HISTOGRAM_ENUMERATION("NewTabPage.ChromeWebStoreOpen",
                             NtpChromeWebStoreOpen::kHomePage);
+}
+
+void CustomizeChromePageHandler::OpenNtpManagedByPage() {
+  const extensions::Extension* extension_managing_ntp =
+      extensions::GetExtensionOverridingNewTabPage(profile_);
+  if (extension_managing_ntp) {
+    open_url_callback_.Run(
+        net::AppendOrReplaceQueryParameter(GURL(chrome::kChromeUIExtensionsURL),
+                                           "id", extension_managing_ntp->id()));
+    return;
+  }
+
+  open_url_callback_.Run(GURL(chrome::kBrowserSettingsSearchEngineURL));
 }
 
 void CustomizeChromePageHandler::SetMostVisitedSettings(
@@ -434,6 +466,15 @@ void CustomizeChromePageHandler::UpdateScrollToSection() {
   ScrollToSection(last_requested_section_);
 }
 
+void CustomizeChromePageHandler::UpdateAttachedTabState() {
+  AttachedTabStateUpdated(last_is_source_tab_first_party_ntp_);
+}
+
+void CustomizeChromePageHandler::UpdateNtpManagedByName() {
+  page_->NtpManagedByNameUpdated(
+      base::UTF16ToUTF8(GetManagingThirdPartyName()));
+}
+
 void CustomizeChromePageHandler::LogEvent(NTPLoggingEventType event) {
   switch (event) {
     case NTP_BACKGROUND_UPLOAD_CANCEL:
@@ -465,6 +506,22 @@ bool CustomizeChromePageHandler::IsCustomLinksEnabled() const {
 
 bool CustomizeChromePageHandler::IsShortcutsVisible() const {
   return profile_->GetPrefs()->GetBoolean(ntp_prefs::kNtpShortcutsVisible);
+}
+
+std::u16string CustomizeChromePageHandler::GetManagingThirdPartyName() const {
+  // Check overriding extensions first.
+  const extensions::Extension* extension_managing_ntp =
+      extensions::GetExtensionOverridingNewTabPage(profile_);
+  if (extension_managing_ntp) {
+    return base::UTF8ToUTF16(extension_managing_ntp->short_name());
+  }
+
+  // Check 3rd party search engines next.
+  if (IsNtpManagedByThirdPartySearchEngine()) {
+    return template_url_service_->GetDefaultSearchProvider()->short_name();
+  }
+
+  return std::u16string();
 }
 
 void CustomizeChromePageHandler::OnNativeThemeUpdated(
@@ -556,6 +613,16 @@ void CustomizeChromePageHandler::OnNextCollectionImageAvailable() {}
 void CustomizeChromePageHandler::OnNtpBackgroundServiceShuttingDown() {
   ntp_background_service_->RemoveObserver(this);
   ntp_background_service_ = nullptr;
+}
+
+void CustomizeChromePageHandler::OnTemplateURLServiceChanged() {
+  UpdateNtpManagedByName();
+}
+
+void CustomizeChromePageHandler::OnTemplateURLServiceShuttingDown() {
+  CHECK(template_url_service_);
+  template_url_service_->RemoveObserver(this);
+  template_url_service_ = nullptr;
 }
 
 void CustomizeChromePageHandler::FileSelected(const ui::SelectedFileInfo& file,

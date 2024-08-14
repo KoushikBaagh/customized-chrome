@@ -9,6 +9,8 @@
 #import "components/browsing_data/core/counters/history_counter.h"
 #import "components/browsing_data/core/counters/passwords_counter.h"
 #import "components/browsing_data/core/pref_names.h"
+#import "components/prefs/ios/pref_observer_bridge.h"
+#import "components/prefs/pref_change_registrar.h"
 #import "components/prefs/pref_service.h"
 #import "components/signin/public/identity_manager/objc/identity_manager_observer_bridge.h"
 #import "components/strings/grit/components_strings.h"
@@ -22,7 +24,16 @@
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util_mac.h"
 
-@interface QuickDeleteMediator () <IdentityManagerObserverBridgeDelegate>
+namespace {
+
+// Delay to observe when triggering further actions after browsing data removal
+// has completed so the progress UI state is not flashed.
+constexpr base::TimeDelta kBrowsingDataRemoveCompletionDelay = base::Seconds(1);
+
+}  // namespace
+
+@interface QuickDeleteMediator () <IdentityManagerObserverBridgeDelegate,
+                                   PrefObserverDelegate>
 @end
 
 @implementation QuickDeleteMediator {
@@ -59,6 +70,13 @@
   // Observer for `IdentityManager`.
   std::unique_ptr<signin::IdentityManagerObserverBridge>
       _identityManagerObserver;
+
+  // Pref observer to track changes to prefs.
+  std::unique_ptr<PrefObserverBridge> _prefObserverBridge;
+  // Registrar for pref changes notifications.
+  PrefChangeRegistrar _prefChangeRegistrar;
+
+  BOOL _canPerformTabsClosureAnimation;
 }
 
 - (instancetype)initWithPrefs:(PrefService*)prefs
@@ -66,8 +84,8 @@
         (BrowsingDataCounterWrapperProducer*)counterWrapperProducer
                        identityManager:(signin::IdentityManager*)identityManager
                    browsingDataRemover:(BrowsingDataRemover*)browsingDataRemover
-                   discoverFeedService:
-                       (DiscoverFeedService*)discoverFeedService {
+                   discoverFeedService:(DiscoverFeedService*)discoverFeedService
+        canPerformTabsClosureAnimation:(BOOL)canPerformTabsClosureAnimation {
   if (self = [super init]) {
     _prefs = prefs;
     _counterWrapperProducer = counterWrapperProducer;
@@ -77,6 +95,14 @@
             _identityManager, self);
     _browsingDataRemover = browsingDataRemover;
     _discoverFeedService = discoverFeedService;
+
+    _prefChangeRegistrar.Init(_prefs);
+    _prefObserverBridge.reset(new PrefObserverBridge(self));
+
+    // Start observing preferences.
+    [self observePreferences];
+
+    _canPerformTabsClosureAnimation = canPerformTabsClosureAnimation;
   }
   return self;
 }
@@ -90,15 +116,30 @@
       setTimeRange:static_cast<browsing_data::TimePeriod>(_prefs->GetInteger(
                        browsing_data::prefs::kDeleteTimePeriod))];
 
-  [self createCounters];
-  [self restartCounters];
-
   BOOL shouldShowFooter =
       _identityManager->HasPrimaryAccount(signin::ConsentLevel::kSignin);
   [_consumer setShouldShowFooter:shouldShowFooter];
+  [_consumer
+      setHistorySelection:_prefs->GetBoolean(
+                              browsing_data::prefs::kDeleteBrowsingHistory)];
+  [_consumer
+      setTabsSelection:_prefs->GetBoolean(browsing_data::prefs::kCloseTabs)];
+  [_consumer setSiteDataSelection:_prefs->GetBoolean(
+                                      browsing_data::prefs::kDeleteCookies)];
+  [_consumer
+      setCacheSelection:_prefs->GetBoolean(browsing_data::prefs::kDeleteCache)];
+  [_consumer setPasswordsSelection:_prefs->GetBoolean(
+                                       browsing_data::prefs::kDeletePasswords)];
+  [_consumer setAutofillSelection:_prefs->GetBoolean(
+                                      browsing_data::prefs::kDeleteFormData)];
+
+  [self createCounters];
+  [self restartCounters];
 }
 
 - (void)disconnect {
+  _prefObserverBridge.reset();
+  _prefChangeRegistrar.RemoveAll();
   _counters.clear();
   _counterWrapperProducer = nil;
   _prefs = nil;
@@ -113,11 +154,11 @@
 - (void)timeRangeSelected:(browsing_data::TimePeriod)timeRange {
   _prefs->SetInteger(browsing_data::prefs::kDeleteTimePeriod,
                      static_cast<int>(timeRange));
-
-  [self restartCounters];
 }
 
 - (void)triggerDeletion {
+  [_consumer deletionInProgress];
+
   BrowsingDataRemoveMask removeMask = BrowsingDataRemoveMask::REMOVE_NOTHING;
 
   if (_prefs->GetBoolean(browsing_data::prefs::kDeleteBrowsingHistory)) {
@@ -131,10 +172,6 @@
                      base::Time::Now().ToTimeT());
 
     _discoverFeedService->BrowsingHistoryCleared();
-  }
-
-  if (_prefs->GetBoolean(browsing_data::prefs::kCloseTabs)) {
-    removeMask |= BrowsingDataRemoveMask::CLOSE_TABS;
   }
 
   if (_prefs->GetBoolean(browsing_data::prefs::kDeleteCookies)) {
@@ -153,19 +190,76 @@
     removeMask |= BrowsingDataRemoveMask::REMOVE_FORM_DATA;
   }
 
-  __weak QuickDeleteMediator* weakSelf = self;
-  void (^removeBrowsingDidFinishCompletionBlock)(void) = ^void() {
-    // TODO(crbug.com/347919133): Trigger post-delete experience.
-    [weakSelf.presentationHandler dismissQuickDelete];
-  };
+  bool shouldCloseTabs = _prefs->GetBoolean(browsing_data::prefs::kCloseTabs);
+
+  // If we cannot perform the tabs closure animation, then close the tabs when
+  // deleting the other data.
+  if (shouldCloseTabs && !_canPerformTabsClosureAnimation) {
+    _browsingDataRemover->SetCachedTabsInfo(_cachedTabsInfo);
+    removeMask |= BrowsingDataRemoveMask::CLOSE_TABS;
+  }
 
   browsing_data::TimePeriod timePeriod = static_cast<browsing_data::TimePeriod>(
       _prefs->GetInteger(browsing_data::prefs::kDeleteTimePeriod));
+  base::Time beginTime = browsing_data::CalculateBeginDeleteTime(timePeriod);
+  base::Time endTime = browsing_data::CalculateEndDeleteTime(timePeriod);
 
-  _browsingDataRemover->SetCachedTabsInfo(_cachedTabsInfo);
-  _browsingDataRemover->Remove(
-      timePeriod, removeMask,
-      base::BindOnce(removeBrowsingDidFinishCompletionBlock));
+  base::OnceClosure removeBrowsingDataCompletion;
+
+  // If we can perform the tabs closure animation, then don't close the tabs
+  // right away, but perform the animation which will eventually close the tabs.
+  if (shouldCloseTabs && _canPerformTabsClosureAnimation) {
+    __weak __typeof(self) weakSelf = self;
+    removeBrowsingDataCompletion = base::BindOnce(
+        [](__typeof(self) strongSelf, base::Time beginTime,
+           base::Time endTime) {
+          [strongSelf triggerTabsClosureAnimationWithBeginTime:beginTime
+                                                       endTime:endTime];
+        },
+        weakSelf, beginTime, endTime);
+  } else {
+    __weak __typeof(self.consumer) weakConsumer = self.consumer;
+    removeBrowsingDataCompletion = base::BindOnce(
+        [](__typeof(self.consumer) strongConsumer) {
+          [strongConsumer deletionFinished];
+        },
+        weakConsumer);
+  }
+
+  base::OnceClosure delayedCompletion = base::BindOnce(
+      [](base::OnceClosure completion) {
+        base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+            FROM_HERE, std::move(completion),
+            kBrowsingDataRemoveCompletionDelay);
+      },
+      std::move(removeBrowsingDataCompletion));
+
+  _browsingDataRemover->RemoveInRange(beginTime, endTime, removeMask,
+                                      std::move(delayedCompletion));
+}
+
+- (void)updateHistorySelection:(BOOL)selected {
+  _prefs->SetBoolean(browsing_data::prefs::kDeleteBrowsingHistory, selected);
+}
+
+- (void)updateTabsSelection:(BOOL)selected {
+  _prefs->SetBoolean(browsing_data::prefs::kCloseTabs, selected);
+}
+
+- (void)updateSiteDataSelection:(BOOL)selected {
+  _prefs->SetBoolean(browsing_data::prefs::kDeleteCookies, selected);
+}
+
+- (void)updateCacheSelection:(BOOL)selected {
+  _prefs->SetBoolean(browsing_data::prefs::kDeleteCache, selected);
+}
+
+- (void)updatePasswordsSelection:(BOOL)selected {
+  _prefs->SetBoolean(browsing_data::prefs::kDeletePasswords, selected);
+}
+
+- (void)updateAutofillSelection:(BOOL)selected {
+  _prefs->SetBoolean(browsing_data::prefs::kDeleteFormData, selected);
 }
 
 #pragma mark - IdentityManagerObserverBridgeDelegate
@@ -185,7 +279,40 @@
   }
 }
 
+#pragma mark - PrefObserverDelegate
+
+- (void)onPreferenceChanged:(const std::string&)preferenceName {
+  if (preferenceName == browsing_data::prefs::kDeleteTimePeriod) {
+    [_consumer
+        setTimeRange:static_cast<browsing_data::TimePeriod>(_prefs->GetInteger(
+                         browsing_data::prefs::kDeleteTimePeriod))];
+  }
+
+  if (preferenceName == browsing_data::prefs::kDeleteTimePeriod ||
+      preferenceName == browsing_data::prefs::kDeleteBrowsingHistory ||
+      preferenceName == browsing_data::prefs::kCloseTabs ||
+      preferenceName == browsing_data::prefs::kDeleteCookies ||
+      preferenceName == browsing_data::prefs::kDeleteCache ||
+      preferenceName == browsing_data::prefs::kDeletePasswords ||
+      preferenceName == browsing_data::prefs::kDeleteFormData) {
+    [self restartCounters];
+    return;
+  }
+  DCHECK(false) << "Unxpected clear browsing data item type.";
+}
+
 #pragma mark - Private
+
+// Trigger the tab closure animation along with the actual closure of the
+// WebStates within [`beginTime`, `endTime`[.
+- (void)triggerTabsClosureAnimationWithBeginTime:(base::Time)beginTime
+                                         endTime:(base::Time)endTime {
+  CHECK(_canPerformTabsClosureAnimation);
+  [_presentationHandler
+      triggerTabsClosureAnimationWithBeginTime:beginTime
+                                       endTime:endTime
+                                cachedTabsInfo:_cachedTabsInfo];
+}
 
 // Creates counters for browsing history, passwords and form data browsing data
 // types. These counters when triggered by `restartCounters` will lead to an
@@ -193,13 +320,14 @@
 - (void)createCounters {
   [self createCounter:browsing_data::prefs::kDeleteBrowsingHistory];
   [self createCounter:browsing_data::prefs::kCloseTabs];
+  [self createCounter:browsing_data::prefs::kDeleteCache];
   [self createCounter:browsing_data::prefs::kDeletePasswords];
   [self createCounter:browsing_data::prefs::kDeleteFormData];
 }
 
 // Creates a counter for the browsing data type defined by the `prefName`.
 - (void)createCounter:(std::string)prefName {
-  __weak QuickDeleteMediator* weakSelf = self;
+  __weak __typeof(self) weakSelf = self;
   std::unique_ptr<BrowsingDataCounterWrapper> counter = [_counterWrapperProducer
       createCounterWrapperWithPrefName:prefName
                       updateUiCallback:
@@ -207,6 +335,7 @@
                               const browsing_data::BrowsingDataCounter::Result&
                                   result) {
                             [weakSelf updateSummaryWith:&result];
+                            [weakSelf updateResultOnConsumer:&result];
                           })];
   if (counter != nullptr) {
     _counters.insert(std::move(counter));
@@ -282,6 +411,11 @@
     _addressesSummary = [self addressesSummary:autofillResult];
     _paymentMethodsSummary = [self paymentMethodsSummary:autofillResult];
     _suggestionsSummary = [self suggestionsSummary:autofillResult];
+  } else if (prefName == browsing_data::prefs::kDeleteCache) {
+    // Do nothing as we don't display the calculated cache result in the summary
+    // on the bottom sheet.
+    // TODO(crbug.com/353211728): Construct the summary on the VC using the new
+    // result methods provided on the mediator.
   } else {
     NOTREACHED();
   }
@@ -385,8 +519,7 @@
 
 // Returns the tabs summary based on `result`. If the count of tabs in
 // `result ` is less than 1, then returns an empty string.
-- (NSString*)tabsSummary:
-    (const browsing_data::PasswordsCounter::FinishedResult*)result {
+- (NSString*)tabsSummary:(const TabsCounter::TabsResult*)result {
   browsing_data::BrowsingDataCounter::ResultInt tabsCount = result->Value();
 
   if (tabsCount < 1) {
@@ -455,6 +588,53 @@
 
   return l10n_util::GetPluralNSStringF(
       IDS_IOS_DELETE_BROWSING_DATA_SUMMARY_SUGGESTIONS, suggestionCount);
+}
+
+- (void)observePreferences {
+  _prefObserverBridge->ObserveChangesForPreference(
+      browsing_data::prefs::kDeleteTimePeriod, &_prefChangeRegistrar);
+  _prefObserverBridge->ObserveChangesForPreference(
+      browsing_data::prefs::kDeleteBrowsingHistory, &_prefChangeRegistrar);
+  _prefObserverBridge->ObserveChangesForPreference(
+      browsing_data::prefs::kCloseTabs, &_prefChangeRegistrar);
+  _prefObserverBridge->ObserveChangesForPreference(
+      browsing_data::prefs::kDeleteCookies, &_prefChangeRegistrar);
+  _prefObserverBridge->ObserveChangesForPreference(
+      browsing_data::prefs::kDeleteCache, &_prefChangeRegistrar);
+  _prefObserverBridge->ObserveChangesForPreference(
+      browsing_data::prefs::kDeletePasswords, &_prefChangeRegistrar);
+  _prefObserverBridge->ObserveChangesForPreference(
+      browsing_data::prefs::kDeleteFormData, &_prefChangeRegistrar);
+}
+
+- (void)updateResultOnConsumer:
+    (const browsing_data::BrowsingDataCounter::Result*)result {
+  std::string prefName = result->source()->GetPrefName();
+
+  if (prefName == browsing_data::prefs::kDeleteBrowsingHistory) {
+    [_consumer updateHistoryWithResult:*result];
+    return;
+  }
+
+  if (prefName == browsing_data::prefs::kCloseTabs) {
+    [_consumer updateTabsWithResult:*result];
+    return;
+  }
+
+  if (prefName == browsing_data::prefs::kDeleteCache) {
+    [_consumer updateCacheWithResult:*result];
+    return;
+  }
+
+  if (prefName == browsing_data::prefs::kDeletePasswords) {
+    [_consumer updatePasswordsWithResult:*result];
+    return;
+  }
+
+  if (prefName == browsing_data::prefs::kDeleteFormData) {
+    [_consumer updateAutofillWithResult:*result];
+    return;
+  }
 }
 
 @end

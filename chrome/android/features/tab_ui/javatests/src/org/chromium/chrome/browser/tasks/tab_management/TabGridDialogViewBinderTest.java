@@ -102,6 +102,8 @@ public class TabGridDialogViewBinderTest extends BlankUiTestActivityTestCase {
     private View mMainContent;
     private @Nullable View mShareButtonContainer;
     private @Nullable View mShareButton;
+    private @Nullable View mImageTilesContainer;
+    private ImageView mHairline;
     private ScrimCoordinator mScrimCoordinator;
     private GridLayoutManager mLayoutManager;
     private LinearLayoutManager mLinearLayoutManager;
@@ -141,6 +143,7 @@ public class TabGridDialogViewBinderTest extends BlankUiTestActivityTestCase {
                     LayoutInflater.from(getActivity())
                             .inflate(R.layout.tab_grid_dialog_layout, parentView, true);
                     mTabGridDialogView = parentView.findViewById(R.id.dialog_parent_view);
+                    mHairline = mTabGridDialogView.findViewById(R.id.tab_grid_dialog_hairline);
                     mLeftButton = mToolbarView.findViewById(R.id.toolbar_left_button);
                     mRightButton = mToolbarView.findViewById(R.id.toolbar_right_button);
                     mTitleTextView = mToolbarView.findViewById(R.id.title);
@@ -150,12 +153,15 @@ public class TabGridDialogViewBinderTest extends BlankUiTestActivityTestCase {
                     mMainContent = mToolbarView.findViewById(R.id.main_content);
                     mShareButtonContainer = mToolbarView.findViewById(R.id.share_button_container);
                     mShareButton = mToolbarView.findViewById(R.id.share_button);
+                    mImageTilesContainer = mToolbarView.findViewById(R.id.image_tiles_container);
                     if (isDataSharingEnabled) {
                         assertNotNull(mShareButtonContainer);
                         assertNotNull(mShareButton);
+                        assertNotNull(mImageTilesContainer);
                     } else {
                         assertNull(mShareButtonContainer);
                         assertNull(mShareButton);
+                        assertNull(mImageTilesContainer);
                     }
                     mScrimCoordinator =
                             new ScrimCoordinator(getActivity(), null, parentView, Color.RED);
@@ -602,6 +608,39 @@ public class TabGridDialogViewBinderTest extends BlankUiTestActivityTestCase {
     @Test
     @SmallTest
     @UiThreadTest
+    @EnableFeatures(DATA_SHARING_ANDROID)
+    public void testImageTiles_Incognito() {
+        mModel.set(TabGridDialogProperties.IS_INCOGNITO, true);
+        mModel.set(TabGridDialogProperties.IS_TAB_GROUP_SHARED, true);
+
+        assertEquals(mImageTilesContainer.getVisibility(), View.GONE);
+
+        mModel.set(TabGridDialogProperties.IS_TAB_GROUP_SHARED, false);
+        assertEquals(mImageTilesContainer.getVisibility(), View.GONE);
+    }
+
+    @Test
+    @SmallTest
+    @UiThreadTest
+    @EnableFeatures(DATA_SHARING_ANDROID)
+    public void testImageTiles_NonIncognito() {
+        mModel.set(TabGridDialogProperties.IS_INCOGNITO, false);
+        mModel.set(TabGridDialogProperties.IS_TAB_GROUP_SHARED, false);
+        mModel.set(TabGridDialogProperties.SHARE_IMAGE_TILES_CLICK_LISTENER, mOnClickListener);
+
+        assertEquals(mImageTilesContainer.getVisibility(), View.GONE);
+
+        mModel.set(TabGridDialogProperties.IS_TAB_GROUP_SHARED, true);
+        assertEquals(mImageTilesContainer.getVisibility(), View.VISIBLE);
+
+        mImageTilesContainer.performClick();
+
+        verify(mOnClickListener).onClick(any());
+    }
+
+    @Test
+    @SmallTest
+    @UiThreadTest
     public void testSetInitialScrollIndex_Linear() {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
@@ -614,6 +653,21 @@ public class TabGridDialogViewBinderTest extends BlankUiTestActivityTestCase {
 
         verify(mLinearLayoutManager, timeout(CriteriaHelper.DEFAULT_MAX_TIME_TO_POLL).times(1))
                 .scrollToPositionWithOffset(eq(5), eq(0));
+    }
+
+    @Test
+    @SmallTest
+    @UiThreadTest
+    public void testHairline() {
+        mContentView.layout(0, 0, 100, 500);
+
+        assertEquals(View.GONE, mHairline.getVisibility());
+
+        mModel.set(TabGridDialogProperties.HAIRLINE_VISIBILITY, true);
+        assertEquals(View.VISIBLE, mHairline.getVisibility());
+
+        mModel.set(TabGridDialogProperties.HAIRLINE_VISIBILITY, false);
+        assertEquals(View.GONE, mHairline.getVisibility());
     }
 
     @Test

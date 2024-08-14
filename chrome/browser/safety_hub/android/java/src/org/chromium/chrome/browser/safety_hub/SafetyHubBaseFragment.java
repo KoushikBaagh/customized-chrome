@@ -6,27 +6,30 @@ package org.chromium.chrome.browser.safety_hub;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.view.View;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import org.chromium.base.ApplicationStatus;
 import org.chromium.chrome.browser.settings.ChromeBaseSettingsFragment;
+import org.chromium.chrome.browser.settings.SettingsLauncherFactory;
 import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
-import org.chromium.components.browser_ui.settings.FragmentSettingsLauncher;
-import org.chromium.components.browser_ui.settings.SettingsLauncher;
 import org.chromium.components.browser_ui.site_settings.ContentSettingsResources;
 import org.chromium.components.browser_ui.site_settings.SingleCategorySettings;
 import org.chromium.components.browser_ui.site_settings.SiteSettingsCategory;
 
-public abstract class SafetyHubBaseFragment extends ChromeBaseSettingsFragment
-        implements FragmentSettingsLauncher {
+public abstract class SafetyHubBaseFragment extends ChromeBaseSettingsFragment {
     private SnackbarManager mSnackbarManager;
-    private SettingsLauncher mSettingsLauncher;
 
     @Override
-    public void setSettingsLauncher(SettingsLauncher settingsLauncher) {
-        mSettingsLauncher = settingsLauncher;
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+
+        // Disable animations of preference changes.
+        getListView().setItemAnimator(null);
     }
 
     public void setSnackbarManager(SnackbarManager snackbarManager) {
@@ -72,16 +75,11 @@ public abstract class SafetyHubBaseFragment extends ChromeBaseSettingsFragment
     }
 
     protected void launchSettingsActivity(Class<? extends Fragment> fragment) {
-        if (mSettingsLauncher != null) {
-            mSettingsLauncher.launchSettingsActivity(getContext(), fragment);
-        }
+        SettingsLauncherFactory.createSettingsLauncher()
+                .launchSettingsActivity(getContext(), fragment);
     }
 
     protected void launchSiteSettingsActivity(@SiteSettingsCategory.Type int category) {
-        if (mSettingsLauncher == null) {
-            return;
-        }
-
         Bundle extras = new Bundle();
         extras.putString(
                 SingleCategorySettings.EXTRA_CATEGORY,
@@ -90,7 +88,7 @@ public abstract class SafetyHubBaseFragment extends ChromeBaseSettingsFragment
                 SingleCategorySettings.EXTRA_TITLE,
                 getContext().getString(ContentSettingsResources.getTitleForCategory(category)));
 
-        mSettingsLauncher.launchSettingsActivity(
-                getContext(), SingleCategorySettings.class, extras);
+        SettingsLauncherFactory.createSettingsLauncher()
+                .launchSettingsActivity(getContext(), SingleCategorySettings.class, extras);
     }
 }

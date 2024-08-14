@@ -39,6 +39,8 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/devtools/devtools_window.h"
 #include "chrome/browser/download/bubble/download_bubble_prefs.h"
+#include "chrome/browser/enterprise/data_protection/data_protection_navigation_observer.h"
+#include "chrome/browser/enterprise/watermark/watermark_view.h"
 #include "chrome/browser/extensions/browser_extension_window_controller.h"
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/feature_engagement/tracker_factory.h"
@@ -91,6 +93,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_utils.h"
 #include "chrome/browser/ui/toolbar/app_menu_model.h"
+#include "chrome/browser/ui/toolbar/chrome_labs/chrome_labs_utils.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/accelerator_table.h"
@@ -161,6 +164,7 @@
 #include "chrome/browser/ui/views/theme_copying_widget.h"
 #include "chrome/browser/ui/views/toolbar/browser_app_menu_button.h"
 #include "chrome/browser/ui/views/toolbar/chrome_labs/chrome_labs_button.h"
+#include "chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.h"
 #include "chrome/browser/ui/views/toolbar/reload_button.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/browser/ui/views/translate/translate_bubble_controller.h"
@@ -288,6 +292,8 @@
 #include "chrome/browser/ui/views/frame/top_controls_slide_controller_chromeos.h"
 #include "chromeos/ui/frame/caption_buttons/frame_size_button.h"
 #include "chromeos/ui/wm/desks/desks_helper.h"
+#else
+#include "chrome/browser/ui/views/enterprise/managed_menu_coordinator.h"
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -341,17 +347,24 @@
 #include "chrome/browser/ui/views/frame/webui_tab_strip_container_view.h"
 #endif  // BUILDFLAG(ENABLE_WEBUI_TAB_STRIP)
 
-#if BUILDFLAG(ENTERPRISE_WATERMARK)
-#include "chrome/browser/enterprise/data_protection/data_protection_navigation_observer.h"
-#include "chrome/browser/enterprise/watermark/watermark_view.h"
-#endif
-
 using base::UserMetricsAction;
 using content::WebContents;
 using input::NativeWebKeyboardEvent;
 using web_modal::WebContentsModalDialogHost;
 
 namespace {
+
+// When enabled, changes the frame rate of the loading tab spinner to
+// 1 / kLoadingTabAnimationFrameDelay. In practice the goal is to reduce the
+// frame rate (increase kLoadingTabAnimationFrameDelay) to improve performance,
+// while still keeping a reasonable experience. Details in crbug.com/355000380.
+// The default rate is 1/0.03 ~= 33fps.
+BASE_FEATURE(kChangeFrameRateOfLoadingTabAnimation,
+             "ChangeFrameRateOfLoadingTabAnimation",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+constexpr base::FeatureParam<base::TimeDelta> kLoadingTabAnimationFrameDelay = {
+    &kChangeFrameRateOfLoadingTabAnimation, "loading_tab_animation_frame_delay",
+    base::Milliseconds(30)};
 
 // The name of a key to store on the window handle so that other code can
 // locate this object using just the handle.
@@ -415,7 +428,7 @@ bool GetGestureCommand(ui::GestureEvent* event, int* command) {
   DCHECK(command);
   *command = 0;
 #if BUILDFLAG(IS_MAC)
-  if (event->details().type() == ui::ET_GESTURE_SWIPE) {
+  if (event->details().type() == ui::EventType::kGestureSwipe) {
     if (event->details().swipe_left()) {
       *command = IDC_BACK;
       return true;
@@ -934,13 +947,8 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
   contents_web_view_ =
       contents_container->AddChildView(std::move(contents_web_view));
   contents_web_view_->set_is_primary_web_contents_for_window(true);
-
-#if BUILDFLAG(ENTERPRISE_WATERMARK)
-  if (base::FeatureList::IsEnabled(features::kEnableWatermarkView)) {
-    watermark_view_ = contents_container->AddChildView(
-        std::make_unique<enterprise_watermark::WatermarkView>());
-  }
-#endif  // BUILDFLAG(ENTERPRISE_WATERMARK)
+  watermark_view_ = contents_container->AddChildView(
+      std::make_unique<enterprise_watermark::WatermarkView>());
 
   contents_container->SetLayoutManager(std::make_unique<ContentsLayoutManager>(
       devtools_web_view_, contents_web_view_, watermark_view_));
@@ -1007,9 +1015,23 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
                           base::Unretained(this), CanFullscreen()));
   UpdateFullscreenAllowedFromPolicy(CanFullscreen());
 
+  if (base::FeatureList::IsEnabled(features::kCompactMode)) {
+    registrar_.Init(browser_->profile()->GetPrefs());
+    registrar_.Add(prefs::kCompactModeEnabled,
+                   base::BindRepeating(&BrowserView::ToggleCompactModeUI,
+                                       base::Unretained(this)));
+    ToggleCompactModeUI();
+  }
+
   WebUIContentsPreloadManager::GetInstance()->WarmupForBrowser(browser_.get());
 
   browser_->GetFeatures().InitPostBrowserViewConstruction(this);
+
+  GetViewAccessibility().SetRole(ax::mojom::Role::kClient);
+}
+
+void BrowserView::ToggleCompactModeUI() {
+  InvalidateLayout();
 }
 
 BrowserView::~BrowserView() {
@@ -1042,11 +1064,9 @@ BrowserView::~BrowserView() {
     global_registry->set_registry_for_active_window(nullptr);
   }
 
-#if BUILDFLAG(ENTERPRISE_WATERMARK)
   // `watermark_view_` is a raw pointer to a child view, so it needs to be set
   // to null before `RemoveAllChildViews()` is called to avoid dangling.
   watermark_view_ = nullptr;
-#endif  // BUILDFLAG(ENTERPRISE_WATERMARK)
 
   // Child views maintain PrefMember attributes that point to
   // OffTheRecordProfile's PrefService which gets deleted by ~Browser.
@@ -1572,7 +1592,8 @@ void BrowserView::UpdateLoadingAnimations(bool is_visible) {
 #endif
     // Loads are happening, and the timer isn't running, so start it.
     loading_animation_start_ = base::TimeTicks::Now();
-    loading_animation_timer_.Start(FROM_HERE, base::Milliseconds(30), this,
+    loading_animation_timer_.Start(FROM_HERE,
+                                   kLoadingTabAnimationFrameDelay.Get(), this,
                                    &BrowserView::LoadingAnimationCallback);
   } else {
     loading_animation_timer_.Stop();
@@ -1775,16 +1796,6 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
   if (AppUsesBorderlessMode() && !old_contents) {
     SetWindowManagementPermissionSubscriptionForBorderlessMode(new_contents);
   }
-
-#if BUILDFLAG(ENTERPRISE_WATERMARK) || \
-    BUILDFLAG(ENTERPRISE_SCREENSHOT_PROTECTION)
-  enterprise_data_protection::DataProtectionNavigationObserver::
-      GetDataProtectionSettings(
-          GetProfile(), web_contents(),
-          base::BindOnce(&BrowserView::ApplyDataProtectionSettings,
-                         weak_ptr_factory_.GetWeakPtr(),
-                         web_contents()->GetWeakPtr()));
-#endif
 }
 
 void BrowserView::OnTabDetached(content::WebContents* contents,
@@ -2187,6 +2198,15 @@ void BrowserView::UpdateToolbar(content::WebContents* contents) {
     toolbar_->Update(contents);
 }
 
+bool BrowserView::UpdateToolbarSecurityState() {
+  // We may end up here during destruction.
+  if (toolbar_) {
+    return toolbar_->UpdateSecurityState();
+  }
+
+  return false;
+}
+
 void BrowserView::UpdateCustomTabBarVisibility(bool visible, bool animate) {
   if (toolbar_)
     toolbar_->UpdateCustomTabBarVisibility(visible, animate);
@@ -2448,7 +2468,8 @@ void BrowserView::SetWindowManagementPermissionSubscriptionForBorderlessMode(
   // owned by BrowserView.
   window_management_subscription_id_ =
       controller->SubscribeToPermissionStatusChange(
-          blink::PermissionType::WINDOW_MANAGEMENT, rfh->GetProcess(), origin,
+          blink::PermissionType::WINDOW_MANAGEMENT,
+          /*render_process_host*/ nullptr, rfh, origin.GetURL(),
           /*should_include_device_status=*/false,
           base::BindRepeating(&BrowserView::UpdateWindowManagementPermission,
                               base::Unretained(this)));
@@ -2480,12 +2501,9 @@ bool BrowserView::WidgetOwnedByAnchorContainsPoint(
 bool BrowserView::IsBorderlessModeEnabled() const {
   return borderless_mode_enabled_ && window_management_permission_granted_;
 }
-
 void BrowserView::ShowChromeLabs() {
-  if (toolbar()->chrome_labs_button() &&
-      toolbar()->chrome_labs_button()->GetVisible()) {
-    toolbar()->chrome_labs_button()->GetChromeLabsCoordinator()->ShowOrHide();
-  }
+  CHECK(IsChromeLabsEnabled());
+  browser_->GetFeatures().chrome_labs_coordinator()->ShowOrHide();
 }
 
 views::WebView* BrowserView::GetContentsWebView() {
@@ -2761,51 +2779,6 @@ void BrowserView::TouchModeChanged() {
   MaybeShowWebUITabStripIPH();
 }
 
-#if BUILDFLAG(ENTERPRISE_WATERMARK) || \
-    BUILDFLAG(ENTERPRISE_SCREENSHOT_PROTECTION)
-
-void BrowserView::DocumentOnLoadCompletedInPrimaryMainFrame() {
-  // It is possible for `clear_watermark_text_on_page_load_` to be set to false
-  // even when the watermark should be cleared.  However, in this case there
-  // is a queued call to `ApplyDataProtectionSettings()` which will correctly
-  // reset the watermark.  The scenario is as followed:
-  //
-  // 1/ User is viewing a page in Tab A that is watermarked.
-  // 2/ User loads a page that should not be watermarked into Tab A.
-  // 3/ `DelayApplyDataProtectionSettingsIfEmpty()` is called at navigation
-  //     finish time which sets clear_watermark_text_on_page_load_=true.
-  //    `DocumentOnLoadCompletedInPrimaryMainFrame()` will be called later.
-  // 4/ User switches to Tab B, which may or may not be watermarked.
-  //    This calls `ApplyDataProtectionSettings()` setting the watermark
-  //    appropriate to Tab B and sets clear_watermark_text_on_page_load_=false.
-  // 5/ User switches back to Tab A (which shows a page that should not be
-  //    watermarked, as described in step 2 above). This also calls
-  //    `ApplyDataProtectionSettings()` setting the watermark
-  //    appropriate to Tab A (i.e. clears the watermark) and sets
-  //    clear_watermark_text_on_page_load_=false.
-  // 6/ `DocumentOnLoadCompletedInPrimaryMainFrame()` is eventually called
-  //    which does nothing because clear_watermark_text_on_page_load_==false.
-  //    However, the watermark is already cleared in step #5.
-  //
-  // Note that steps #5 and #6 are racy but the final outcome is correct
-  // regardless of the order in which they execute.
-
-#if BUILDFLAG(ENTERPRISE_WATERMARK)
-  if (watermark_view_ && clear_watermark_text_on_page_load_) {
-    ApplyWatermarkSettings(std::string());
-  }
-#endif  // BUILDFLAG(ENTERPRISE_WATERMARK)
-
-#if BUILDFLAG(ENTERPRISE_SCREENSHOT_PROTECTION)
-  if (clear_screenshot_protection_on_page_load_) {
-    ApplyScreenshotSettings(true);
-  }
-#endif
-}
-
-#endif  // BUILDFLAG(ENTERPRISE_WATERMARK) ||
-        // BUILDFLAG(ENTERPRISE_SCREENSHOT_PROTECTION)
-
 void BrowserView::MaybeShowWebUITabStripIPH() {
   if (!webui_tab_strip_)
     return;
@@ -3011,9 +2984,17 @@ BrowserView::ShowQRCodeGeneratorBubble(content::WebContents* contents,
     on_back_button_pressed = controller->GetOnBackButtonPressedCallback();
   }
 
+  views::View* anchor_view =
+      toolbar_button_provider()->GetAnchorView(std::nullopt);
+  if (features::IsToolbarPinningEnabled() &&
+      toolbar()->pinned_toolbar_actions_container()->IsActionPinnedOrPoppedOut(
+          kActionQrCodeGenerator)) {
+    anchor_view = toolbar()->pinned_toolbar_actions_container()->GetButtonFor(
+        kActionQrCodeGenerator);
+  }
+
   auto* bubble = new qrcode_generator::QRCodeGeneratorBubble(
-      toolbar_button_provider()->GetAnchorView(std::nullopt),
-      contents->GetWeakPtr(), std::move(on_closing),
+      anchor_view, contents->GetWeakPtr(), std::move(on_closing),
       std::move(on_back_button_pressed), url);
 
   views::BubbleDialogDelegateView::CreateBubble(bubble);
@@ -3052,8 +3033,16 @@ SharingDialog* BrowserView::ShowSharingDialog(
 send_tab_to_self::SendTabToSelfBubbleView*
 BrowserView::ShowSendTabToSelfDevicePickerBubble(
     content::WebContents* web_contents) {
+  views::View* anchor_view =
+      toolbar_button_provider()->GetAnchorView(std::nullopt);
+  if (features::IsToolbarPinningEnabled() &&
+      toolbar()->pinned_toolbar_actions_container()->IsActionPinnedOrPoppedOut(
+          kActionSendTabToSelf)) {
+    anchor_view = toolbar()->pinned_toolbar_actions_container()->GetButtonFor(
+        kActionSendTabToSelf);
+  }
   auto* bubble = new send_tab_to_self::SendTabToSelfDevicePickerBubbleView(
-      toolbar_button_provider()->GetAnchorView(std::nullopt), web_contents);
+      anchor_view, web_contents);
 
   views::BubbleDialogDelegateView::CreateBubble(bubble);
   // This is always triggered due to a user gesture, c.f. this method's
@@ -3065,9 +3054,16 @@ BrowserView::ShowSendTabToSelfDevicePickerBubble(
 send_tab_to_self::SendTabToSelfBubbleView*
 BrowserView::ShowSendTabToSelfPromoBubble(content::WebContents* web_contents,
                                           bool show_signin_button) {
+  views::View* anchor_view =
+      toolbar_button_provider()->GetAnchorView(std::nullopt);
+  if (features::IsToolbarPinningEnabled() &&
+      toolbar()->pinned_toolbar_actions_container()->IsActionPinnedOrPoppedOut(
+          kActionSendTabToSelf)) {
+    anchor_view = toolbar()->pinned_toolbar_actions_container()->GetButtonFor(
+        kActionSendTabToSelf);
+  }
   auto* bubble = new send_tab_to_self::SendTabToSelfPromoBubbleView(
-      toolbar_button_provider()->GetAnchorView(std::nullopt), web_contents,
-      show_signin_button);
+      anchor_view, web_contents, show_signin_button);
 
   views::BubbleDialogDelegateView::CreateBubble(bubble);
   // This is always triggered due to a user gesture, c.f. method documentation.
@@ -3844,9 +3840,12 @@ bool BrowserView::ShouldShowWindowTitle() const {
 }
 
 bool BrowserView::ShouldShowWindowIcon() const {
-  return GetIsWebAppType()
-             ? base::FeatureList::IsEnabled(features::kWebAppIconInTitlebar)
-             : WidgetDelegate::ShouldShowWindowIcon();
+#if !BUILDFLAG(IS_CHROMEOS)
+  if (GetIsWebAppType() && !GetSupportsTabStrip()) {
+    return base::FeatureList::IsEnabled(features::kWebAppIconInTitlebar);
+  }
+#endif
+  return WidgetDelegate::ShouldShowWindowIcon();
 }
 
 ui::ImageModel BrowserView::GetWindowAppIcon() {
@@ -4004,6 +4003,7 @@ views::View* BrowserView::CreateMacOverlayView() {
     params.parent = parent->GetNativeView();
     params.shadow_type = views::Widget::InitParams::ShadowType::kNone;
     params.activatable = views::Widget::InitParams::Activatable::kNo;
+    params.is_overlay = true;
     OverlayWidget* overlay_widget = new OverlayWidget(GetWidget());
 
     // When the overlay is used some Views are moved to the overlay_widget. When
@@ -4091,9 +4091,9 @@ void BrowserView::OnWidgetActivationChanged(views::Widget* widget,
           RestoreFocus();
       }
 
-      BrowserList::SetLastActive(browser_.get());
+      browser_->DidBecomeActive();
     } else {
-      BrowserList::NotifyBrowserNoLongerActive(browser_.get());
+      browser_->DidBecomeInactive();
     }
   }
 
@@ -4450,8 +4450,9 @@ void BrowserView::AddedToWidget() {
   // TODO(pbos): Investigate whether the side panels should be creatable when
   // the ToolbarView does not create a button for them. This specifically seems
   // to hit web apps. See https://crbug.com/1267781.
-  unified_side_panel_->AddObserver(
-      SidePanelUtil::GetSidePanelCoordinatorForBrowser((browser_.get())));
+  auto* side_panel_coordinator =
+      browser_->GetFeatures().side_panel_coordinator();
+  unified_side_panel_->AddObserver(side_panel_coordinator);
 
 #if BUILDFLAG(IS_CHROMEOS)
   // TopControlsSlideController must be initialized here in AddedToWidget()
@@ -4526,10 +4527,6 @@ void BrowserView::PaintChildren(const views::PaintInfo& paint_info) {
     startup_metric_utils::GetBrowser().RecordBrowserWindowFirstPaint(
         base::TimeTicks::Now());
   }
-}
-
-void BrowserView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  node_data->role = ax::mojom::Role::kClient;
 }
 
 void BrowserView::OnThemeChanged() {
@@ -5137,6 +5134,12 @@ void BrowserView::ShowAvatarBubbleFromAvatarButton(bool is_source_accelerator) {
       is_source_accelerator);
 }
 
+void BrowserView::ShowBubbleFromManagementToolbarButton() {
+#if !BUILDFLAG(IS_CHROMEOS)
+  ManagedMenuCoordinator::GetOrCreateForBrowser(browser())->Show();
+#endif
+}
+
 void BrowserView::MaybeShowProfileSwitchIPH() {
   if (GetGuestSession() || GetIncognito())
     return;
@@ -5507,37 +5510,11 @@ void BrowserView::UpdateFullscreenAllowedFromPolicy(
   }
 }
 
-#if BUILDFLAG(ENTERPRISE_WATERMARK) || \
-    BUILDFLAG(ENTERPRISE_SCREENSHOT_PROTECTION)
-
-void BrowserView::ApplyDataProtectionSettings(
-    base::WeakPtr<content::WebContents> expected_web_contents,
-    const enterprise_data_protection::UrlSettings& settings) {
-  // Since retrieving data protections is async, make sure that the view is
-  // still on the right tab before applying the settings.
-  if (!expected_web_contents || web_contents() != expected_web_contents.get()) {
-    return;
-  }
-
-#if BUILDFLAG(ENTERPRISE_WATERMARK)
-  ApplyWatermarkSettings(settings.watermark_text);
-#endif  // BUILDFLAG(ENTERPRISE_WATERMARK)
-
-#if BUILDFLAG(ENTERPRISE_SCREENSHOT_PROTECTION)
-  ApplyScreenshotSettings(settings.allow_screenshots);
-#endif  // BUILDFLAG(ENTERPRISE_SCREENSHOT_PROTECTION)
-}
-
-#if BUILDFLAG(ENTERPRISE_WATERMARK)
 void BrowserView::ApplyWatermarkSettings(const std::string& watermark_text) {
   if (watermark_view_) {
     watermark_view_->SetString(watermark_text);
   }
-
-  // Watermark string should not be changed once the page loads.
-  clear_watermark_text_on_page_load_ = false;
 }
-#endif  // BUILDFLAG(ENTERPRISE_WATERMARK)
 
 #if BUILDFLAG(ENTERPRISE_SCREENSHOT_PROTECTION)
 void BrowserView::ApplyScreenshotSettings(bool allow) {
@@ -5546,51 +5523,8 @@ void BrowserView::ApplyScreenshotSettings(bool allow) {
             gfx::kNullAcceleratedWidget);
 #endif  // BUILDFLAG(IS_WIN)
   GetWidget()->SetAllowScreenshots(allow);
-
-  // Screenshot protection should not be changed once the page loads.
-  clear_screenshot_protection_on_page_load_ = false;
 }
 #endif  // BUILDFLAG(ENTERPRISE_SCREENSHOT_PROTECTION)
-
-void BrowserView::DelayApplyDataProtectionSettingsIfEmpty(
-    base::WeakPtr<content::WebContents> expected_web_contents,
-    const enterprise_data_protection::UrlSettings& settings) {
-  // Since retrieving data protections is async, make sure that the view is
-  // still on the right tab before applying the settings.
-  if (!expected_web_contents || web_contents() != expected_web_contents.get()) {
-    return;
-  }
-
-#if BUILDFLAG(ENTERPRISE_SCREENSHOT_PROTECTION)
-  if (!settings.allow_screenshots) {
-    ApplyScreenshotSettings(settings.allow_screenshots);
-  } else {
-    // Screenshot protection should be cleared.  Delay that until the page
-    // finishes loading.
-    clear_screenshot_protection_on_page_load_ = true;
-  }
-#endif  // BUILDFLAG(ENTERPRISE_SCREENSHOT_PROTECTION)
-
-#if BUILDFLAG(ENTERPRISE_WATERMARK)
-  if (!settings.watermark_text.empty()) {
-    ApplyWatermarkSettings(settings.watermark_text);
-  } else {
-    // The watermark string should be cleared.  Delay that until the page
-    // finishes loading.
-    clear_watermark_text_on_page_load_ = true;
-  }
-#endif  // BUILDFLAG(ENTERPRISE_WATERMARK)
-
-  if (!on_delay_apply_data_protection_settings_if_empty_called_for_testing_
-           .is_null()) {
-    std::move(
-        on_delay_apply_data_protection_settings_if_empty_called_for_testing_)
-        .Run();
-  }
-}
-
-#endif  // BUILDFLAG(ENTERPRISE_WATERMARK) ||
-        // BUILDFLAG(ENTERPRISE_SCREENSHOT_PROTECTION)
 
 BEGIN_METADATA(BrowserView)
 ADD_READONLY_PROPERTY_METADATA(gfx::Rect, FindBarBoundingBox)

@@ -9,29 +9,37 @@
   }
 
   #backgroundScrim {
-    background-color: rgba(var(--color-scrim-rgb), 0.2);
+    background-color: rgba(0, 0 ,0, 0.3);
     inset: 0;
     position: absolute;
   }
 
-  #buttonContainer {
+  .button-container {
     display: flex;
-    gap: 12px;
-    inset-block-start: 28px;
-    inset-inline-end: 30px;
     pointer-events: none;
     position: absolute;
   }
 
-  :host(:not([initial-flash-animation-has-ended])) #buttonContainer {
+  :host(:not([initial-flash-animation-has-ended])) .button-container {
     opacity: 0;
     visibility: hidden;
+  }
+
+  #optionsButtonContainer {
+    gap: 12px;
+    inset-block-start: 28px;
+    inset-inline-end: 30px;
+  }
+
+  #translateButtonContainer {
+    inset-block-start: 21px;
+    inset-inline-start: 25px;
   }
 
   .action-button {
     --cr-icon-button-icon-size: 20px;
     --cr-icon-button-size: 36px;
-    --cr-icon-button-fill-color: white;
+    --cr-icon-button-fill-color: var(--color-overlay-icon);
     background-color: rgba(var(--color-scrim-rgb), 0.6);
     pointer-events: all;
   }
@@ -79,7 +87,7 @@
     height: 36px;
   }
 
-  .menu-item:hover {
+  .menu-item:focus, .menu-item:hover {
     background-color: rgba(var(--color-scrim-rgb), 0.05);
   }
 
@@ -125,6 +133,11 @@
     opacity: 0;
   }
 
+  :host([is-closing]) cursor-tooltip {
+    /* When the overlay is closing, immediately hide the cursor tooltip. */
+    display: none;
+  }
+
   cursor-tooltip {
     left: 0;
     position: fixed;
@@ -158,7 +171,9 @@
     --color-scrim-rgb: [[skColorToRgb_(theme.scrim)]];
     --color-surface-container-highest-light: [[skColorToHex_(theme.surfaceContainerHighestLight)]];
     --color-surface-container-highest-dark: [[skColorToHex_(theme.surfaceContainerHighestDark)]];
-    --color-selection-element: [[skColorToHex_(theme.selectionElement)]];">
+    --color-selection-element: [[skColorToHex_(theme.selectionElement)]];
+    --color-overlay-icon: white;
+    --color-overlay-button-label: white;">
   <cr-toast id="copyToast" duration="4000">
     <div>$i18n{copyToastMessage}</div>
     <cr-button on-click="onHideToastClick">
@@ -176,28 +191,37 @@
       on-pointerleave="handlePointerLeaveSelectionOverlay">
   </lens-selection-overlay>
   <initial-gradient id="initialGradient"></initial-gradient>
-  <div id="buttonContainer">
+  <template is="dom-if" if="[[isTranslateButtonVisible]]">
+    <div id="translateButtonContainer" class="button-container">
+      <translate-button></translate-button>
+    </div>
+  </template>
+  <div id="optionsButtonContainer" class="button-container">
     <div id="moreOptions">
       <cr-icon-button iron-icon="cr:more-vert" id="moreOptionsButton"
           class="action-button" on-click="onMoreOptionsButtonClick"
-          aria-label="$i18n{moreOptions}"
-          title="$i18n{moreOptions}">
+          role="button" aria-label="$i18n{moreOptions}"
+          aria-controls="moreOptionsMenu" aria-haspopup="menu"
+          aria-expanded="[[moreOptionsMenuVisible]]" title="$i18n{moreOptions}">
       </cr-icon-button>
-      <div id="moreOptionsMenu">
+      <div id="moreOptionsMenu" role="menu" aria-labelledby="moreOptionsButton">
         <div class="menu-item" on-click="onMyActivityClick"
-            aria-label="$i18n{myActivity}">
+            on-keydown="onMyActivityClick" role="menuitem" tabindex="0"
+            aria-labelledby="myActivity">
           <span class="menu-item-icon activity"></span>
           <span id="myActivity"
               class="menu-item-label">$i18n{myActivity}</span>
         </div>
         <div class="menu-item" on-click="onLearnMoreClick"
-            aria-label="$i18n{learnMore}">
+            on-keydown="onLearnMoreClick" role="menuitem" tabindex="0"
+            aria-labelledby="learnMore">
           <span class="menu-item-icon learn-more"></span>
           <span id="learnMore"
               class="menu-item-label">$i18n{learnMore}</span>
         </div>
         <div class="menu-item" on-click="onFeedbackClick"
-            aria-label="$i18n{sendFeedback}">
+            on-keydown="onFeedbackClick" role="menuitem" tabindex="0"
+            aria-labelledby="sendFeedback">
           <span class="menu-item-icon feedback"></span>
           <span id="sendFeedback"
               class="menu-item-label">$i18n{sendFeedback}</span>

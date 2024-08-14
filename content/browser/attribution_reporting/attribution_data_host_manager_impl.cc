@@ -71,7 +71,6 @@
 #include "net/http/http_response_headers.h"
 #include "net/http/structured_headers.h"
 #include "services/data_decoder/public/cpp/data_decoder.h"
-#include "services/network/public/cpp/attribution_reporting_runtime_features.h"
 #include "services/network/public/cpp/attribution_utils.h"
 #include "services/network/public/cpp/features.h"
 #include "services/network/public/mojom/attribution.mojom-forward.h"
@@ -116,7 +115,7 @@ enum class NavigationDataHostStatus {
 
   kMaxValue = kProcessed,
 };
-// LINT.ThenChange(//tools/metrics/histograms/enums.xml:ConversionNavigationDataHostStatus)
+// LINT.ThenChange(//tools/metrics/histograms/metadata/attribution_reporting/enums.xml:ConversionNavigationDataHostStatus)
 
 void RecordNavigationDataHostStatus(NavigationDataHostStatus event) {
   base::UmaHistogramEnumeration("Conversions.NavigationDataHostStatus3", event);
@@ -140,7 +139,7 @@ enum class RegistrationMethod {
   kForegroundOrBackgroundBrowser = 10,
   kMaxValue = kForegroundOrBackgroundBrowser,
 };
-// LINT.ThenChange(//tools/metrics/histograms/enums.xml:ConversionsRegistrationMethod)
+// LINT.ThenChange(//tools/metrics/histograms/metadata/attribution_reporting/enums.xml:ConversionsRegistrationMethod)
 
 void RecordRegistrationMethod(RegistrationMethod method) {
   base::UmaHistogramEnumeration("Conversions.RegistrationMethod2", method);
@@ -156,7 +155,7 @@ enum class RegisterDataHostOutcome {
   kDropped = 2,
   kMaxValue = kDropped,
 };
-// LINT.ThenChange(//tools/metrics/histograms/enums.xml:ConversionRegisterDataHostOutcome)
+// LINT.ThenChange(//tools/metrics/histograms/metadata/attribution_reporting/enums.xml:ConversionRegisterDataHostOutcome)
 
 void RecordRegisterDataHostHostOutcome(RegisterDataHostOutcome status) {
   base::UmaHistogramEnumeration("Conversions.RegisterDataHostOutcome", status);
@@ -171,7 +170,7 @@ enum class NavigationUnexpectedRegistration {
   kRegistrationMissingUponReceivingData = 1,
   kMaxValue = kRegistrationMissingUponReceivingData,
 };
-// LINT.ThenChange(//tools/metrics/histograms/enums.xml:ConversionNavigationUnexpectedRegistration)
+// LINT.ThenChange(//tools/metrics/histograms/metadata/attribution_reporting/enums.xml:ConversionNavigationUnexpectedRegistration)
 
 // See https://crbug.com/1500667 for details. There are assumptions that a
 // navigation registration can only be registered once and that it must be
@@ -194,7 +193,7 @@ enum class BackgroundNavigationOutcome {
   kNeverTiedIneligible = 3,
   kMaxValue = kNeverTiedIneligible,
 };
-// LINT.ThenChange(//tools/metrics/histograms/enums.xml:ConversionBackgroundNavigationOutcome)
+// LINT.ThenChange(//tools/metrics/histograms/metadata/attribution_reporting/enums.xml:ConversionBackgroundNavigationOutcome)
 
 void RecordBackgroundNavigationOutcome(BackgroundNavigationOutcome outcome) {
   base::UmaHistogramEnumeration("Conversions.BackgroundNavigation.Outcome",
@@ -757,19 +756,13 @@ struct AttributionDataHostManagerImpl::RegistrationDataHeaders {
   bool cross_app_web_enabled = false;
 
   static RegistrationDataHeaders Get(const net::HttpResponseHeaders* headers,
-                                     bool cross_app_web_runtime_enabled,
                                      const Registrations& registrations,
                                      const GURL& reporting_url) {
     if (!headers) {
       return RegistrationDataHeaders();
     }
 
-    // Note that it's important that the browser process check both the
-    // base::Feature (which is set from the browser, so trustworthy) and the
-    // runtime feature (which can be spoofed in a compromised renderer, so is
-    // best-effort).
     const bool cross_app_web_enabled =
-        cross_app_web_runtime_enabled &&
         base::FeatureList::IsEnabled(
             network::features::kAttributionReportingCrossAppWeb);
 
@@ -1076,8 +1069,6 @@ AttributionDataHostManagerImpl::AttributionDataHostManagerImpl(
       base::Unretained(this)));
 }
 
-// TODO(anthonygarant): Should we bind all `deferred_receivers_` when the
-// `AttributionDataHostManagerImpl` is about to be destroyed?
 AttributionDataHostManagerImpl::~AttributionDataHostManagerImpl() = default;
 
 void AttributionDataHostManagerImpl::RegisterDataHost(
@@ -1463,8 +1454,7 @@ void AttributionDataHostManagerImpl::NotifyNavigationRegistrationStarted(
 bool AttributionDataHostManagerImpl::NotifyNavigationRegistrationData(
     const blink::AttributionSrcToken& attribution_src_token,
     const net::HttpResponseHeaders* headers,
-    GURL reporting_url,
-    network::AttributionReportingRuntimeFeatures runtime_features) {
+    GURL reporting_url) {
   auto reporting_origin = SuitableOrigin::Create(reporting_url);
   CHECK(reporting_origin);
 
@@ -1479,8 +1469,6 @@ bool AttributionDataHostManagerImpl::NotifyNavigationRegistrationData(
 
   auto header = RegistrationDataHeaders::Get(
       headers,
-      runtime_features.Has(
-          network::AttributionReportingRuntimeFeature::kCrossAppWeb),
       *it, reporting_url);
 
   if (!header) {
@@ -1670,8 +1658,7 @@ void AttributionDataHostManagerImpl::NotifyBackgroundRegistrationStarted(
 bool AttributionDataHostManagerImpl::NotifyBackgroundRegistrationData(
     BackgroundRegistrationsId id,
     const net::HttpResponseHeaders* headers,
-    GURL reporting_url,
-    network::AttributionReportingRuntimeFeatures runtime_features) {
+    GURL reporting_url) {
   CHECK(BackgroundRegistrationsEnabled());
 
   auto it = registrations_.find(id);
@@ -1696,8 +1683,6 @@ bool AttributionDataHostManagerImpl::NotifyBackgroundRegistrationData(
 
   auto header = RegistrationDataHeaders::Get(
       headers,
-      runtime_features.Has(
-          network::AttributionReportingRuntimeFeature::kCrossAppWeb),
       *it, reporting_url);
 
   if (!header) {
@@ -1906,7 +1891,6 @@ void AttributionDataHostManagerImpl::NotifyFencedFrameReportingBeaconStarted(
 
 void AttributionDataHostManagerImpl::NotifyFencedFrameReportingBeaconData(
     BeaconId beacon_id,
-    network::AttributionReportingRuntimeFeatures runtime_features,
     GURL reporting_url,
     const net::HttpResponseHeaders* headers,
     bool is_final_response) {
@@ -1932,8 +1916,6 @@ void AttributionDataHostManagerImpl::NotifyFencedFrameReportingBeaconData(
 
   auto header = RegistrationDataHeaders::Get(
       headers,
-      runtime_features.Has(
-          network::AttributionReportingRuntimeFeature::kCrossAppWeb),
       *it, reporting_url);
 
   if (!header) {
@@ -1992,18 +1974,13 @@ void AttributionDataHostManagerImpl::HandleParsedWebSource(
       return base::unexpected(SourceRegistrationError::kInvalidJson);
     }
 
-    base::Value::Dict* dict = result->GetIfDict();
-    if (!dict) {
-      return base::unexpected(SourceRegistrationError::kRootWrongType);
-    }
-
     auto source_type = registrations.navigation_id().has_value()
                            ? SourceType::kNavigation
                            : SourceType::kEvent;
 
     ASSIGN_OR_RETURN(auto registration,
                      attribution_reporting::SourceRegistration::Parse(
-                         std::move(*dict), source_type));
+                         *std::move(result), source_type));
 
     if (auto navigation_id = registrations.navigation_id()) {
       AddNavigationSourceRegistrationToBatchMap(
@@ -2038,14 +2015,9 @@ void AttributionDataHostManagerImpl::HandleParsedWebTrigger(
       return base::unexpected(TriggerRegistrationError::kInvalidJson);
     }
 
-    base::Value::Dict* dict = result->GetIfDict();
-    if (!dict) {
-      return base::unexpected(TriggerRegistrationError::kRootWrongType);
-    }
-
     ASSIGN_OR_RETURN(
         auto registration,
-        attribution_reporting::TriggerRegistration::Parse(std::move(*dict)));
+        attribution_reporting::TriggerRegistration::Parse(*std::move(result)));
 
     return AttributionTrigger(
         std::move(pending_decode.reporting_origin), std::move(registration),

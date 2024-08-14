@@ -48,11 +48,12 @@
 #include "chrome/browser/ui/bookmarks/bookmark_utils.h"
 #include "chrome/browser/ui/bookmarks/bookmark_utils_desktop.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/layout_constants.h"
-#include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_service_factory.h"
+#include "chrome/browser/ui/tabs/saved_tab_groups/tab_group_service_wrapper.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/view_ids.h"
@@ -226,6 +227,8 @@ class BookmarkFolderButton : public BookmarkMenuButtonBase {
                              ui::EF_MIDDLE_MOUSE_BUTTON);
 
     GetViewAccessibility().SetName(GetAccessibleText());
+    GetViewAccessibility().SetRoleDescription(l10n_util::GetStringUTF8(
+        IDS_ACCNAME_BOOKMARK_FOLDER_BUTTON_ROLE_DESCRIPTION));
 
     text_changed_callback_ =
         label()->AddTextChangedCallback(base::BindRepeating(
@@ -258,14 +261,6 @@ class BookmarkFolderButton : public BookmarkMenuButtonBase {
     return GetText().empty()
                ? l10n_util::GetStringUTF16(IDS_UNNAMED_BOOKMARK_FOLDER)
                : GetText();
-  }
-
-  void GetAccessibleNodeData(ui::AXNodeData* node_data) override {
-    BookmarkMenuButtonBase::GetAccessibleNodeData(node_data);
-    node_data->AddStringAttribute(
-        ax::mojom::StringAttribute::kRoleDescription,
-        l10n_util::GetStringUTF8(
-            IDS_ACCNAME_BOOKMARK_FOLDER_BUTTON_ROLE_DESCRIPTION));
   }
 
  private:
@@ -352,15 +347,14 @@ class BookmarkBarView::ButtonSeparatorView : public views::Separator {
 
     SetColorId(color_id);
     UpdateBorderAndPreferredSize(border_insets);
+
+    GetViewAccessibility().SetRole(ax::mojom::Role::kSplitter);
+    GetViewAccessibility().SetName(
+        l10n_util::GetStringUTF8(IDS_ACCNAME_SEPARATOR));
   }
   ButtonSeparatorView(const ButtonSeparatorView&) = delete;
   ButtonSeparatorView& operator=(const ButtonSeparatorView&) = delete;
   ~ButtonSeparatorView() override = default;
-
-  void GetAccessibleNodeData(ui::AXNodeData* node_data) override {
-    node_data->role = ax::mojom::Role::kSplitter;
-    node_data->SetNameChecked(l10n_util::GetStringUTF8(IDS_ACCNAME_SEPARATOR));
-  }
 
   void UpdateBorderAndPreferredSize(gfx::Insets border_insets) {
     SetPreferredSize(gfx::Size(
@@ -409,6 +403,8 @@ BookmarkBarView::BookmarkBarView(Browser* browser, BrowserView* browser_view)
   views::SetCascadingColorProviderColor(this, views::kCascadingBackgroundColor,
                                         kColorBookmarkBarBackground);
   GetViewAccessibility().SetRole(ax::mojom::Role::kToolbar);
+  GetViewAccessibility().SetName(
+      l10n_util::GetStringUTF8(IDS_ACCNAME_BOOKMARKS));
 
   Init();
 }
@@ -635,7 +631,13 @@ std::u16string BookmarkBarView::CreateToolTipForURLAndTitle(
 gfx::Size BookmarkBarView::CalculatePreferredSize(
     const views::SizeBounds& available_size) const {
   gfx::Size prefsize;
+  // 34 dp = 28 height + 6px center margin
   int preferred_height = GetLayoutConstant(BOOKMARK_BAR_HEIGHT);
+  if (browser_view_ && browser_view_->browser() &&
+      browser_view_->browser()->profile() &&
+      chrome::ShouldUseCompactMode(browser_view_->browser()->profile())) {
+    preferred_height = 30;
+  }
   prefsize.set_height(
       static_cast<int>(preferred_height * size_animation_.GetCurrentValue()));
   return prefsize;
@@ -649,6 +651,11 @@ gfx::Size BookmarkBarView::GetMinimumSize() const {
   int width = GetLeadingMargin();
 
   int height = GetLayoutConstant(BOOKMARK_BAR_HEIGHT);
+  if (browser_view_ && browser_view_->browser() &&
+      browser_view_->browser()->profile() &&
+      chrome::ShouldUseCompactMode(browser_view_->browser()->profile())) {
+    height = 30;
+  }
 
   const int bookmark_bar_button_padding =
       GetLayoutConstant(BOOKMARK_BAR_BUTTON_PADDING);
@@ -731,8 +738,14 @@ void BookmarkBarView::Layout(PassKey) {
           ? apps_page_shortcut_->GetPreferredSize()
           : gfx::Size();
 
-  const int bookmark_bar_button_padding =
+  int bookmark_bar_button_padding =
       GetLayoutConstant(BOOKMARK_BAR_BUTTON_PADDING);
+  const bool should_use_compact_mode =
+      browser_view_ &&
+      chrome::ShouldUseCompactMode(browser_view_->browser()->profile());
+  if (should_use_compact_mode) {
+    bookmark_bar_button_padding = 0;
+  }
 
   int max_x = GetLeadingMargin() + width - overflow_pref.width() -
               bookmarks_separator_pref.width();
@@ -817,7 +830,8 @@ void BookmarkBarView::Layout(PassKey) {
                                    ? 0
                                    : kSeparatorPadding;
       saved_tab_groups_separator_view_->UpdateBorderAndPreferredSize(
-          gfx::Insets::TLBR(0, left_padding, 0, kSeparatorPadding));
+          gfx::Insets::TLBR(0, left_padding, 0,
+                            should_use_compact_mode ? 0 : kSeparatorPadding));
 
       // Update the bounds for the separator.
       gfx::Size saved_tab_groups_separator_view_pref =
@@ -1123,10 +1137,6 @@ void BookmarkBarView::ChildPreferredSizeChanged(views::View* child) {
 
 void BookmarkBarView::AddedToWidget() {
   MaybeShowSavedTabGroupsIntroPromo();
-}
-
-void BookmarkBarView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  node_data->SetNameChecked(l10n_util::GetStringUTF8(IDS_ACCNAME_BOOKMARKS));
 }
 
 void BookmarkBarView::AnimationProgressed(const gfx::Animation* animation) {
@@ -1512,6 +1522,15 @@ void BookmarkBarView::Init() {
       bookmarks::prefs::kShowManagedBookmarksInBookmarkBar,
       base::BindRepeating(&BookmarkBarView::OnShowManagedBookmarksPrefChanged,
                           base::Unretained(this)));
+
+  if (base::FeatureList::IsEnabled(features::kCompactMode)) {
+    profile_pref_registrar_.Add(
+        prefs::kCompactModeEnabled,
+        base::BindRepeating(&BookmarkBarView::OnCompactModeChanged,
+                            base::Unretained(this)));
+    is_compact_mode_ = chrome::ShouldUseCompactMode(browser_->profile());
+  }
+
   apps_page_shortcut_->SetVisible(
       chrome::ShouldShowAppsShortcutInBookmarkBar(browser_->profile()));
 
@@ -2077,6 +2096,10 @@ void BookmarkBarView::OnShowManagedBookmarksPrefChanged() {
   }
 }
 
+void BookmarkBarView::OnCompactModeChanged() {
+  is_compact_mode_ = !is_compact_mode_;
+}
+
 void BookmarkBarView::InsertBookmarkButtonAtIndex(
     std::unique_ptr<views::View> bookmark_button,
     size_t index) {
@@ -2188,15 +2211,14 @@ void BookmarkBarView::MaybeShowSavedTabGroupsIntroPromo() const {
   }
 
   // Check whether to show the synced, or unsyned version of the promo.
-  tab_groups::SavedTabGroupKeyedService* const service =
-      tab_groups::SavedTabGroupServiceFactory::GetForProfile(
-          browser_->profile());
-  if (!service) {
+  const auto wrapper_service =
+      tab_groups::TabGroupServiceWrapper::GetForProfile(browser_->profile());
+  if (!wrapper_service) {
     return;
   }
 
   // In order for IPH's for V2 to show up, there must be at least 1 group.
-  if (service->model()->saved_tab_groups().empty()) {
+  if (wrapper_service->GetAllGroups().empty()) {
     return;
   }
 
@@ -2210,7 +2232,7 @@ void BookmarkBarView::MaybeShowSavedTabGroupsIntroPromo() const {
   // substitutions, add them in.
 
   // If tabs groups are syncing...
-  if (service->AreSavedTabGroupsSynced()) {
+  if (wrapper_service->AreSavedTabGroupsSyncedForProfile(browser_->profile())) {
     // Anchor the IPH to the bookmarks bar if the everything button is visible.
     // Otherwise, anchor to the AppMenu.
     if (everything_button_is_visible) {

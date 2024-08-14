@@ -8,10 +8,9 @@
 #include <string>
 #include <utility>
 
-#include "chrome/browser/ui/views/webauthn/authenticator_gpm_account_info_view.h"
+#include "chrome/browser/ui/views/webauthn/authenticator_common_views.h"
 #include "chrome/browser/ui/views/webauthn/authenticator_gpm_arbitrary_pin_view.h"
 #include "chrome/browser/ui/views/webauthn/authenticator_request_sheet_view.h"
-#include "chrome/browser/ui/webauthn/sheet_models.h"
 
 AuthenticatorGPMArbitraryPinSheetView::AuthenticatorGPMArbitraryPinSheetView(
     std::unique_ptr<AuthenticatorGpmArbitraryPinSheetModel> sheet_model)
@@ -27,8 +26,7 @@ AuthenticatorGPMArbitraryPinSheetView::gpm_arbitrary_pin_sheet_model() {
 
 std::unique_ptr<views::View>
 AuthenticatorGPMArbitraryPinSheetView::BuildStepSpecificHeader() {
-  return std::make_unique<AuthenticatorGpmAccountInfoView>(
-      gpm_arbitrary_pin_sheet_model());
+  return CreateGpmIconWithLabel();
 }
 
 std::pair<std::unique_ptr<views::View>,
@@ -38,16 +36,16 @@ AuthenticatorGPMArbitraryPinSheetView::BuildStepSpecificContent() {
   return std::make_pair(
       std::make_unique<AuthenticatorGPMArbitraryPinView>(
           ui_disabled, gpm_arbitrary_pin_sheet_model()->pin(),
-          gpm_arbitrary_pin_sheet_model()->mode() ==
-              AuthenticatorGpmPinSheetModelBase::Mode::kPinCreate,
-          this),
+          gpm_arbitrary_pin_sheet_model()->GetAccessibleName(),
+          gpm_arbitrary_pin_sheet_model()->GetAccessibleDescription(), this),
       ui_disabled ? AutoFocus::kNo : AutoFocus::kYes);
+}
+
+int AuthenticatorGPMArbitraryPinSheetView::
+    GetSpacingBetweenTitleAndDescription() {
+  return kWebAuthnGpmDialogSpacingBetweenTitleAndDescription;
 }
 
 void AuthenticatorGPMArbitraryPinSheetView::OnPinChanged(std::u16string pin) {
   gpm_arbitrary_pin_sheet_model()->SetPin(std::move(pin));
-}
-
-void AuthenticatorGPMArbitraryPinSheetView::UpdateHintVisibility() {
-  gpm_arbitrary_pin_sheet_model()->dialog_model()->OnSheetModelChanged();
 }

@@ -20,6 +20,7 @@ import org.chromium.chrome.browser.tab.TabUtils;
 import org.chromium.chrome.browser.ui.android.webid.data.Account;
 import org.chromium.chrome.browser.ui.android.webid.data.ClientIdMetadata;
 import org.chromium.chrome.browser.ui.android.webid.data.IdentityCredentialTokenError;
+import org.chromium.chrome.browser.ui.android.webid.data.IdentityProviderData;
 import org.chromium.chrome.browser.ui.android.webid.data.IdentityProviderMetadata;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetControllerProvider;
@@ -58,20 +59,23 @@ class AccountSelectionBridge implements AccountSelectionComponent.Delegate {
     }
 
     @CalledByNative
-    static int getBrandIconMinimumSize() {
+    static int getBrandIconMinimumSize(@RpMode.EnumType int rpMode) {
         // Icon needs to be big enough for the smallest screen density (1x).
         Resources resources = ContextUtils.getApplicationContext().getResources();
         // Density < 1.0f on ldpi devices. Adjust density to ensure that
         // {@link getBrandIconMinimumSize()} <= {@link getBrandIconIdealSize()}.
         float density = Math.max(resources.getDisplayMetrics().density, 1.0f);
-        return Math.round(getBrandIconIdealSize() / density);
+        return Math.round(getBrandIconIdealSize(rpMode) / density);
     }
 
     @CalledByNative
-    static int getBrandIconIdealSize() {
+    static int getBrandIconIdealSize(@RpMode.EnumType int rpMode) {
         Resources resources = ContextUtils.getApplicationContext().getResources();
         return Math.round(
-                resources.getDimension(R.dimen.account_selection_sheet_icon_size)
+                resources.getDimension(
+                                rpMode == RpMode.BUTTON
+                                        ? R.dimen.account_selection_button_mode_sheet_icon_size
+                                        : R.dimen.account_selection_sheet_icon_size)
                         / MASKABLE_ICON_SAFE_ZONE_DIAMETER_RATIO);
     }
 
@@ -118,7 +122,8 @@ class AccountSelectionBridge implements AccountSelectionComponent.Delegate {
             ClientIdMetadata clientIdMetadata,
             boolean isAutoReauthn,
             @RpContext.EnumType int rpContext,
-            boolean requestPermission) {
+            boolean requestPermission,
+            @Nullable IdentityProviderData newAccountsIdp) {
         assert accounts != null && accounts.length > 0;
         mAccountSelectionComponent.showAccounts(
                 rpForDisplay,
@@ -128,7 +133,8 @@ class AccountSelectionBridge implements AccountSelectionComponent.Delegate {
                 clientIdMetadata,
                 isAutoReauthn,
                 rpContext,
-                requestPermission);
+                requestPermission,
+                newAccountsIdp);
     }
 
     /**

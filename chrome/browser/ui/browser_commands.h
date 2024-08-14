@@ -124,6 +124,8 @@ bool CanDuplicateTab(const Browser* browser);
 bool CanDuplicateKeyboardFocusedTab(const Browser* browser);
 bool CanMoveActiveTabToNewWindow(Browser* browser);
 void MoveActiveTabToNewWindow(Browser* browser);
+void ToggleCompactMode(Browser* browser);
+bool ShouldUseCompactMode(Profile* profile);
 bool CanMoveTabsToNewWindow(Browser* browser,
                             const std::vector<int>& tab_indices);
 // Moves the specified |tab_indices| to a newly-created window. If |group| is
@@ -244,6 +246,9 @@ void ToggleFullscreenMode(Browser* browser);
 void ClearCache(Browser* browser);
 bool IsDebuggerAttachedToCurrentTab(Browser* browser);
 void CopyURL(content::WebContents* web_contents);
+bool CanCopyUrl(const Browser* browser);
+// Returns true if the browser window is for a web app or custom tab.
+bool IsWebAppOrCustomTab(const Browser* browser);
 // Moves the WebContents of a hosted app Browser to a tabbed Browser. Returns
 // the tabbed Browser.
 Browser* OpenInChrome(Browser* hosted_app_browser);

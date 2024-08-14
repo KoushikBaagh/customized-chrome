@@ -37,6 +37,7 @@
 #include "chrome/browser/dom_distiller/tab_utils.h"
 #include "chrome/browser/download/download_prefs.h"
 #include "chrome/browser/favicon/favicon_utils.h"
+#include "chrome/browser/feedback/show_feedback_page.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/media/router/media_router_feature.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
@@ -72,7 +73,6 @@
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window.h"
-#include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/exclusive_access/exclusive_access_manager.h"
 #include "chrome/browser/ui/exclusive_access/fullscreen_controller.h"
 #include "chrome/browser/ui/find_bar/find_bar.h"
@@ -96,6 +96,7 @@
 #include "chrome/browser/ui/tabs/organization/tab_organization_session.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_keyed_service.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_service_factory.h"
+#include "chrome/browser/ui/tabs/saved_tab_groups/tab_group_service_wrapper.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
@@ -140,6 +141,7 @@
 #include "components/reading_list/core/reading_list_entry.h"
 #include "components/reading_list/core/reading_list_model.h"
 #include "components/reading_list/core/reading_list_pref_names.h"
+#include "components/saved_tab_groups/tab_group_sync_service.h"
 #include "components/services/app_service/public/cpp/app_launch_util.h"
 #include "components/sessions/core/live_tab_context.h"
 #include "components/sessions/core/tab_restore_service.h"
@@ -1083,6 +1085,20 @@ void MoveActiveTabToNewWindow(Browser* browser) {
   MoveTabsToNewWindow(browser,
                       std::vector<int>(selection.begin(), selection.end()));
 }
+
+void ToggleCompactMode(Browser* browser) {
+  const bool current_pref =
+      browser->profile()->GetPrefs()->GetBoolean(prefs::kCompactModeEnabled);
+  browser->profile()->GetPrefs()->SetBoolean(prefs::kCompactModeEnabled,
+                                             !current_pref);
+}
+
+bool ShouldUseCompactMode(Profile* profile) {
+  CHECK(profile);
+  return base::FeatureList::IsEnabled(features::kCompactMode) &&
+         profile->GetPrefs()->GetBoolean(prefs::kCompactModeEnabled);
+}
+
 bool CanMoveTabsToNewWindow(Browser* browser,
                             const std::vector<int>& tab_indices) {
   if (browser->is_type_app()) {
@@ -1115,11 +1131,9 @@ void MoveTabsToNewWindow(Browser* browser,
         Browser::Create(Browser::CreateParams(browser->profile(), true));
   }
 
-  std::optional<base::Uuid> paused_saved_guid = std::nullopt;
-
-  tab_groups::SavedTabGroupKeyedService* const service =
-      tab_groups::SavedTabGroupServiceFactory::GetForProfile(
-          browser->profile());
+  const auto wrapper_service =
+      tab_groups::TabGroupServiceWrapper::GetForProfile(browser->profile());
+  std::unique_ptr<tab_groups::ScopedLocalObservationPauser> observation_pauser;
 
   tab_groups::TabGroupVisualData visual_data;
 
@@ -1133,10 +1147,8 @@ void MoveTabsToNewWindow(Browser* browser,
     visual_data = tab_groups::TabGroupVisualData(old_visual_data->title(),
                                                  old_visual_data->color(),
                                                  false /* is_collapsed */);
-
-    if (service && service->model()->Contains(group.value())) {
-      paused_saved_guid = service->model()->Get(group.value())->saved_guid();
-      service->PauseTrackingLocalTabGroup(group.value());
+    if (wrapper_service && wrapper_service->GetGroup(group.value())) {
+      observation_pauser = wrapper_service->CreateScopedLocalObserverPauser();
     }
   }
 
@@ -1169,9 +1181,8 @@ void MoveTabsToNewWindow(Browser* browser,
     new_browser->tab_strip_model()->AddToNewGroup(indices, group.value(),
                                                   visual_data);
 
-    if (paused_saved_guid.has_value()) {
-      service->ResumeTrackingLocalTabGroup(paused_saved_guid.value(),
-                                           group.value());
+    if (observation_pauser) {
+      observation_pauser.reset();
     }
   }
 
@@ -2099,6 +2110,19 @@ void CopyURL(content::WebContents* web_contents) {
   scw.WriteText(base::UTF8ToUTF16(web_contents->GetVisibleURL().spec()));
 }
 
+bool CanCopyUrl(const Browser* browser) {
+  return IsWebAppOrCustomTab(browser) ||
+         !sharing_hub::SharingIsDisabledByPolicy(browser->profile());
+}
+
+bool IsWebAppOrCustomTab(const Browser* browser) {
+  return
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+      browser->is_type_custom_tab() ||
+#endif
+      web_app::AppBrowserController::IsWebApp(browser);
+}
+
 Browser* OpenInChrome(Browser* hosted_app_browser) {
   // Find a non-incognito browser.
   Browser* target_browser =
@@ -2290,7 +2314,7 @@ void ExecLensRegionSearch(Browser* browser) {
         std::make_unique<lens::LensRegionSearchController>();
     lens_region_search_controller_data->lens_region_search_controller->Start(
         contents, lens::features::IsLensFullscreenSearchEnabled(),
-        is_google_dsp, entry_point);
+        /*force_open_in_new_tab=*/false, is_google_dsp, entry_point);
     browser->SetUserData(lens::LensRegionSearchControllerData::kDataKey,
                          std::move(lens_region_search_controller_data));
   }

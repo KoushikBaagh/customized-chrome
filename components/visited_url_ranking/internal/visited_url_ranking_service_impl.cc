@@ -34,11 +34,13 @@
 #include "components/segmentation_platform/public/segmentation_platform_service.h"
 #include "components/segmentation_platform/public/types/processed_value.h"
 #include "components/sync_sessions/session_sync_service.h"
+#include "components/url_deduplication/url_deduplication_helper.h"
 #include "components/visited_url_ranking/internal/history_url_visit_data_fetcher.h"
 #include "components/visited_url_ranking/internal/session_url_visit_data_fetcher.h"
 #include "components/visited_url_ranking/public/features.h"
 #include "components/visited_url_ranking/public/fetch_options.h"
 #include "components/visited_url_ranking/public/fetch_result.h"
+#include "components/visited_url_ranking/public/fetcher_config.h"
 #include "components/visited_url_ranking/public/url_visit.h"
 #include "components/visited_url_ranking/public/url_visit_aggregates_transformer.h"
 #include "components/visited_url_ranking/public/url_visit_schema.h"
@@ -73,6 +75,8 @@ const char* EventNameForAction(ScoredURLUserAction action) {
   }
 }
 
+// Update URLVisitAggregatesTransformType in tools/metrics/histograms
+// /metadata/visited_url_ranking/histogram.xml for them to be in sync.
 const char* URLVisitAggregatesTransformTypeName(
     URLVisitAggregatesTransformType type) {
   switch (type) {
@@ -92,6 +96,8 @@ const char* URLVisitAggregatesTransformTypeName(
       return "RecencyFilter";
     case URLVisitAggregatesTransformType::kSegmentationMetricsData:
       return "SegmentationMetricsData";
+    case URLVisitAggregatesTransformType::kHistoryBrowserTypeFilter:
+      return "HistoryBrowserTypeFilter";
   }
 }
 
@@ -192,7 +198,9 @@ VisitedURLRankingServiceImpl::VisitedURLRankingServiceImpl(
         segmentation_platform_service,
     std::map<Fetcher, std::unique_ptr<URLVisitDataFetcher>> data_fetchers,
     std::map<URLVisitAggregatesTransformType,
-             std::unique_ptr<URLVisitAggregatesTransformer>> transformers)
+             std::unique_ptr<URLVisitAggregatesTransformer>> transformers,
+    std::unique_ptr<url_deduplication::URLDeduplicationHelper>
+        deduplication_helper)
     : segmentation_platform_service_(segmentation_platform_service),
       data_fetchers_(std::move(data_fetchers)),
       transformers_(std::move(transformers)),
@@ -203,7 +211,8 @@ VisitedURLRankingServiceImpl::VisitedURLRankingServiceImpl(
       seen_records_sampling_rate_(base::GetFieldTrialParamByFeatureAsInt(
           features::kVisitedURLRankingService,
           "seen_record_action_sampling_rate",
-          kSeenRecordsSamplingRate)) {}
+          kSeenRecordsSamplingRate)),
+      deduplication_helper_(std::move(deduplication_helper)) {}
 
 VisitedURLRankingServiceImpl::~VisitedURLRankingServiceImpl() = default;
 
@@ -230,7 +239,7 @@ void VisitedURLRankingServiceImpl::FetchURLVisitAggregates(
     }
     const auto& data_fetcher = data_fetchers_.at(fetcher_entry.first);
     data_fetcher->FetchURLVisitData(
-        options,
+        options, FetcherConfig(deduplication_helper_.get()),
         base::BindOnce(
             [](base::RepeatingCallback<void(std::pair<Fetcher, FetchResult>)>
                    barrier_callback,
@@ -336,7 +345,7 @@ void VisitedURLRankingServiceImpl::MergeVisitsAndCallback(
   TransformVisitsAndCallback(
       std::move(callback), options, std::move(transform_type_queue),
       URLVisitAggregatesTransformType::kUnspecified,
-      /*previous_aggregates_count=*/0,
+      /*previous_aggregates_count=*/0, base::Time::Now(),
       URLVisitAggregatesTransformer::Status::kSuccess,
       ComputeURLVisitAggregates(std::move(fetcher_results)));
 }
@@ -347,6 +356,7 @@ void VisitedURLRankingServiceImpl::TransformVisitsAndCallback(
     std::queue<URLVisitAggregatesTransformType> transform_type_queue,
     URLVisitAggregatesTransformType transform_type,
     size_t previous_aggregates_count,
+    base::Time start_time,
     URLVisitAggregatesTransformer::Status status,
     std::vector<URLVisitAggregate> aggregates) {
   if (transform_type != URLVisitAggregatesTransformType::kUnspecified) {
@@ -371,6 +381,11 @@ void VisitedURLRankingServiceImpl::TransformVisitsAndCallback(
         base::StringPrintf("VisitedURLRanking.TransformType.%s.InOutPercentage",
                            URLVisitAggregatesTransformTypeName(transform_type)),
         (aggregates.size() / previous_aggregates_count) * 100, 1, 100, 100);
+
+    base::UmaHistogramMediumTimes(
+        base::StringPrintf("VisitedURLRanking.TransformType.%s.Latency",
+                           URLVisitAggregatesTransformTypeName(transform_type)),
+        base::Time::Now() - start_time);
   }
 
   if (transform_type_queue.empty() || aggregates.empty()) {
@@ -399,7 +414,7 @@ void VisitedURLRankingServiceImpl::TransformVisitsAndCallback(
       base::BindOnce(&VisitedURLRankingServiceImpl::TransformVisitsAndCallback,
                      weak_ptr_factory_.GetWeakPtr(), std::move(callback),
                      options, std::move(transform_type_queue), transform_type,
-                     aggregates_count));
+                     aggregates_count, base::Time::Now()));
 }
 
 void VisitedURLRankingServiceImpl::GetNextResult(

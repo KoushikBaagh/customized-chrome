@@ -13,8 +13,16 @@ inline constexpr char kChromeUICommerceInternalsHost[] = "commerce-internals";
 // The host for compare.
 inline constexpr char kChromeUICompareHost[] = "compare";
 
+// The URL for managing compare entities.
+inline constexpr char kChromeUICompareListsUrl[] =
+    "chrome://history/comparisonTables";
+
 // The URL for compare.
 inline constexpr char kChromeUICompareUrl[] = "chrome://compare";
+
+// The URL for compare disclosure.
+inline constexpr char kChromeUICompareDisclosureUrl[] =
+    "chrome://compare/disclosure";
 
 // The host for the shopping insights side panel page.
 inline constexpr char kChromeUIShoppingInsightsSidePanelHost[] =
@@ -57,6 +65,10 @@ inline constexpr char kOgTypeProductItem[] = "product.item";
 
 // Http POST method.
 inline constexpr char kPostHttpMethod[] = "POST";
+
+// Prefix for model quality logging entry for product specifications.
+inline constexpr char kProductSpecificationsLoggingPrefix[] =
+    "product-specifications:";
 
 // A means of specifying the URL for the product specifications backend from
 // the command line.

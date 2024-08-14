@@ -140,7 +140,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Bookmarks.BookmarkBar.NavigationOrActivationToFirstMeaningfulPaint"
-    units="ms" expires_after="2024-11-17">
+    units="ms" expires_after="2025-01-26">
   <owner>robertlin@chromium.org</owner>
   <owner>chrome-prerendering@google.com</owner>
   <summary>
@@ -267,7 +267,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Bookmarks.IdsReassigned.OnProfileLoad{BookmarksFileType}"
-    enum="BooleanReassigned" expires_after="2024-12-08">
+    enum="BooleanReassigned" expires_after="2025-02-09">
   <owner>mastiz@chromium.org</owner>
   <owner>arthurmilchior@chromium.org</owner>
   <summary>
@@ -369,7 +369,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Bookmarks.OpenBookmarkTimeInterval2.{BookmarkType}" units="ms"
-    expires_after="2024-12-01">
+    expires_after="2025-02-02">
   <owner>wylieb@chromium.org</owner>
   <owner>chrome-collections@google.com</owner>
   <summary>
@@ -419,7 +419,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Bookmarks.ParentFolderType" enum="BookmarkFolderType"
-    expires_after="2024-11-17">
+    expires_after="2025-01-26">
   <owner>emshack@chromium.org</owner>
   <owner>chrome-desktop-ui-sea@google.com</owner>
   <summary>
@@ -483,7 +483,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Bookmarks.Storage.FileSizeAtStartup2" units="KB"
-    expires_after="2024-12-01">
+    expires_after="2025-02-02">
   <owner>wylieb@chromium.org</owner>
   <owner>chrome-collections@google.com</owner>
   <summary>
@@ -507,7 +507,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Bookmarks.Storage.TimeToLoadAtStartup2" units="ms"
-    expires_after="2024-12-01">
+    expires_after="2025-02-02">
   <owner>wylieb@chromium.org</owner>
   <owner>chrome-collections@google.com</owner>
   <summary>
@@ -669,6 +669,18 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="PowerBookmarks.SidePanel.BookmarksShown" units="Bookmarks"
+    expires_after="2024-12-08">
+  <owner>emshack@chromium.org</owner>
+  <owner>chrome-desktop-sea@google.com</owner>
+  <component>1457140</component>
+  <summary>
+    Records the number of bookmarks shown in the side panel. Logged once when
+    the side panel is opened and then again every time a folder is navigated to
+    (either up or down the tree).
+  </summary>
+</histogram>
+
 <histogram name="PowerBookmarks.SidePanel.Search.CTR"
     enum="BookmarksSidePanelSearchCTREvent" expires_after="2024-12-08">
   <owner>emshack@chromium.org</owner>
@@ -678,6 +690,18 @@ chromium-metrics-reviews@google.com.
     Logs when the power bookmarks side panel is shown, as well as when the
     search bar is defocused as a proxy for performing a search. The CTR can be
     calculated by computing &quot;Searched&quot; / &quot;Shown&quot;.
+  </summary>
+</histogram>
+
+<histogram name="PowerBookmarks.SidePanel.SearchOrFilter.BookmarksShown"
+    units="Bookmarks" expires_after="2024-12-08">
+  <owner>emshack@chromium.org</owner>
+  <owner>chrome-desktop-sea@google.com</owner>
+  <component>1457140</component>
+  <summary>
+    Records the number of bookmark search or filter results are shown in the
+    side panel. Logged once for each time a search is performed or edited or a
+    filter is applied or removed.
   </summary>
 </histogram>
 

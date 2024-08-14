@@ -24,6 +24,7 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/mojom/ui_base_types.mojom-shared.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/events/event.h"
@@ -100,8 +101,8 @@ class LocatedEventHandlerView : public views::View {
   }
 
   void OnGestureEvent(ui::GestureEvent* event) override {
-    if (event->type() == ui::ET_GESTURE_TAP ||
-        event->type() == ui::ET_GESTURE_TAP_DOWN ||
+    if (event->type() == ui::EventType::kGestureTap ||
+        event->type() == ui::EventType::kGestureTapDown ||
         event->IsScrollGestureEvent()) {
       ProcessEventAtLocation(event->location());
       event->SetHandled();
@@ -533,10 +534,11 @@ bool ColorChooser::HandleKeyEvent(Textfield* sender,
                                   const ui::KeyEvent& key_event) {
   DCHECK(IsViewAttached());
 
-  if (key_event.type() != ui::ET_KEY_PRESSED ||
+  if (key_event.type() != ui::EventType::kKeyPressed ||
       (key_event.key_code() != ui::VKEY_RETURN &&
-       key_event.key_code() != ui::VKEY_ESCAPE))
+       key_event.key_code() != ui::VKEY_ESCAPE)) {
     return false;
+  }
 
   tracker_.view()->GetWidget()->Close();
   return true;
@@ -549,7 +551,7 @@ std::unique_ptr<WidgetDelegate> ColorChooser::MakeWidgetDelegate() {
   delegate->SetCanMinimize(false);
   delegate->SetContentsView(BuildView());
   delegate->SetInitiallyFocusedView(textfield_);
-  delegate->SetModalType(ui::MODAL_TYPE_WINDOW);
+  delegate->SetModalType(ui::mojom::ModalType::kWindow);
   delegate->RegisterWindowClosingCallback(base::BindOnce(
       &ColorChooser::OnViewClosing, weak_ptr_factory_.GetWeakPtr()));
 

@@ -39,6 +39,7 @@
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
 #include "chrome/browser/apps/app_service/browser_app_launcher.h"
 #include "chrome/browser/apps/platform_apps/app_load_service.h"
+#include "chrome/browser/ash/crosapi/browser_util.h"
 #include "chrome/browser/autocomplete/autocomplete_classifier_factory.h"
 #include "chrome/browser/autofill/personal_data_manager_factory.h"
 #include "chrome/browser/browser_features.h"
@@ -90,10 +91,12 @@
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/exclusive_access/exclusive_access_manager.h"
 #include "chrome/browser/ui/exclusive_access/keyboard_lock_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_controller.h"
+#include "chrome/browser/ui/lens/lens_overlay_entry_point_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_invocation_source.h"
 #include "chrome/browser/ui/passwords/ui_utils.h"
 #include "chrome/browser/ui/profiles/profile_colors_util.h"
@@ -138,6 +141,7 @@
 #include "components/google/core/common/google_util.h"
 #include "components/guest_view/browser/guest_view_base.h"
 #include "components/language/core/browser/language_model_manager.h"
+#include "components/lens/lens_constants.h"
 #include "components/lens/lens_features.h"
 #include "components/lens/lens_metadata.mojom.h"
 #include "components/lens/lens_metrics.h"
@@ -305,7 +309,7 @@
 #include "chrome/browser/ash/arc/intent_helper/arc_intent_helper_mojo_ash.h"
 #include "chrome/browser/ash/input_method/editor_mediator.h"
 #include "chrome/browser/ash/system_web_apps/types/system_web_app_delegate.h"
-#include "chrome/browser/ash/url_handler.h"
+#include "chrome/browser/ash/url_handler/url_handler.h"
 #include "chrome/browser/ui/ash/system_web_apps/system_web_app_ui_utils.h"
 #include "chrome/browser/ui/settings_window_manager_chromeos.h"
 #include "chrome/browser/ui/webui/ash/system_web_dialog_delegate.h"
@@ -518,13 +522,14 @@ const std::map<int, int>& GetIdcToUmaMap(UmaEnumIdLookupType type) {
        {IDC_CONTENT_CONTEXT_AUTOFILL_FALLBACK_PASSWORDS_SUGGEST_PASSWORD, 149},
        {IDC_CONTENT_CONTEXT_AUTOFILL_FALLBACK_PASSWORDS_NO_SAVED_PASSWORDS,
         150},
+       {IDC_CONTENT_CONTEXT_AUTOFILL_PREDICTION_IMPROVEMENTS, 151},
        // To add new items:
        //   - Add one more line above this comment block, using the UMA value
        //     from the line below this comment block.
        //   - Increment the UMA value in that latter line.
        //   - Add the new item to the RenderViewContextMenuItem enum in
        //     tools/metrics/histograms/enums.xml.
-       {0, 151}});
+       {0, 152}});
 
   // These UMA values are for the ContextMenuOptionDesktop enum, used for
   // the ContextMenu.SelectedOptionDesktop histograms.
@@ -816,6 +821,16 @@ bool MaybePdfViewerHandlesSave(RenderFrameHost* frame_host) {
   return pdf_extension_util::MaybeDispatchSaveEvent(embedder_host);
 }
 #endif  // BUILDFLAG(ENABLE_PDF)
+
+bool IsLensOptionEnteredThroughKeyboard(int event_flags) {
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+  // This check must be done inside the BUILDFLAG block because
+  // GetMenuSourceType is only available in this case.
+  return ui::GetMenuSourceType(event_flags) == ui::MENU_SOURCE_KEYBOARD;
+#else
+  return false;
+#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
+}
 
 }  // namespace
 
@@ -2040,13 +2055,16 @@ void RenderViewContextMenu::AppendSearchWebForImageItems() {
   }
 
   const int search_for_image_idc = GetSearchForImageIdc();
-  if (LensOverlayController::IsEnabled(GetBrowser()) &&
+  if (GetBrowser()
+          ->GetFeatures()
+          .lens_overlay_entry_point_controller()
+          ->IsEnabled() &&
       lens::features::UseLensOverlayForImageSearch()) {
     const gfx::VectorIcon& icon =
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
         vector_icons::kGoogleLensMonochromeLogoIcon;
 #else
-        vector_icons::kSearchIcon;
+        vector_icons::kSearchChromeRefreshIcon;
 #endif
     menu_model_.AddItemWithStringIdAndIcon(
         search_for_image_idc, IDS_CONTENT_CONTEXT_LENS_OVERLAY,
@@ -2134,13 +2152,16 @@ void RenderViewContextMenu::AppendVideoItems() {
   if (base::FeatureList::IsEnabled(media::kContextMenuSearchForVideoFrame)) {
     const int search_for_video_frame_idc = GetSearchForVideoFrameIdc();
 
-    if (LensOverlayController::IsEnabled(GetBrowser()) &&
+    if (GetBrowser()
+            ->GetFeatures()
+            .lens_overlay_entry_point_controller()
+            ->IsEnabled() &&
         lens::features::UseLensOverlayForVideoFrameSearch()) {
       const gfx::VectorIcon& icon =
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
           vector_icons::kGoogleLensMonochromeLogoIcon;
 #else
-          vector_icons::kSearchIcon;
+          vector_icons::kSearchChromeRefreshIcon;
 #endif
       menu_model_.AddItemWithStringIdAndIcon(
           search_for_video_frame_idc, IDS_CONTENT_CONTEXT_LENS_OVERLAY,
@@ -2728,12 +2749,15 @@ void RenderViewContextMenu::AppendClickToCallItem() {
 }
 
 void RenderViewContextMenu::AppendRegionSearchItem() {
-  if (LensOverlayController::IsEnabled(GetBrowser())) {
+  if (GetBrowser()
+          ->GetFeatures()
+          .lens_overlay_entry_point_controller()
+          ->IsEnabled()) {
     const gfx::VectorIcon& icon =
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
         vector_icons::kGoogleLensMonochromeLogoIcon;
 #else
-        vector_icons::kSearchIcon;
+        vector_icons::kSearchChromeRefreshIcon;
 #endif
     menu_model_.AddItemWithStringIdAndIcon(
         IDC_CONTENT_CONTEXT_LENS_REGION_SEARCH,
@@ -3274,13 +3298,13 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
       RecordAmbientSearchQuery(
           lens::AmbientSearchEntryPoint::
               CONTEXT_MENU_SEARCH_VIDEO_FRAME_WITH_GOOGLE_LENS);
-      ExecSearchForVideoFrame();
+      ExecSearchForVideoFrame(event_flags);
       break;
 
     case IDC_CONTENT_CONTEXT_SEARCHWEBFORVIDEOFRAME:
       RecordAmbientSearchQuery(lens::AmbientSearchEntryPoint::
                                    CONTEXT_MENU_SEARCH_VIDEO_FRAME_WITH_WEB);
-      ExecSearchForVideoFrame();
+      ExecSearchForVideoFrame(event_flags);
       break;
 
     case IDC_CONTENT_CONTEXT_SEARCHWEBFORIMAGE:
@@ -3288,7 +3312,7 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
       break;
 
     case IDC_CONTENT_CONTEXT_SEARCHLENSFORIMAGE:
-      ExecSearchLensForImage(/*is_image_translate=*/false);
+      ExecSearchLensForImage(event_flags, /*is_image_translate=*/false);
       break;
 
     case IDC_CONTENT_CONTEXT_TRANSLATEIMAGEWITHWEB:
@@ -3296,7 +3320,7 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
       break;
 
     case IDC_CONTENT_CONTEXT_TRANSLATEIMAGEWITHLENS:
-      ExecSearchLensForImage(/*is_image_translate=*/true);
+      ExecSearchLensForImage(event_flags, /*is_image_translate=*/true);
       break;
 
     case IDC_CONTENT_CONTEXT_OPEN_IN_READING_MODE:
@@ -3650,18 +3674,28 @@ const policy::DlpRulesManager* RenderViewContextMenu::GetDlpRulesManager()
 }
 #endif
 
-bool RenderViewContextMenu::IsSaveAsItemAllowedByPolicy() const {
+bool RenderViewContextMenu::IsSaveAsItemAllowedByPolicy(
+    const GURL& item_url) const {
   PrefService* local_state = g_browser_process->local_state();
   DCHECK(local_state);
   // Check if file-selection dialogs are forbidden by policy.
   if (!local_state->GetBoolean(prefs::kAllowFileSelectionDialogs)) {
     return false;
   }
+
   // Check if all downloads are forbidden by policy.
   if (DownloadPrefs::FromBrowserContext(GetProfile())->download_restriction() ==
       DownloadPrefs::DownloadRestriction::ALL_FILES) {
     return false;
   }
+
+  PolicyBlocklistService* service =
+      PolicyBlocklistFactory::GetForBrowserContext(browser_context_);
+  if (service->GetURLBlocklistState(item_url) ==
+      policy::URLBlocklist::URLBlocklistState::URL_IN_BLOCKLIST) {
+    return false;
+  }
+
   return true;
 }
 
@@ -3718,9 +3752,11 @@ bool RenderViewContextMenu::IsDevCommandEnabled(int id) const {
 bool RenderViewContextMenu::IsTranslateEnabled() const {
   ChromeTranslateClient* chrome_translate_client =
       ChromeTranslateClient::FromWebContents(embedder_web_contents_);
-  // If no |chrome_translate_client| attached with this WebContents or we're
-  // viewing in a MimeHandlerViewGuest translate will be disabled.
+  // If no |chrome_translate_client| attached with this WebContents, or
+  // the translate manager has been shut down, or we're viewing in a
+  // MimeHandlerViewGuest translate will be disabled.
   if (!chrome_translate_client ||
+      !chrome_translate_client->GetTranslateManager() ||
       !!extensions::MimeHandlerViewGuest::FromRenderFrameHost(
           GetRenderFrameHost())) {
     return false;
@@ -3739,7 +3775,7 @@ bool RenderViewContextMenu::IsTranslateEnabled() const {
 }
 
 bool RenderViewContextMenu::IsSaveLinkAsEnabled() const {
-  if (!IsSaveAsItemAllowedByPolicy()) {
+  if (!IsSaveAsItemAllowedByPolicy(params_.link_url)) {
     return false;
   }
 
@@ -3747,16 +3783,9 @@ bool RenderViewContextMenu::IsSaveLinkAsEnabled() const {
     return false;
   }
 
-  PolicyBlocklistService* service =
-      PolicyBlocklistFactory::GetForBrowserContext(browser_context_);
-  if (service->GetURLBlocklistState(params_.link_url) ==
-      policy::URLBlocklist::URLBlocklistState::URL_IN_BLOCKLIST) {
-    return false;
-  }
-
   Profile* const profile = Profile::FromBrowserContext(browser_context_);
   CHECK(profile);
-  if (supervised_user::IsSubjectToParentalControls(*profile->GetPrefs())) {
+  if (profile->IsChild()) {
     supervised_user::SupervisedUserService* supervised_user_service =
         SupervisedUserServiceFactory::GetForProfile(profile);
     supervised_user::SupervisedUserURLFilter* url_filter =
@@ -3777,7 +3806,7 @@ bool RenderViewContextMenu::IsSaveLinkAsEnabled() const {
 }
 
 bool RenderViewContextMenu::IsSaveImageAsEnabled() const {
-  if (!IsSaveAsItemAllowedByPolicy()) {
+  if (!IsSaveAsItemAllowedByPolicy(params_.src_url)) {
     return false;
   }
 
@@ -3789,7 +3818,8 @@ bool RenderViewContextMenu::IsSaveImageAsEnabled() const {
 }
 
 bool RenderViewContextMenu::IsSaveAsEnabled() const {
-  if (!IsSaveAsItemAllowedByPolicy()) {
+  const GURL& url = params_.src_url;
+  if (!IsSaveAsItemAllowedByPolicy(url)) {
     return false;
   }
 
@@ -3797,7 +3827,6 @@ bool RenderViewContextMenu::IsSaveAsEnabled() const {
     return false;
   }
 
-  const GURL& url = params_.src_url;
   bool can_save = (params_.media_flags & ContextMenuData::kMediaCanSave) &&
                   url.is_valid() &&
                   ProfileIOData::IsHandledProtocol(url.scheme());
@@ -3822,15 +3851,20 @@ bool RenderViewContextMenu::IsSavePageEnabled() const {
     return false;
   }
 
-  if (!IsSaveAsItemAllowedByPolicy()) {
-    return false;
-  }
-
   // We save the last committed entry (which the user is looking at), as
   // opposed to any pending URL that hasn't committed yet.
   NavigationEntry* entry =
       embedder_web_contents_->GetController().GetLastCommittedEntry();
-  return content::IsSavableURL(entry ? entry->GetURL() : GURL());
+  if (!entry) {
+    return false;
+  }
+
+  GURL url = entry->GetURL();
+  if (!IsSaveAsItemAllowedByPolicy(url)) {
+    return false;
+  }
+
+  return content::IsSavableURL(url);
 }
 
 bool RenderViewContextMenu::IsPasteEnabled() const {
@@ -3914,7 +3948,10 @@ bool RenderViewContextMenu::IsRegionSearchEnabled() const {
     return false;
   }
 
-  if (LensOverlayController::IsEnabled(GetBrowser())) {
+  if (GetBrowser()
+          ->GetFeatures()
+          .lens_overlay_entry_point_controller()
+          ->IsEnabled()) {
     return true;
   }
 
@@ -4167,7 +4204,7 @@ void RenderViewContextMenu::ExecInspectBackgroundPage() {
 void RenderViewContextMenu::CheckSupervisedUserURLFilterAndSaveLinkAs() {
   Profile* const profile = Profile::FromBrowserContext(browser_context_);
   CHECK(profile);
-  if (supervised_user::IsSubjectToParentalControls(*profile->GetPrefs())) {
+  if (profile->IsChild()) {
     supervised_user::SupervisedUserService* supervised_user_service =
         SupervisedUserServiceFactory::GetForProfile(profile);
     supervised_user::SupervisedUserURLFilter* url_filter =
@@ -4269,7 +4306,7 @@ void RenderViewContextMenu::ExecSaveAs() {
     // Handle the save here.
     target_frame_host = pdf_frame_util::GetEmbedderHost(frame_host);
     CHECK(target_frame_host);
-    url = frame_host->GetLastCommittedURL();
+    url = target_frame_host->GetLastCommittedURL();
   }
 #endif  // BUILDFLAG(ENABLE_PDF)
 
@@ -4321,7 +4358,8 @@ void RenderViewContextMenu::ExecCopyImageAt() {
   }
 }
 
-void RenderViewContextMenu::ExecSearchLensForImage(bool is_image_translate) {
+void RenderViewContextMenu::ExecSearchLensForImage(int event_flags,
+                                                   bool is_image_translate) {
   CoreTabHelper* core_tab_helper =
       CoreTabHelper::FromWebContents(source_web_contents_);
   if (!core_tab_helper) {
@@ -4335,9 +4373,15 @@ void RenderViewContextMenu::ExecSearchLensForImage(bool is_image_translate) {
   lens::RecordAmbientSearchQuery(
       lens::AmbientSearchEntryPoint::
           CONTEXT_MENU_SEARCH_IMAGE_WITH_GOOGLE_LENS);
-
-  if (LensOverlayController::IsEnabled(GetBrowser()) &&
-      lens::features::UseLensOverlayForImageSearch()) {
+  bool entered_through_keyboard =
+      IsLensOptionEnteredThroughKeyboard(event_flags);
+  bool lens_overlay_for_image_search_enabled =
+      GetBrowser()
+          ->GetFeatures()
+          .lens_overlay_entry_point_controller()
+          ->IsEnabled() &&
+      lens::features::UseLensOverlayForImageSearch();
+  if (lens_overlay_for_image_search_enabled && !entered_through_keyboard) {
     auto view_bounds = render_frame_host->GetView()->GetViewBounds();
     auto tab_bounds = source_web_contents_->GetViewBounds();
     float device_scale_factor =
@@ -4355,6 +4399,12 @@ void RenderViewContextMenu::ExecSearchLensForImage(bool is_image_translate) {
         weak_pointer_factory_.GetWeakPtr(), std::move(chrome_render_frame),
         tab_bounds, view_bounds, device_scale_factor));
   } else {
+    // When the Lens image search feature is entered via the context menu
+    // with a Keyboard action, use the Lens region search flow through
+    // core_tab_helper (with results forced into a new tab) instead of the
+    // Lens Overlay flow.
+    bool force_open_in_new_tab =
+        lens_overlay_for_image_search_enabled && entered_through_keyboard;
     core_tab_helper->SearchWithLens(
         render_frame_host, params().src_url,
         is_image_translate
@@ -4362,7 +4412,7 @@ void RenderViewContextMenu::ExecSearchLensForImage(bool is_image_translate) {
                   CHROME_TRANSLATE_IMAGE_WITH_GOOGLE_LENS_CONTEXT_MENU_ITEM
             : lens::EntryPoint::
                   CHROME_SEARCH_WITH_GOOGLE_LENS_CONTEXT_MENU_ITEM,
-        is_image_translate);
+        is_image_translate, force_open_in_new_tab);
   }
 }
 
@@ -4391,15 +4441,29 @@ void RenderViewContextMenu::ExecRegionSearch(
   Browser* browser = GetBrowser();
   CHECK(browser);
 
-  if (LensOverlayController::IsEnabled(browser)) {
-    LensOverlayController* const controller =
-        LensOverlayController::GetController(embedder_web_contents_);
-    CHECK(controller);
-    controller->ShowUI(
-        lens::LensOverlayInvocationSource::kContentAreaContextMenuPage);
+  bool lens_overlay_for_region_search_enabled =
+      GetBrowser()
+          ->GetFeatures()
+          .lens_overlay_entry_point_controller()
+          ->IsEnabled();
+  // If Lens overlay is enabled, but the user triggered the context menu
+  // option via keyboard, use the Lens region search flow (with results
+  // forced into a new tab) instead of the Lens Overlay flow.
+  // TODO(crbug/353984457): Clean this branching when the new server
+  // results flow is ready.
+  bool entered_through_keyboard =
+      IsLensOptionEnteredThroughKeyboard(event_flags);
+  if (lens_overlay_for_region_search_enabled) {
     UserEducationService::MaybeNotifyPromoFeatureUsed(
         GetBrowserContext(), lens::features::kLensOverlay);
-    return;
+    if (!entered_through_keyboard) {
+      LensOverlayController* const controller =
+          LensOverlayController::GetController(embedder_web_contents_);
+      CHECK(controller);
+      controller->ShowUI(
+          lens::LensOverlayInvocationSource::kContentAreaContextMenuPage);
+      return;
+    }
   }
 
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
@@ -4410,16 +4474,19 @@ void RenderViewContextMenu::ExecRegionSearch(
 
   // If Lens fullscreen search is enabled, we want to send every region search
   // as a fullscreen capture.
-  bool use_fullscreen_capture =
-      ui::GetMenuSourceType(event_flags) == ui::MENU_SOURCE_KEYBOARD ||
-      lens::features::IsLensFullscreenSearchEnabled();
+  // TODO(crbug/353984457): Clean this branching when the new server
+  // results flow is ready.
+  bool use_fullscreen_capture = entered_through_keyboard ||
+                                lens::features::IsLensFullscreenSearchEnabled();
+  bool force_open_in_new_tab =
+      lens_overlay_for_region_search_enabled && entered_through_keyboard;
 
   auto* companion_helper =
       companion::CompanionTabHelper::FromWebContents(embedder_web_contents_);
   if (companion_helper &&
       companion::IsSearchImageInCompanionSidePanelSupported(browser)) {
-    companion_helper->StartRegionSearch(embedder_web_contents_,
-                                        use_fullscreen_capture);
+    companion_helper->StartRegionSearch(
+        embedder_web_contents_, use_fullscreen_capture, force_open_in_new_tab);
     return;
   }
 
@@ -4433,7 +4500,7 @@ void RenderViewContextMenu::ExecRegionSearch(
                 CONTEXT_MENU_SEARCH_REGION_WITH_GOOGLE_LENS
           : lens::AmbientSearchEntryPoint::CONTEXT_MENU_SEARCH_REGION_WITH_WEB;
   lens_region_search_controller_->Start(
-      embedder_web_contents_, use_fullscreen_capture,
+      embedder_web_contents_, use_fullscreen_capture, force_open_in_new_tab,
       is_google_default_search_provider, entry_point);
 #endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
 }
@@ -4509,7 +4576,7 @@ void RenderViewContextMenu::ExecCopyVideoFrame() {
       /*enable=*/true));
 }
 
-void RenderViewContextMenu::ExecSearchForVideoFrame() {
+void RenderViewContextMenu::ExecSearchForVideoFrame(int event_flags) {
   base::RecordAction(UserMetricsAction("MediaContextMenu_SearchForVideoFrame"));
 
   RenderFrameHost* frame_host = GetRenderFrameHost();
@@ -4519,11 +4586,10 @@ void RenderViewContextMenu::ExecSearchForVideoFrame() {
 
   frame_host->RequestVideoFrameAtWithBoundsHint(
       gfx::Point(params_.x, params_.y),
-      gfx::Size(lens::features::GetMaxPixelsForImageSearch(),
-                lens::features::GetMaxPixelsForImageSearch()),
-      lens::features::GetMaxAreaForImageSearch(),
+      gfx::Size(lens::kMaxPixelsForImageSearch, lens::kMaxPixelsForImageSearch),
+      lens::kMaxAreaForImageSearch,
       base::BindOnce(&RenderViewContextMenu::SearchForVideoFrame,
-                     weak_pointer_factory_.GetWeakPtr()));
+                     weak_pointer_factory_.GetWeakPtr(), event_flags));
 }
 
 void RenderViewContextMenu::ExecLiveCaption() {
@@ -4681,31 +4747,47 @@ void RenderViewContextMenu::MediaPlayerAction(
 }
 
 void RenderViewContextMenu::SearchForVideoFrame(
+    int event_flags,
     const SkBitmap& bitmap,
     const gfx::Rect& region_bounds) {
   if (bitmap.isNull()) {
     return;
   }
 
-  if (LensOverlayController::IsEnabled(GetBrowser()) &&
+  bool entered_through_keyboard =
+      IsLensOptionEnteredThroughKeyboard(event_flags);
+  bool force_open_in_new_tab = false;
+  // TODO(crbug/353984457): Clean this branching when the new server
+  // results flow is ready.
+  if (GetBrowser()
+          ->GetFeatures()
+          .lens_overlay_entry_point_controller()
+          ->IsEnabled() &&
       lens::features::UseLensOverlayForVideoFrameSearch()) {
-    RenderFrameHost* render_frame_host = GetRenderFrameHost();
-    if (!render_frame_host) {
+    if (entered_through_keyboard) {
+      // Using the keyboard to invoke this entry point should use the
+      // Lens region search flow through core_tab_helper (with results forced
+      // into a new tab) instead of the Lens Overlay flow.
+      force_open_in_new_tab = true;
+    } else {
+      RenderFrameHost* render_frame_host = GetRenderFrameHost();
+      if (!render_frame_host) {
+        return;
+      }
+
+      auto tab_bounds = source_web_contents_->GetViewBounds();
+      auto view_bounds = render_frame_host->GetView()->GetViewBounds();
+      float device_scale_factor =
+          render_frame_host->GetView()->GetDeviceScaleFactor();
+
+      // OpenLensOverlayWithPreselectedRegion() only takes a `ChromeRenderFrame`
+      // to keep it alive while the mojo calls run, which is not needed here.
+      OpenLensOverlayWithPreselectedRegion(
+          /*chrome_render_frame=*/mojo::AssociatedRemote<
+              chrome::mojom::ChromeRenderFrame>(),
+          tab_bounds, view_bounds, device_scale_factor, bitmap, region_bounds);
       return;
     }
-
-    auto tab_bounds = source_web_contents_->GetViewBounds();
-    auto view_bounds = render_frame_host->GetView()->GetViewBounds();
-    float device_scale_factor =
-        render_frame_host->GetView()->GetDeviceScaleFactor();
-
-    // OpenLensOverlayWithPreselectedRegion() only takes a `ChromeRenderFrame`
-    // to keep it alive while the mojo calls run, which is not needed here.
-    OpenLensOverlayWithPreselectedRegion(
-        /*chrome_render_frame=*/mojo::AssociatedRemote<
-            chrome::mojom::ChromeRenderFrame>(),
-        tab_bounds, view_bounds, device_scale_factor, bitmap, region_bounds);
-    return;
   }
 
   // If not using Lens overlay for video frame search, fallback to use
@@ -4721,7 +4803,8 @@ void RenderViewContextMenu::SearchForVideoFrame(
 
   if (search::DefaultSearchProviderIsGoogle(GetProfile())) {
     core_tab_helper->SearchWithLens(
-        image, lens::EntryPoint::CHROME_VIDEO_FRAME_SEARCH_CONTEXT_MENU_ITEM);
+        image, lens::EntryPoint::CHROME_VIDEO_FRAME_SEARCH_CONTEXT_MENU_ITEM,
+        force_open_in_new_tab);
   } else {
     core_tab_helper->SearchByImage(image);
   }

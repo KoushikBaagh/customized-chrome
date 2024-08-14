@@ -6,7 +6,6 @@
 #include "base/containers/contains.h"
 #include "base/time/time.h"
 #include "components/country_codes/country_codes.h"
-#include "components/feed/buildflags.h"
 
 #include "base/feature_list.h"
 #include "base/metrics/field_trial_params.h"
@@ -17,6 +16,11 @@
 #endif  // BUILDFLAG(IS_ANDROID)
 
 namespace feed {
+
+namespace switches {
+// Specifies whether RssLinkReader is enabled.
+const char kEnableRssLinkReader[] = "enable-rss-link-reader";
+}  // namespace switches
 
 // InterestFeedV2 takes precedence over InterestFeedContentSuggestions.
 // InterestFeedV2 is cached in ChromeCachedFlags. If the default value here is

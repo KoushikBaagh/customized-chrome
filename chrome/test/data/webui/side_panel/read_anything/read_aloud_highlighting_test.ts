@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 import 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 
-import type {ReadAnythingElement} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import type {AppElement} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 import {ToolbarEvent} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 import {assertEquals, assertFalse} from 'chrome-untrusted://webui-test/chai_assert.js';
 
 import {emitEvent, suppressInnocuousErrors, waitForPlayFromSelection} from './common.js';
 
 suite('ReadAloudHighlight', () => {
-  let app: ReadAnythingElement;
+  let app: AppElement;
   const sentence1 = 'Only need the light when it\'s burning low.\n';
   const sentence2 = 'Only miss the sun when it starts to snow.\n';
   const sentenceSegment1 = 'Only know you love her when you let her go';
@@ -69,25 +69,15 @@ suite('ReadAloudHighlight', () => {
     chrome.readingMode.setContentForTesting(axTree, leafIds);
   });
 
-  suite('on speak first sentence', () => {
-    let currentHighlight: HTMLElement|null;
-    let previousHighlight: HTMLElement|null;
+  test('on speak first sentence highlights are correct', () => {
+    app.playSpeech();
+    const currentHighlight =
+        app.$.container.querySelector('.current-read-highlight');
+    const previousHighlight =
+        app.$.container.querySelector('.previous-read-highlight');
 
-    setup(() => {
-      app.playSpeech();
-      currentHighlight =
-          app.$.container.querySelector('.current-read-highlight');
-      previousHighlight =
-          app.$.container.querySelector('.previous-read-highlight');
-    });
-
-    test('sentence is highlighted', () => {
-      assertEquals(sentence1, currentHighlight!.textContent);
-    });
-
-    test('no previous highlight', () => {
-      assertFalse(!!previousHighlight);
-    });
+    assertEquals(sentence1, currentHighlight!.textContent);
+    assertFalse(!!previousHighlight);
   });
 
   suite('on sentence spread across multiple segments', () => {
@@ -129,26 +119,16 @@ suite('ReadAloudHighlight', () => {
     });
   });
 
-  suite('on speak next sentence', () => {
-    let currentHighlight: HTMLElement|null;
-    let previousHighlight: HTMLElement|null;
+  test('on speak next sentence highlights are correct', () => {
+    app.playSpeech();
+    emitNextGranularity();
+    const currentHighlight =
+        app.$.container.querySelector('.current-read-highlight');
+    const previousHighlight =
+        app.$.container.querySelector('.previous-read-highlight');
 
-    setup(() => {
-      app.playSpeech();
-      emitNextGranularity();
-      currentHighlight =
-          app.$.container.querySelector('.current-read-highlight');
-      previousHighlight =
-          app.$.container.querySelector('.previous-read-highlight');
-    });
-
-    test('sentence is highlighted', () => {
-      assertEquals(sentence2, currentHighlight!.textContent);
-    });
-
-    test('previous sentence has highlight', () => {
-      assertEquals(sentence1, previousHighlight!.textContent);
-    });
+    assertEquals(sentence2, currentHighlight!.textContent);
+    assertEquals(sentence1, previousHighlight!.textContent);
   });
 
   suite('on finish speaking', () => {
@@ -167,12 +147,10 @@ suite('ReadAloudHighlight', () => {
           app.$.container.querySelectorAll('.previous-read-highlight');
     });
 
-    test('no highlights', () => {
+    test('no highlights and keeps content', () => {
       assertFalse(!!currentHighlight);
       assertEquals(0, previousHighlights.length);
-    });
 
-    test('text content is still there', () => {
       const expectedText =
           sentence1 + sentence2 + sentenceSegment1 + sentenceSegment2;
       assertEquals(expectedText, app.$.container.textContent);
@@ -199,11 +177,8 @@ suite('ReadAloudHighlight', () => {
           app.$.container.querySelectorAll('.previous-read-highlight');
     });
 
-    test('previous sentence is now current', () => {
+    test('previous sentence is now current and nothing marked previous', () => {
       assertEquals(sentence1, currentHighlight!.textContent);
-    });
-
-    test('nothing marked previous', () => {
       assertEquals(0, previousHighlights.length);
     });
 

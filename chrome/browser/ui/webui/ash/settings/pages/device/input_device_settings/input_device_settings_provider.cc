@@ -213,6 +213,9 @@ InputDeviceSettingsProvider::InputDeviceSettingsProvider() {
     if (power_manager_client) {
       // power_manager_client may be NULL in unittests.
       power_manager_client->AddObserver(this);
+      power_manager_client->GetSwitchStates(
+          base::BindOnce(&InputDeviceSettingsProvider::OnReceiveSwitchStates,
+                         weak_ptr_factory_.GetWeakPtr()));
     }
   }
 }
@@ -431,7 +434,8 @@ void InputDeviceSettingsProvider::SetKeyboardAmbientLightSensorEnabled(
     return;
   }
   keyboard_brightness_control_delegate_
-      ->HandleSetKeyboardAmbientLightSensorEnabled(enabled);
+      ->HandleSetKeyboardAmbientLightSensorEnabled(
+          enabled, KeyboardAmbientLightSensorEnabledChangeSource::kSettingsApp);
 
   // Record the keyboard auto-brightness toggle event.
   base::UmaHistogramBoolean(
@@ -541,6 +545,34 @@ void InputDeviceSettingsProvider::ObserveKeyboardAmbientLightSensor(
                          weak_ptr_factory_.GetWeakPtr()));
 }
 
+void InputDeviceSettingsProvider::ObserveLidState(
+    mojo::PendingRemote<mojom::LidStateObserver> observer,
+    ObserveLidStateCallback callback) {
+  DCHECK(features::IsKeyboardBacklightControlInSettingsEnabled());
+  lid_state_observers_.Add(std::move(observer));
+  std::move(callback).Run(is_lid_open_);
+}
+
+void InputDeviceSettingsProvider::LidEventReceived(
+    chromeos::PowerManagerClient::LidState state,
+    base::TimeTicks time) {
+  DCHECK(features::IsKeyboardBacklightControlInSettingsEnabled());
+  // If the lid state is open or if the lid state sensors is not present, the
+  // lid is considered open
+  is_lid_open_ = state != chromeos::PowerManagerClient::LidState::CLOSED;
+  for (auto& observer : lid_state_observers_) {
+    observer->OnLidStateChanged(is_lid_open_);
+  }
+}
+
+void InputDeviceSettingsProvider::OnReceiveSwitchStates(
+    std::optional<chromeos::PowerManagerClient::SwitchStates> switch_states) {
+  DCHECK(features::IsKeyboardBacklightControlInSettingsEnabled());
+  if (switch_states.has_value()) {
+    LidEventReceived(switch_states->lid_state, /*time=*/{});
+  }
+}
+
 void InputDeviceSettingsProvider::OnCustomizableMouseButtonPressed(
     const ::ash::mojom::Mouse& mouse,
     const ::ash::mojom::Button& button) {
@@ -605,6 +637,24 @@ void InputDeviceSettingsProvider::OnMouseCompanionAppInfoChanged(
     const ::ash::mojom::Mouse& mouse) {
   CHECK(features::IsWelcomeExperienceEnabled());
   NotifyMiceUpdated();
+}
+
+void InputDeviceSettingsProvider::OnKeyboardCompanionAppInfoChanged(
+    const ::ash::mojom::Keyboard& keyboard) {
+  CHECK(features::IsWelcomeExperienceEnabled());
+  NotifyKeyboardsUpdated();
+}
+
+void InputDeviceSettingsProvider::OnTouchpadCompanionAppInfoChanged(
+    const ::ash::mojom::Touchpad& touchpad) {
+  CHECK(features::IsWelcomeExperienceEnabled());
+  NotifyTouchpadsUpdated();
+}
+
+void InputDeviceSettingsProvider::OnGraphicsTabletCompanionAppInfoChanged(
+    const ::ash::mojom::GraphicsTablet& graphics_tablet) {
+  CHECK(features::IsWelcomeExperienceEnabled());
+  NotifyGraphicsTabletUpdated();
 }
 
 void InputDeviceSettingsProvider::OnKeyboardConnected(

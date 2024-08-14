@@ -17,6 +17,7 @@ import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.OneshotSupplier;
 import org.chromium.chrome.browser.back_press.BackPressManager;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
+import org.chromium.chrome.browser.data_sharing.DataSharingTabManager;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.lifecycle.NativeInitObserver;
 import org.chromium.chrome.browser.multiwindow.MultiWindowModeStateDispatcher;
@@ -55,6 +56,7 @@ public class TabSwitcherPaneCoordinatorFactory {
     private final ModalDialogManager mModalDialogManager;
     private final @TabListMode int mMode;
     private final @NonNull BottomSheetController mBottomSheetController;
+    private final DataSharingTabManager mDataSharingTabManager;
     private final @NonNull BackPressManager mBackPressManager;
 
     private @Nullable TabSwitcherMessageManager mMessageManager;
@@ -73,6 +75,8 @@ public class TabSwitcherPaneCoordinatorFactory {
      * @param snackbarManager The activity level snackbar manager.
      * @param modalDialogManager The modal dialog manager for the activity.
      * @param bottomSheetController The {@link BottomSheetController} for the current activity.
+     * @param dataSharingTabManager The {@link} DataSharingTabManager managing communication between
+     *     UI and DataSharing services.
      * @param backPressManager Manages the different back press handlers throughout the app.
      */
     TabSwitcherPaneCoordinatorFactory(
@@ -88,6 +92,7 @@ public class TabSwitcherPaneCoordinatorFactory {
             @NonNull SnackbarManager snackbarManager,
             @NonNull ModalDialogManager modalDialogManager,
             @NonNull BottomSheetController bottomSheetController,
+            @NonNull DataSharingTabManager dataSharingTabManager,
             @NonNull BackPressManager backPressManager) {
         mActivity = activity;
         mLifecycleDispatcher = lifecycleDispatcher;
@@ -104,6 +109,7 @@ public class TabSwitcherPaneCoordinatorFactory {
         mSnackbarManager = snackbarManager;
         mModalDialogManager = modalDialogManager;
         mBottomSheetController = bottomSheetController;
+        mDataSharingTabManager = dataSharingTabManager;
         mMode =
                 TabUiFeatureUtilities.shouldUseListMode()
                         ? TabListCoordinator.TabListMode.LIST
@@ -120,6 +126,7 @@ public class TabSwitcherPaneCoordinatorFactory {
      * @param isVisibleSupplier Supplies visibility information to the tab switcher.
      * @param isAnimatingSupplier Supplies animation information to the tab switcher.
      * @param onTabClickCallback Callback to be invoked with the tab ID of the selected tab.
+     * @param setHairlineVisibilityCallback Callback to be invoked to show or hide the hairline.
      * @param isIncognito Whether this is for the incognito tab switcher.
      * @param onTabGroupCreation Should be run when the UI is used to create a tab group.
      * @return a {@link TabSwitcherPaneCoordinator} to use.
@@ -130,6 +137,7 @@ public class TabSwitcherPaneCoordinatorFactory {
             @NonNull ObservableSupplier<Boolean> isVisibleSupplier,
             @NonNull ObservableSupplier<Boolean> isAnimatingSupplier,
             @NonNull Callback<Integer> onTabClickCallback,
+            @NonNull Callback<Boolean> setHairlineVisibilityCallback,
             boolean isIncognito,
             @Nullable Runnable onTabGroupCreation) {
         int token = mMessageManagerTokenHolder.acquireToken();
@@ -144,12 +152,14 @@ public class TabSwitcherPaneCoordinatorFactory {
                 mScrimCoordinator,
                 mModalDialogManager,
                 mBottomSheetController,
+                mDataSharingTabManager,
                 mMessageManager,
                 parentView,
                 resetHandler,
                 isVisibleSupplier,
                 isAnimatingSupplier,
                 onTabClickCallback,
+                setHairlineVisibilityCallback,
                 mMode,
                 /* supportsEmptyState= */ !isIncognito,
                 onTabGroupCreation,

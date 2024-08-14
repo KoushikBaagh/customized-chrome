@@ -4,11 +4,14 @@
 
 import 'chrome://compare/app.js';
 
+import {CrFeedbackOption} from '//resources/cr_elements/cr_feedback_buttons/cr_feedback_buttons.js';
 import type {ProductSpecificationsElement} from 'chrome://compare/app.js';
 import {Router} from 'chrome://compare/router.js';
 import type {ProductInfo, ProductSpecifications, ProductSpecificationsProduct, ProductSpecificationsSet, ProductSpecificationsValue} from 'chrome://compare/shopping_service.mojom-webui.js';
+import {WindowProxy} from 'chrome://compare/window_proxy.js';
 import {BrowserProxyImpl} from 'chrome://resources/cr_components/commerce/browser_proxy.js';
-import {PageCallbackRouter} from 'chrome://resources/cr_components/commerce/shopping_service.mojom-webui.js';
+import {PageCallbackRouter, UserFeedback} from 'chrome://resources/cr_components/commerce/shopping_service.mojom-webui.js';
+import type {CrInputElement} from 'chrome://resources/cr_elements/cr_input/cr_input.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {stringToMojoUrl} from 'chrome://resources/js/mojo_type_util.js';
 import type {Url} from 'chrome://resources/mojo/url/mojom/url.mojom-webui.js';
@@ -17,7 +20,7 @@ import {flushTasks, waitAfterNextRender} from 'chrome://webui-test/polymer_test_
 import {TestMock} from 'chrome://webui-test/test_mock.js';
 import {isVisible} from 'chrome://webui-test/test_util.js';
 
-import {$$, assertNotStyle, assertStyle} from './test_support.js';
+import {$$, installMock} from './test_support.js';
 
 function createInfo(overrides?: Partial<ProductInfo>): ProductInfo {
   return Object.assign(
@@ -44,7 +47,7 @@ function createSpecsProduct(overrides?: Partial<ProductSpecificationsProduct>):
         productUrl: {url: ''},
         imageUrl: {url: ''},
         productDimensionValues: new Map<bigint, string[]>(),
-        summary: '',
+        summary: [],
       },
       overrides);
 }
@@ -93,6 +96,7 @@ function createAppPromiseValues(overrides?: Partial<AppPromiseValues>):
 
 suite('AppTest', () => {
   let appElement: ProductSpecificationsElement;
+  let windowProxy: TestMock<WindowProxy>;
   const shoppingServiceApi = TestMock.fromClass(BrowserProxyImpl);
   const callbackRouter = new PageCallbackRouter();
   const callbackRouterRemote = callbackRouter.$.bindNewPipeAndPassRemote();
@@ -140,13 +144,19 @@ suite('AppTest', () => {
   }
 
   setup(async () => {
-    loadTimeData.overrideValues({priceRowTitle: 'price'});
+    document.body.innerHTML = window.trustedTypes!.emptyHTML;
+    loadTimeData.overrideValues(
+        {priceRowTitle: 'price', productSummaryRowTitle: 'summary'});
     shoppingServiceApi.reset();
     shoppingServiceApi.setResultFor('getCallbackRouter', callbackRouter);
-    router.reset();
-    document.body.innerHTML = window.trustedTypes!.emptyHTML;
+    shoppingServiceApi.setResultFor(
+        'maybeShowProductSpecificationDisclosure',
+        Promise.resolve({show: false}));
     BrowserProxyImpl.setInstance(shoppingServiceApi);
+    router.reset();
     Router.setInstance(router);
+    windowProxy = installMock(WindowProxy);
+    windowProxy.setResultFor('onLine', true);
   });
 
   test('calls shopping service when there are url params', () => {
@@ -265,7 +275,7 @@ suite('AppTest', () => {
       summary: [{
         text: 'summary',
         urls: [{
-          url: {url: ''},
+          url: {url: 'http://example.com/citation'},
           title: '',
           faviconUrl: {url: ''},
           thumbnailUrl: {url: ''},
@@ -273,7 +283,7 @@ suite('AppTest', () => {
       }],
       specificationDescriptions: [
         {
-          label: '',
+          label: 'label',
           altText: '',
           options: [
             {
@@ -309,6 +319,10 @@ suite('AppTest', () => {
       productClusterId: BigInt(123),
       title: 'qux',
       productDimensionValues: dimensionValuesMap,
+      summary: [{
+        text: 'product summary',
+        urls: [],
+      }],
     });
     const info1 = createInfo({
       clusterId: BigInt(123),
@@ -346,8 +360,32 @@ suite('AppTest', () => {
               imageUrl: info1.imageUrl.url,
             },
             productDetails: [
-              {title: 'price', description: '$100', summary: ''},
-              {title: detailTitle, description: 'bar, baz', summary: 'summary'},
+              {title: 'price', text: '$100', description: [], summary: []},
+              {
+                title: 'summary',
+                text: null,
+                description: [],
+                summary: [{
+                  text: 'product summary',
+                  urls: [],
+                }],
+              },
+              {
+                title: detailTitle,
+                text: null,
+                description: [
+                  {label: 'label', description: 'bar, baz'},
+                ],
+                summary: [{
+                  text: 'summary',
+                  urls: [{
+                    url: {url: 'http://example.com/citation'},
+                    title: '',
+                    faviconUrl: {url: ''},
+                    thumbnailUrl: {url: ''},
+                  }],
+                }],
+              },
             ],
           },
           {
@@ -362,8 +400,9 @@ suite('AppTest', () => {
             // `productDetails` should have empty strings for `description` and
             // summary`.
             productDetails: [
-              {title: 'price', description: '', summary: ''},
-              {title: detailTitle, description: '', summary: ''},
+              {title: 'price', text: null, description: [], summary: []},
+              {title: 'summary', text: null, description: [], summary: []},
+              {title: detailTitle, text: null, description: [], summary: []},
             ],
           },
         ],
@@ -432,8 +471,14 @@ suite('AppTest', () => {
               imageUrl: info1.imageUrl.url,
             },
             productDetails: [
-              {title: 'price', description: '', summary: ''},
-              {title: detailTitle, description: 'bar', summary: ''},
+              {title: 'price', text: null, description: [], summary: []},
+              {title: 'summary', text: null, description: [], summary: []},
+              {
+                title: detailTitle,
+                text: null,
+                description: [{label: '', description: 'bar'}],
+                summary: [],
+              },
             ],
           },
         ],
@@ -547,8 +592,14 @@ suite('AppTest', () => {
               imageUrl: info1.imageUrl.url,
             },
             productDetails: [
-              {title: 'price', description: '', summary: ''},
-              {title: detailTitle, description: 'desc 1', summary: ''},
+              {title: 'price', text: null, description: [], summary: []},
+              {title: 'summary', text: null, description: [], summary: []},
+              {
+                title: detailTitle,
+                text: null,
+                description: [{label: '', description: 'desc 1'}],
+                summary: [],
+              },
             ],
           },
           {
@@ -558,8 +609,14 @@ suite('AppTest', () => {
               imageUrl: info2.imageUrl.url,
             },
             productDetails: [
-              {title: 'price', description: '', summary: ''},
-              {title: detailTitle, description: 'desc 2', summary: ''},
+              {title: 'price', text: null, description: [], summary: []},
+              {title: 'summary', text: null, description: [], summary: []},
+              {
+                title: detailTitle,
+                text: null,
+                description: [{label: '', description: 'desc 2'}],
+                summary: [],
+              },
             ],
           },
         ],
@@ -701,8 +758,14 @@ suite('AppTest', () => {
               imageUrl: info2.imageUrl.url,
             },
             productDetails: [
-              {title: 'price', description: '', summary: ''},
-              {title: rowTitle, description: 'desc 2', summary: ''},
+              {title: 'price', text: null, description: [], summary: []},
+              {title: 'summary', text: null, description: [], summary: []},
+              {
+                title: rowTitle,
+                text: null,
+                description: [{label: '', description: 'desc 2'}],
+                summary: [],
+              },
             ],
           },
           {
@@ -712,8 +775,14 @@ suite('AppTest', () => {
               imageUrl: info1.imageUrl.url,
             },
             productDetails: [
-              {title: 'price', description: '', summary: ''},
-              {title: rowTitle, description: 'desc 1', summary: ''},
+              {title: 'price', text: null, description: [], summary: []},
+              {title: 'summary', text: null, description: [], summary: []},
+              {
+                title: rowTitle,
+                text: null,
+                description: [{label: '', description: 'desc 1'}],
+                summary: [],
+              },
             ],
           },
         ],
@@ -860,6 +929,45 @@ suite('AppTest', () => {
     assertArrayEquals([{url: 'https://example.com/'}], args[1]);
   });
 
+  test('creating new set triggers disclosure', async () => {
+    const productTabs = [{
+      title: 'title',
+      url: stringToMojoUrl('https://example.com/'),
+    }];
+    shoppingServiceApi.setResultFor(
+        'getUrlInfosForProductTabs', Promise.resolve({urlInfos: productTabs}));
+    shoppingServiceApi.setResultFor(
+        'getUrlInfosForRecentlyViewedTabs', Promise.resolve({urlInfos: []}));
+    // Mock that disclosure dialog should be shown.
+    shoppingServiceApi.setResultFor(
+        'maybeShowProductSpecificationDisclosure',
+        Promise.resolve({disclosureShown: true}));
+    createAppElement();
+
+    // Click on the "add column" button and select the first (only) item.
+    const newColSelector = appElement.$.newColumnSelector;
+    newColSelector.$.button.click();
+    await waitAfterNextRender(appElement);
+    const menu = newColSelector.$.productSelectionMenu;
+    const crActionMenu = menu.$.menu.get();
+    assertTrue(crActionMenu.open);
+    const dropdownItem =
+        crActionMenu.querySelector<HTMLElement>('.dropdown-item');
+    assertTrue(!!dropdownItem);
+    dropdownItem.click();
+    await waitAfterNextRender(appElement);
+
+    await shoppingServiceApi.whenCalled(
+        'maybeShowProductSpecificationDisclosure');
+    const showArgs =
+        shoppingServiceApi.getArgs('maybeShowProductSpecificationDisclosure');
+    assertEquals('https://example.com/', showArgs[0][0][0].url);
+    // Product spec set title will be empty by default.
+    assertEquals('', showArgs[0][1]);
+    assertEquals(
+        0, shoppingServiceApi.getCallCount('addProductSpecificationsSet'));
+  });
+
   test('add url for existing set', async () => {
     const dimensionValues = {
       summary: [],
@@ -926,6 +1034,11 @@ suite('AppTest', () => {
     assertArrayEquals(
         [{url: 'https://example.com/'}, {url: 'https://example.com/2'}],
         args[1]);
+    // We should not try to show the disclosure when there is an existing set.
+    assertEquals(
+        0,
+        shoppingServiceApi.getCallCount(
+            'maybeShowProductSpecificationDisclosure'));
   });
 
   test('name change updates page title', async () => {
@@ -1012,6 +1125,28 @@ suite('AppTest', () => {
     assertTrue(appElement.$.header.$.menuButton.disabled);
   });
 
+  test('show feedback loading state while loading', async () => {
+    const minLoadingAnimationMs = 10;
+    const promiseValues = createAppPromiseValues({
+      urlsParam: ['https://example.com/'],
+    });
+    createAppElementWithPromiseValues(promiseValues);
+    const feedbackButtonPlacholder =
+        appElement.shadowRoot!.querySelector('#feedbackLoading');
+    const feedbackButtons = appElement.$.feedbackButtons;
+    appElement.resetMinLoadingAnimationMsForTesting(minLoadingAnimationMs);
+    await flushTasks();
+
+    assertTrue(isVisible(feedbackButtonPlacholder));
+    assertFalse(isVisible(feedbackButtons));
+
+    // Wait for the loading animation to finish.
+    await new Promise(res => setTimeout(res, minLoadingAnimationMs));
+
+    assertFalse(isVisible(feedbackButtonPlacholder));
+    assertTrue(isVisible(feedbackButtons));
+  });
+
   test('updates on selection change', async () => {
     const urlsParam = ['https://example.com/', 'https://example2.com/'];
     const specsSetUrls =
@@ -1085,10 +1220,7 @@ suite('AppTest', () => {
 
     const uuid =
         shoppingServiceApi.getArgs('addProductSpecificationsSet')[0][2];
-    const header =
-        appElement.shadowRoot!.querySelector('product-specifications-header');
-    assertTrue(!!header);
-    header.dispatchEvent(new CustomEvent('delete-click'));
+    appElement.$.header.dispatchEvent(new CustomEvent('delete-click'));
 
     assertEquals(
         1, shoppingServiceApi.getCallCount('deleteProductSpecificationsSet'));
@@ -1104,11 +1236,8 @@ suite('AppTest', () => {
 
     const uuid =
         shoppingServiceApi.getArgs('addProductSpecificationsSet')[0][2];
-    const header =
-        appElement.shadowRoot!.querySelector('product-specifications-header');
-    assertTrue(!!header);
     const newName = 'new name';
-    header.dispatchEvent(
+    appElement.$.header.dispatchEvent(
         new CustomEvent('name-change', {detail: {name: newName}}));
 
     assertEquals(
@@ -1200,8 +1329,10 @@ suite('AppTest', () => {
       router.setResultFor('getCurrentQuery', '');
       createAppElement();
 
-      assertNotStyle($$(appElement, '#empty')!, 'display', 'none');
-      assertStyle($$(appElement, '#specs')!, 'display', 'none');
+      assertTrue(isVisible(appElement.$.empty));
+      assertFalse(isVisible(appElement.$.specs));
+      const footer = appElement.shadowRoot!.querySelector('#footer');
+      assertFalse(isVisible(footer));
     });
 
     test('hides empty state if app loads with urls', async () => {
@@ -1209,8 +1340,8 @@ suite('AppTest', () => {
       const promiseValues = createAppPromiseValues({urlsParam: urlsParam});
       await createAppElementWithPromiseValues(promiseValues);
 
-      assertStyle($$(appElement, '#empty')!, 'display', 'none');
-      assertNotStyle($$(appElement, '#specs')!, 'display', 'none');
+      assertFalse(isVisible(appElement.$.empty));
+      assertTrue(isVisible(appElement.$.specs));
     });
 
     test('hides empty state after product selection', async () => {
@@ -1248,8 +1379,8 @@ suite('AppTest', () => {
       await waitAfterNextRender(appElement);
 
       // The table should be updated with the selected URL.
-      assertStyle($$(appElement, '#empty')!, 'display', 'none');
-      assertNotStyle($$(appElement, '#specs')!, 'display', 'none');
+      assertFalse(isVisible(appElement.$.empty));
+      assertTrue(isVisible(appElement.$.specs));
       const tableColumns = appElement.$.summaryTable.columns;
       assertEquals(1, tableColumns.length);
       assertEquals(url, tableColumns[0]!.selectedItem.url);
@@ -1268,8 +1399,8 @@ suite('AppTest', () => {
       await createAppElementWithPromiseValues(promiseValues);
       const table = appElement.$.summaryTable;
       assertEquals(1, table.columns.length);
-      assertStyle($$(appElement, '#empty')!, 'display', 'none');
-      assertNotStyle($$(appElement, '#specs')!, 'display', 'none');
+      assertFalse(isVisible(appElement.$.empty));
+      assertTrue(isVisible(appElement.$.specs));
 
       table.dispatchEvent(new CustomEvent('url-remove', {
         detail: {
@@ -1282,8 +1413,164 @@ suite('AppTest', () => {
       await waitAfterNextRender(appElement);
 
       assertEquals(0, table.columns.length);
-      assertNotStyle($$(appElement, '#empty')!, 'display', 'none');
-      assertStyle($$(appElement, '#specs')!, 'display', 'none');
+      assertTrue(isVisible(appElement.$.empty));
+      assertFalse(isVisible(appElement.$.specs));
     });
+  });
+
+  suite('Offline', () => {
+    test('shows empty state and offline toast if app loads offline', () => {
+      router.setResultFor(
+          'getCurrentQuery',
+          new URLSearchParams(
+              'urls=' + JSON.stringify('https://example.com/')));
+      windowProxy.setResultFor('onLine', false);
+      createAppElement();
+
+      assertTrue(isVisible(appElement.$.empty));
+      assertTrue(appElement.$.offlineToast.open);
+    });
+
+    test(
+        `shows offline toast instead of making api call when
+                  #delete is clicked`,
+        async () => {
+          // Arrange.
+          const promiseValues = createAppPromiseValues({
+            urlsParam: ['https://example.com/'],
+            specsSet: createSpecsSet(),
+          });
+          await createAppElementWithPromiseValues(promiseValues);
+          windowProxy.setResultFor('onLine', false);
+          assertFalse(appElement.$.offlineToast.open);
+
+          // Act.
+          const header = appElement.$.header;
+          header.$.menuButton.click();
+          const menu = header.$.menu.$.menu;
+          const menuItemButton =
+              menu.get().querySelector<HTMLElement>('#delete');
+          assertTrue(!!menuItemButton);
+          menuItemButton.click();
+          await flushTasks();
+
+          // Assert.
+          assertTrue(appElement.$.offlineToast.open);
+          assertEquals(
+              0,
+              shoppingServiceApi.getCallCount(
+                  'deleteProductSpecificationsSet'));
+        });
+
+    test(
+        `shows offline toast instead of making api call when rename attempted`,
+        async () => {
+          // Arrange.
+          const promiseValues = createAppPromiseValues({
+            urlsParam: ['https://example.com/'],
+            specsSet: createSpecsSet(),
+          });
+          await createAppElementWithPromiseValues(promiseValues);
+          windowProxy.setResultFor('onLine', false);
+          assertFalse(appElement.$.offlineToast.open);
+
+          // Act.
+          const header = appElement.$.header;
+          header.$.menu.dispatchEvent(new CustomEvent('rename-click'));
+          await waitAfterNextRender(header);
+          const input = $$<CrInputElement>(header, '#input');
+          assertTrue(!!input);
+          input.value = 'foo';
+          input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));
+          await flushTasks();
+
+          // Assert.
+          assertTrue(appElement.$.offlineToast.open);
+          assertEquals(
+              0,
+              shoppingServiceApi.getCallCount(
+                  'setNameForProductSpecificationsSet'));
+        });
+
+    test('hides offline toast if app comes back online', () => {
+      windowProxy.setResultFor('onLine', false);
+      createAppElement();
+      assertTrue(appElement.$.offlineToast.open);
+
+      window.dispatchEvent(new Event('online'));
+
+      assertFalse(appElement.$.offlineToast.open);
+    });
+
+    test('hides offline toast if element is clicked', () => {
+      windowProxy.setResultFor('onLine', false);
+      createAppElement();
+      assertTrue(appElement.$.offlineToast.open);
+
+      appElement.click();
+
+      assertFalse(appElement.$.offlineToast.open);
+    });
+
+    test('shows offline toast post-click if it is re-triggered', async () => {
+      // Arrange.
+      const promiseValues = createAppPromiseValues(
+          {urlsParam: ['https://example.com/'], specsSet: createSpecsSet()});
+      await createAppElementWithPromiseValues(promiseValues);
+      windowProxy.setResultFor('onLine', false);
+      assertFalse(appElement.$.offlineToast.open);
+
+      // Act.
+      const openTabButton =
+          $$<HTMLElement>(appElement.$.summaryTable, '.open-tab-button');
+      assertTrue(!!openTabButton);
+      openTabButton.click();
+      await waitAfterNextRender(appElement);
+
+      // Assert.
+      assertTrue(appElement.$.offlineToast.open);
+      assertEquals(0, shoppingServiceApi.getCallCount('switchToOrOpenTab'));
+
+      // Act.
+      openTabButton.click();
+      await flushTasks();
+
+      // Assert.
+      assertTrue(appElement.$.offlineToast.open);
+      assertEquals(0, shoppingServiceApi.getCallCount('switchToOrOpenTab'));
+    });
+  });
+
+  test('sends feedback', async () => {
+    const urlsParam = ['https://example.com/'];
+    const promiseValues = createAppPromiseValues(
+        {urlsParam: urlsParam, specsSet: createSpecsSet()});
+    await createAppElementWithPromiseValues(promiseValues);
+
+    function updateCrFeedbackButtons(option: CrFeedbackOption) {
+      appElement.$.feedbackButtons.dispatchEvent(
+          new CustomEvent('selected-option-changed', {
+            bubbles: true,
+            composed: true,
+            detail: {value: option},
+          }));
+    }
+
+    updateCrFeedbackButtons(CrFeedbackOption.THUMBS_DOWN);
+    let feedbackArgs = await shoppingServiceApi.whenCalled(
+        'setProductSpecificationsUserFeedback');
+    assertEquals(UserFeedback.kThumbsDown, feedbackArgs);
+    shoppingServiceApi.resetResolver('setProductSpecificationsUserFeedback');
+
+    updateCrFeedbackButtons(CrFeedbackOption.THUMBS_UP);
+    feedbackArgs = await shoppingServiceApi.whenCalled(
+        'setProductSpecificationsUserFeedback');
+    assertEquals(UserFeedback.kThumbsUp, feedbackArgs);
+    shoppingServiceApi.resetResolver('setProductSpecificationsUserFeedback');
+
+    updateCrFeedbackButtons(CrFeedbackOption.UNSPECIFIED);
+    feedbackArgs = await shoppingServiceApi.whenCalled(
+        'setProductSpecificationsUserFeedback');
+    assertEquals(UserFeedback.kUnspecified, feedbackArgs);
   });
 });

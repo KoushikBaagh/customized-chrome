@@ -14,7 +14,6 @@
 #include "chrome/browser/lens/core/mojom/overlay_object.mojom.h"
 #include "chrome/browser/lens/core/mojom/text.mojom.h"
 #include "chrome/browser/themes/theme_service.h"
-#include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/exclusive_access/fullscreen_controller.h"
 #include "chrome/browser/ui/exclusive_access/fullscreen_observer.h"
 #include "chrome/browser/ui/lens/lens_overlay_colors.h"
@@ -74,6 +73,8 @@ class SyncService;
 namespace variations {
 class VariationsClient;
 }  // namespace variations
+
+enum class SidePanelEntryHideReason;
 
 class PrefService;
 class Profile;
@@ -143,10 +144,6 @@ class LensOverlayController : public LensSearchboxClient,
     // The selection type of the current Lens request, if any.
     lens::LensOverlaySelectionType lens_selection_type_;
   };
-
-  // Returns whether the Lens Overlay feature is enabled for this user profile
-  // and browser window.
-  static bool IsEnabled(Browser* browser);
 
   // Sets a region to search after the overlay loads, then calls ShowUI().
   // All units are in device pixels. region_bitmap contains the high definition
@@ -221,6 +218,11 @@ class LensOverlayController : public LensSearchboxClient,
   // `handler`.
   void SetSearchboxHandler(std::unique_ptr<RealboxHandler> handler);
 
+  // Passes ownership of the realbox handler to the search bubble controller.
+  // This is called by the WebUIController when the WebUI is executing
+  // javascript and has bound the handler.
+  void SetContextualSearchboxHandler(std::unique_ptr<RealboxHandler> handler);
+
   // This method is used to release the owned `SearchboxHandler`. It should be
   // called before the embedding web contents is destroyed since it contains a
   // reference to that web contents.
@@ -247,6 +249,12 @@ class LensOverlayController : public LensSearchboxClient,
 
     // Showing an overlay with results.
     kOverlayAndResults,
+
+    // Showing results with the overlay hidden and live page showing.
+    // TODO(b/357121367): Live page with results is no longer related to the
+    // overlay and therefore should not exist as a state of the overlay
+    // controller. Remove once we have a parent class that can handle this flow.
+    kLivePageAndResults,
 
     // The UI has been made inactive / backgrounded and is hidden. This differs
     // from kSuspended as the overlay and web view are not freed and could be
@@ -298,6 +306,10 @@ class LensOverlayController : public LensSearchboxClient,
   lens::LensOverlayEventHandler* lens_overlay_event_handler() {
     return lens_overlay_event_handler_.get();
   }
+
+  // Returns invocation time since epoch. Used to set up html source for metric
+  // logging.
+  uint64_t GetInvocationTimeSinceEpoch();
 
   // Testing helper method for checking view housing our overlay.
   views::View* GetOverlayViewForTesting();
@@ -351,6 +363,10 @@ class LensOverlayController : public LensSearchboxClient,
   // Sets whether the side panel should show a full error page.
   virtual void SetSidePanelShowErrorPage(bool should_show_error_page);
 
+  // Called before the lens results panel begins hiding. This is called before
+  // any side panel closing animations begin.
+  void OnSidePanelWillHide(SidePanelEntryHideReason reason);
+
   // Called when the lens side panel has been hidden.
   void OnSidePanelHidden();
 
@@ -382,7 +398,7 @@ class LensOverlayController : public LensSearchboxClient,
                                            int selection_end_index);
 
   // Testing function to issue a text request.
-  void RecordUkmLensOverlayInteractionForTesting(
+  void RecordUkmAndTaskCompletionForLensOverlayInteractionForTesting(
       lens::mojom::UserAction user_action);
 
   // Testing function to issue a translate request.
@@ -619,12 +635,6 @@ class LensOverlayController : public LensSearchboxClient,
   // Called when the UI needs to create the view to show in the overlay.
   std::unique_ptr<views::View> CreateViewForOverlay();
 
-  // Sets the action state for our toolbar entrypoint. This will set the toolbar
-  // to visible if it is active and not already visible to the user. When
-  // setting is_active to false, will remove from the toolbar if not pinned by
-  // the user.
-  void SetToolbarEntrypointActionState(bool is_active);
-
   // content::WebContentsDelegate:
   bool HandleContextMenu(content::RenderFrameHost& render_frame_host,
                          const content::ContextMenuParams& params) override;
@@ -721,7 +731,7 @@ class LensOverlayController : public LensSearchboxClient,
   void CopyText(const std::string& text) override;
   void CloseSearchBubble() override;
   void ClosePreselectionBubble() override;
-  void RecordUkmLensOverlayInteraction(
+  void RecordUkmAndTaskCompletionForLensOverlayInteraction(
       lens::mojom::UserAction user_action) override;
 
   // Performs shared logic for IssueTextSelectionRequest() and
@@ -893,6 +903,10 @@ class LensOverlayController : public LensSearchboxClient,
   // The time at which the overlay was invoked. Used to compute timing metrics.
   base::TimeTicks invocation_time_;
 
+  // The time at which the overlay was invoked, since epoch. Used to calculate
+  // timeToWebUIReady on the WebUI side.
+  base::Time invocation_time_since_epoch_;
+
   // ---------------Browser window scoped state: START---------------------
   // State that is scoped to the browser window must be reset when the tab is
   // backgrounded, since the tab may move between browser windows.
@@ -921,6 +935,10 @@ class LensOverlayController : public LensSearchboxClient,
 
   base::ScopedObservation<OmniboxTabHelper, OmniboxTabHelper::Observer>
       omnibox_tab_helper_observer_{this};
+
+  // Owns the search bubble that shows over the overlay, before the side panel
+  // is showing.
+  std::unique_ptr<lens::LensSearchBubbleController> search_bubble_controller_;
 
   // Searchbox handler for passing in image and text selections. The handler is
   // null if the WebUI containing the searchbox has not been initialized yet,
@@ -952,10 +970,6 @@ class LensOverlayController : public LensSearchboxClient,
   raw_ptr<views::View> overlay_view_;
   // Pointer to the web view within the overlay view if it exists.
   raw_ptr<views::WebView> overlay_web_view_;
-
-  // Owns the search bubble that shows over the overlay, before the side panel
-  // is showing.
-  std::unique_ptr<lens::LensSearchBubbleController> search_bubble_controller_;
 
   // Preselection toast bubble. Weak; owns itself. NULL when closed.
   raw_ptr<views::Widget> preselection_widget_ = nullptr;

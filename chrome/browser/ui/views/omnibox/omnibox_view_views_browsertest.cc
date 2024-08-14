@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
 
 #include <stddef.h>
@@ -488,14 +493,14 @@ IN_PROC_BROWSER_TEST_F(OmniboxViewViewsTest, CloseOmniboxPopupOnTextDrag) {
 
   // Simulate a mouse click before dragging the mouse.
   gfx::Point point(omnibox_view_views->origin() + gfx::Vector2d(10, 10));
-  ui::MouseEvent pressed(ui::ET_MOUSE_PRESSED, point, point,
+  ui::MouseEvent pressed(ui::EventType::kMousePressed, point, point,
                          ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
                          ui::EF_LEFT_MOUSE_BUTTON);
   omnibox_view_views->OnMousePressed(pressed);
   EXPECT_TRUE(omnibox_view->model()->PopupIsOpen());
 
   // Simulate a mouse drag of the omnibox text, and the omnibox should close.
-  ui::MouseEvent dragged(ui::ET_MOUSE_DRAGGED, point, point,
+  ui::MouseEvent dragged(ui::EventType::kMouseDragged, point, point,
                          ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON, 0);
   omnibox_view_views->OnMouseDragged(dragged);
 
@@ -648,7 +653,7 @@ IN_PROC_BROWSER_TEST_F(OmniboxViewViewsTest, FriendlyAccessibleLabel) {
   // Test friendly label.
   const int kFriendlyPrefixLength = match.description.size() + 1;
   ui::AXNodeData node_data;
-  omnibox_view_views->GetAccessibleNodeData(&node_data);
+  omnibox_view_views->GetViewAccessibility().GetAccessibleNodeData(&node_data);
   EXPECT_EQ(u"Google https://google.com location from history, 1 of 1",
             node_data.GetString16Attribute(ax::mojom::StringAttribute::kValue));
   // Selection offsets are moved over by length the inserted descriptive text

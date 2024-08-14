@@ -204,8 +204,13 @@ std::unique_ptr<SkiaImageRepresentation> SharedImageBacking::ProduceSkia(
     case gpu::GrContextType::kNone:
       // `kNone` signifies that the GPU process is being used only for WebGL via
       // SwiftShader. Skia is not initialized and should never be used in this
-      // case.
-      NOTREACHED_NORETURN();
+      // case but renderer/extension processes find out about software
+      // compositing fallback asynchronously. They could issue GPU work before
+      // finding out.
+      // TODO(crbug.com/335279173): This would never be reached if clients found
+      // out about compositing mode from the GPU process when they initialize a
+      // GPU channel.
+      return nullptr;
     case gpu::GrContextType::kGL:
     case gpu::GrContextType::kVulkan:
       return ProduceSkiaGanesh(manager, tracker, context_state);
@@ -248,13 +253,6 @@ std::unique_ptr<DawnImageRepresentation> SharedImageBacking::ProduceDawn(
 std::unique_ptr<OverlayImageRepresentation> SharedImageBacking::ProduceOverlay(
     SharedImageManager* manager,
     MemoryTypeTracker* tracker) {
-  return nullptr;
-}
-
-std::unique_ptr<VaapiImageRepresentation> SharedImageBacking::ProduceVASurface(
-    SharedImageManager* manager,
-    MemoryTypeTracker* tracker,
-    VaapiDependenciesFactory* dep_factory) {
   return nullptr;
 }
 

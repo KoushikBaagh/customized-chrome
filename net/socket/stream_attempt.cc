@@ -13,6 +13,7 @@
 #include "net/log/net_log.h"
 #include "net/log/net_log_with_source.h"
 #include "net/socket/stream_socket.h"
+#include "net/ssl/ssl_cert_request_info.h"
 
 namespace net {
 
@@ -58,7 +59,8 @@ StreamAttempt::~StreamAttempt() {
 }
 
 int StreamAttempt::Start(CompletionOnceCallback callback) {
-  net_log().BeginEvent(net_log_attempt_event_type_);
+  net_log().BeginEvent(net_log_attempt_event_type_,
+                       [&] { return GetNetLogStartParams(); });
 
   int rv = StartInternal();
   if (rv != ERR_IO_PENDING) {

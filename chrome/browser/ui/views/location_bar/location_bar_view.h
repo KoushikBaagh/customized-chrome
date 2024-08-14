@@ -71,6 +71,9 @@ class Label;
 //   The LocationBarView class is a View subclass that paints the background
 //   of the URL bar strip and contains its content.
 //
+//   This class can be used outside the context of a normal browser window. See
+//   PresentationReceiverWindowView and https://crbug.com/41351409 for details.
+//
 /////////////////////////////////////////////////////////////////////////////
 class LocationBarView
     : public LocationBar,
@@ -169,6 +172,10 @@ class LocationBarView
 
   OmniboxViewViews* omnibox_view() { return omnibox_view_; }
 
+  // Returns true if the location bar's current security state does not match
+  // the currently visible state.
+  bool HasSecurityStateChanged();
+
   // Updates the controller, and, if |contents| is non-null, restores saved
   // state that the tab holds.
   void Update(content::WebContents* contents);
@@ -202,7 +209,6 @@ class LocationBarView
   void AddedToWidget() override;
   void RemovedFromWidget() override;
   bool HasFocus() const override;
-  void GetAccessibleNodeData(ui::AXNodeData* node_data) override;
   gfx::Size GetMinimumSize() const override;
   gfx::Size CalculatePreferredSize(
       const views::SizeBounds& available_size) const override;
@@ -329,7 +335,6 @@ class LocationBarView
   void FocusSearch() override;
   void UpdateContentSettingsIcons() override;
   void SaveStateToContents(content::WebContents* contents) override;
-  const OmniboxView* GetOmniboxView() const override;
   LocationBarTesting* GetLocationBarForTesting() override;
   void OnChanged() override;
   void OnPopupVisibilityChanged() override;

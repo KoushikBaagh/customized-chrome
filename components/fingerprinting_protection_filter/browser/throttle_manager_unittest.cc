@@ -15,6 +15,7 @@
 #include "base/test/scoped_feature_list.h"
 #include "components/fingerprinting_protection_filter/browser/fingerprinting_protection_web_contents_helper.h"
 #include "components/fingerprinting_protection_filter/browser/test_support.h"
+#include "components/fingerprinting_protection_filter/common/fingerprinting_protection_filter_constants.h"
 #include "components/fingerprinting_protection_filter/common/fingerprinting_protection_filter_features.h"
 #include "components/privacy_sandbox/privacy_sandbox_features.h"
 #include "components/subresource_filter/content/shared/browser/child_frame_navigation_test_utils.h"
@@ -166,7 +167,8 @@ class ThrottleManagerTest
     // tests, to ensure that the NavigationSimulator properly runs all necessary
     // tasks while waiting for throttle checks to finish.
     dealer_handle_ = std::make_unique<VerifiedRulesetDealer::Handle>(
-        base::SingleThreadTaskRunner::GetCurrentDefault());
+        base::SingleThreadTaskRunner::GetCurrentDefault(),
+        kFingerprintingProtectionRulesetConfig);
     dealer_handle_->TryOpenAndSetRulesetFile(test_ruleset_pair_.indexed.path,
                                              /*expected_checksum=*/0,
                                              base::DoNothing());
@@ -175,7 +177,8 @@ class ThrottleManagerTest
 
     FingerprintingProtectionWebContentsHelper::CreateForWebContents(
         web_contents, test_support_->prefs(),
-        test_support_->tracking_protection_settings(), dealer_handle_.get());
+        test_support_->tracking_protection_settings(), dealer_handle_.get(),
+        /*is_incognito=*/false);
 
     Observe(web_contents);
 
@@ -621,17 +624,17 @@ TEST_P(ThrottleManagerEnabledTest, CreateHelperForWebContents) {
     // protection filter feature is not enabled.
     FingerprintingProtectionWebContentsHelper::CreateForWebContents(
         web_contents.get(), test_support.prefs(), tracking_protection_settings,
-        dealer_handle());
+        dealer_handle(), /*is_incognito=*/false);
     EXPECT_EQ(FingerprintingProtectionWebContentsHelper::FromWebContents(
                   web_contents.get()),
               nullptr);
   }
 
-  // If the fingerprinting protection filter feature is enabled,\
+  // If the fingerprinting protection filter feature is enabled,
   // CreateForWebContents() should create and attach an instance.
   FingerprintingProtectionWebContentsHelper::CreateForWebContents(
       web_contents.get(), test_support.prefs(), tracking_protection_settings,
-      dealer_handle());
+      dealer_handle(), /*is_incognito=*/false);
   auto* helper = FingerprintingProtectionWebContentsHelper::FromWebContents(
       web_contents.get());
   EXPECT_NE(helper, nullptr);
@@ -639,7 +642,7 @@ TEST_P(ThrottleManagerEnabledTest, CreateHelperForWebContents) {
   // A second call should not attach a different instance.
   FingerprintingProtectionWebContentsHelper::CreateForWebContents(
       web_contents.get(), test_support.prefs(), tracking_protection_settings,
-      dealer_handle());
+      dealer_handle(), /*is_incognito=*/false);
   EXPECT_EQ(FingerprintingProtectionWebContentsHelper::FromWebContents(
                 web_contents.get()),
             helper);

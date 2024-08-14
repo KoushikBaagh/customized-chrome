@@ -26,6 +26,7 @@ import org.chromium.chrome.browser.ui.android.webid.AccountSelectionProperties.I
 import org.chromium.chrome.browser.ui.android.webid.data.Account;
 import org.chromium.chrome.browser.ui.android.webid.data.ClientIdMetadata;
 import org.chromium.chrome.browser.ui.android.webid.data.IdentityCredentialTokenError;
+import org.chromium.chrome.browser.ui.android.webid.data.IdentityProviderData;
 import org.chromium.chrome.browser.ui.android.webid.data.IdentityProviderMetadata;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.image_fetcher.ImageFetcher;
@@ -77,6 +78,7 @@ public class AccountSelectionJUnitTestBase {
     GURL mTestUrlTermsOfService;
     GURL mTestUrlPrivacyPolicy;
     GURL mTestIdpBrandIconUrl;
+    GURL mTestRpBrandIconUrl;
     GURL mTestProfilePicUrl;
     GURL mTestConfigUrl;
     GURL mTestLoginUrl;
@@ -97,6 +99,9 @@ public class AccountSelectionJUnitTestBase {
     ModelList mSheetAccountItems;
     View mContentView;
     IdentityProviderMetadata mIdpMetadata;
+    IdentityProviderData mNewAccountsIdpSingleReturningAccount;
+    IdentityProviderData mNewAccountsIdpSingleNewAccount;
+    IdentityProviderData mNewAccountsIdpMultipleAccounts;
     AccountSelectionBottomSheetContent mBottomSheetContent;
     AccountSelectionMediator mMediator;
 
@@ -112,6 +117,7 @@ public class AccountSelectionJUnitTestBase {
         mTestUrlTermsOfService = JUnitTestGURLs.RED_1;
         mTestUrlPrivacyPolicy = JUnitTestGURLs.RED_2;
         mTestIdpBrandIconUrl = JUnitTestGURLs.RED_3;
+        mTestRpBrandIconUrl = JUnitTestGURLs.RED_3;
         mTestProfilePicUrl = new GURL("https://profile-picture.com");
         mTestConfigUrl = new GURL("https://idp.com/fedcm.json");
         mTestLoginUrl = new GURL("https://idp.com/login");
@@ -126,7 +132,8 @@ public class AccountSelectionJUnitTestBase {
                         "Ana",
                         mTestProfilePicUrl,
                         /* pictureBitmap= */ null,
-                        /* isSignIn= */ true);
+                        /* isSignIn= */ true,
+                        /* isBrowserTrustedSignIn= */ true);
         mBobAccount =
                 new Account(
                         "Bob",
@@ -135,7 +142,8 @@ public class AccountSelectionJUnitTestBase {
                         "",
                         mTestProfilePicUrl,
                         /* pictureBitmap= */ null,
-                        /* isSignIn= */ true);
+                        /* isSignIn= */ true,
+                        /* isBrowserTrustedSignIn= */ true);
         mCarlAccount =
                 new Account(
                         "Carl",
@@ -144,7 +152,8 @@ public class AccountSelectionJUnitTestBase {
                         ":)",
                         mTestProfilePicUrl,
                         /* pictureBitmap= */ null,
-                        /* isSignIn= */ true);
+                        /* isSignIn= */ true,
+                        /* isBrowserTrustedSignIn= */ true);
         mNewUserAccount =
                 new Account(
                         "602214076",
@@ -153,7 +162,8 @@ public class AccountSelectionJUnitTestBase {
                         "Sam",
                         mTestProfilePicUrl,
                         /* pictureBitmap= */ null,
-                        /* isSignIn= */ false);
+                        /* isSignIn= */ false,
+                        /* isBrowserTrustedSignIn= */ false);
         mNoOneAccount =
                 new Account(
                         "",
@@ -162,9 +172,14 @@ public class AccountSelectionJUnitTestBase {
                         "",
                         mTestProfilePicUrl,
                         /* pictureBitmap= */ null,
-                        /* isSignIn= */ true);
+                        /* isSignIn= */ true,
+                        /* isBrowserTrustedSignIn= */ true);
 
-        mClientIdMetadata = new ClientIdMetadata(mTestUrlTermsOfService, mTestUrlPrivacyPolicy);
+        mClientIdMetadata =
+                new ClientIdMetadata(
+                        mTestUrlTermsOfService,
+                        mTestUrlPrivacyPolicy,
+                        mTestRpBrandIconUrl.getSpec());
         mTokenError = new IdentityCredentialTokenError(TEST_ERROR_CODE, mTestErrorUrl);
         mTokenErrorEmptyUrl = new IdentityCredentialTokenError(TEST_ERROR_CODE, mTestEmptyErrorUrl);
 
@@ -176,6 +191,34 @@ public class AccountSelectionJUnitTestBase {
                         mTestConfigUrl,
                         mTestLoginUrl,
                         /* supportsAddAccount= */ false);
+
+        mNewAccountsIdpSingleReturningAccount =
+                new IdentityProviderData(
+                        mTestEtldPlusOne,
+                        new Account[] {mAnaAccount},
+                        mIdpMetadata,
+                        mClientIdMetadata,
+                        RpContext.SIGN_IN,
+                        /* requestPermission= */ true,
+                        /* hasLoginStatusMismatch= */ false);
+        mNewAccountsIdpSingleNewAccount =
+                new IdentityProviderData(
+                        mTestEtldPlusOne,
+                        new Account[] {mNewUserAccount},
+                        mIdpMetadata,
+                        mClientIdMetadata,
+                        RpContext.SIGN_IN,
+                        /* requestPermission= */ true,
+                        /* hasLoginStatusMismatch= */ false);
+        mNewAccountsIdpMultipleAccounts =
+                new IdentityProviderData(
+                        mTestEtldPlusOne,
+                        new Account[] {mAnaAccount, mBobAccount},
+                        mIdpMetadata,
+                        mClientIdMetadata,
+                        RpContext.SIGN_IN,
+                        /* requestPermission= */ true,
+                        /* hasLoginStatusMismatch= */ false);
 
         mActivityScenarioRule
                 .getScenario()
@@ -194,7 +237,12 @@ public class AccountSelectionJUnitTestBase {
                             mResources = activity.getResources();
                         });
 
-        mBottomSheetContent = new AccountSelectionBottomSheetContent(null, null, mRpMode);
+        mBottomSheetContent =
+                new AccountSelectionBottomSheetContent(
+                        /* contentView= */ null,
+                        /* bottomSheetController= */ null,
+                        /* scrollOffsetSupplier= */ null,
+                        mRpMode);
         mMediator =
                 new AccountSelectionMediator(
                         mTab,

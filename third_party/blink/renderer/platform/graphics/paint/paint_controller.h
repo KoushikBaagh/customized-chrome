@@ -27,7 +27,6 @@
 #include "third_party/blink/renderer/platform/heap/persistent.h"
 #include "third_party/blink/renderer/platform/platform_export.h"
 #include "third_party/blink/renderer/platform/wtf/hash_map.h"
-#include "third_party/blink/renderer/platform/wtf/vector.h"
 #include "third_party/skia/include/core/SkRefCnt.h"
 #include "ui/gfx/geometry/rect.h"
 
@@ -268,6 +267,8 @@ class PLATFORM_EXPORT PaintController
 
 #if DCHECK_IS_ON()
   void ShowCompactDebugData() const;
+  String DebugDataAsString(
+      DisplayItemList::JsonOption = DisplayItemList::kDefault) const;
   void ShowDebugData() const;
   void ShowDebugDataWithPaintRecords() const;
 #endif
@@ -382,7 +383,7 @@ class PLATFORM_EXPORT PaintController
   ALWAYS_INLINE bool IsCheckingUnderInvalidation() const;
 
 #if DCHECK_IS_ON()
-  void ShowDebugDataInternal(DisplayItemList::JsonFlags) const;
+  void ShowDebugDataInternal(DisplayItemList::JsonOption) const;
 #endif
 
   void SetBenchmarkMode(PaintBenchmarkMode);

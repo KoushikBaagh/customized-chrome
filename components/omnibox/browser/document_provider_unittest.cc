@@ -51,7 +51,7 @@ class FakeAutocompleteProviderClient : public MockAutocompleteProviderClient {
  public:
   FakeAutocompleteProviderClient() {
     set_template_url_service(
-        search_engines_test_environment_.ReleaseTemplateURLService());
+        search_engines_test_environment_.template_url_service());
     search_engines_test_environment_.pref_service()
         .registry()
         ->RegisterBooleanPref(omnibox::kDocumentSuggestEnabled, true);
@@ -148,8 +148,9 @@ class DocumentProviderTest : public testing::Test,
     std::vector<Summary> summaries;
     base::ranges::transform(
         matches, std::back_inserter(summaries), [](const auto& match) {
-          return Summary{match.contents, match.relevance,
-                         match.GetAdditionalInfo("from cache") == "true"};
+          return Summary{
+              match.contents, match.relevance,
+              match.GetAdditionalInfoForDebugging("from cache") == "true"};
         });
     return summaries;
   }

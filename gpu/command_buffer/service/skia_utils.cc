@@ -6,8 +6,11 @@
 
 #include "base/command_line.h"
 #include "base/logging.h"
+#include "base/trace_event/memory_dump_manager.h"
+#include "base/trace_event/process_memory_dump.h"
 #include "build/build_config.h"
 #include "gpu/command_buffer/service/feature_info.h"
+#include "gpu/command_buffer/service/graphite_image_provider.h"
 #include "gpu/command_buffer/service/shared_context_state.h"
 #include "gpu/config/gpu_finch_features.h"
 #include "gpu/config/gpu_switches.h"
@@ -22,7 +25,9 @@
 #include "third_party/skia/include/gpu/ganesh/gl/GrGLBackendSurface.h"
 #include "third_party/skia/include/gpu/ganesh/vk/GrVkBackendSurface.h"
 #include "third_party/skia/include/gpu/gl/GrGLTypes.h"
+#include "third_party/skia/include/gpu/graphite/Context.h"
 #include "third_party/skia/include/gpu/graphite/GraphiteTypes.h"
+#include "third_party/skia/include/gpu/graphite/Recorder.h"
 #include "third_party/skia/include/gpu/vk/VulkanTypes.h"
 #include "ui/base/ui_base_features.h"
 #include "ui/gfx/color_space.h"
@@ -144,6 +149,49 @@ skgpu::graphite::ContextOptions GetDefaultGraphiteContextOptions(
   options.fDisableCachedGlyphUploads = true;
 
   return options;
+}
+
+void DumpBackgroundGraphiteMemoryStatistics(
+    const skgpu::graphite::Context* context,
+    const skgpu::graphite::Recorder* recorder,
+    base::trace_event::ProcessMemoryDump* pmd) {
+  using base::trace_event::MemoryAllocatorDump;
+  static constexpr char kNamePurgeableSize[] = "purgeable_size";
+
+  std::string context_dump_name =
+      base::StringPrintf("skia/gpu_resources/graphite_context_0x%" PRIXPTR,
+                         reinterpret_cast<uintptr_t>(context));
+  MemoryAllocatorDump* context_dump =
+      pmd->CreateAllocatorDump(context_dump_name);
+  context_dump->AddScalar(MemoryAllocatorDump::kNameSize,
+                          MemoryAllocatorDump::kUnitsBytes,
+                          context->currentBudgetedBytes());
+  context_dump->AddScalar(kNamePurgeableSize, MemoryAllocatorDump::kUnitsBytes,
+                          context->currentPurgeableBytes());
+
+  std::string recorder_dump_name = base::StringPrintf(
+      "skia/gpu_resources/gpu_main_graphite_recorder_0x%" PRIXPTR,
+      reinterpret_cast<uintptr_t>(recorder));
+  MemoryAllocatorDump* recorder_dump =
+      pmd->CreateAllocatorDump(recorder_dump_name);
+  recorder_dump->AddScalar(MemoryAllocatorDump::kNameSize,
+                           MemoryAllocatorDump::kUnitsBytes,
+                           recorder->currentBudgetedBytes());
+  recorder_dump->AddScalar(kNamePurgeableSize, MemoryAllocatorDump::kUnitsBytes,
+                           recorder->currentPurgeableBytes());
+
+  // The ImageProvider's bytes are not included in the recorder's budgeted
+  // bytes as they are owned by Chrome, so dump them separately.
+  const auto* image_provider = static_cast<const gpu::GraphiteImageProvider*>(
+      recorder->clientImageProvider());
+  std::string image_provider_dump_name = base::StringPrintf(
+      "skia/gpu_resources/gpu_main_graphite_image_provider_0x%" PRIXPTR,
+      reinterpret_cast<uintptr_t>(image_provider));
+  MemoryAllocatorDump* image_provider_dump =
+      pmd->CreateAllocatorDump(image_provider_dump_name);
+  image_provider_dump->AddScalar(MemoryAllocatorDump::kNameSize,
+                                 MemoryAllocatorDump::kUnitsBytes,
+                                 image_provider->CurrentSizeInBytes());
 }
 
 GLuint GetGrGLBackendTextureFormat(

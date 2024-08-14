@@ -73,7 +73,6 @@ BASE_DECLARE_FEATURE(kNtpSharepointModule);
 BASE_DECLARE_FEATURE(kNtpShortcuts);
 BASE_DECLARE_FEATURE(kNtpHandleMostVisitedNavigationExplicitly);
 BASE_DECLARE_FEATURE(kNtpHistoryClustersModule);
-BASE_DECLARE_FEATURE(kNtpHistoryClustersModuleBeginTimeDuration);
 BASE_DECLARE_FEATURE(kNtpHistoryClustersModuleMinimumVisitsRequired);
 BASE_DECLARE_FEATURE(kNtpHistoryClustersModuleMinimumImagesRequired);
 BASE_DECLARE_FEATURE(kNtpHistoryClustersModuleCategories);
@@ -96,6 +95,7 @@ BASE_DECLARE_FEATURE(kNtpTabResumptionModuleCategories);
 BASE_DECLARE_FEATURE(kNtpTabResumptionModuleTimeLimit);
 BASE_DECLARE_FEATURE(kNtpWallpaperSearchButton);
 BASE_DECLARE_FEATURE(kNtpWallpaperSearchButtonAnimation);
+BASE_DECLARE_FEATURE(kNtpWallpaperSearchButtonAnimationShownThreshold);
 
 // Parameter for controlling the luminosity difference for NTP elements on light
 // backgrounds.
@@ -138,12 +138,6 @@ extern const char kNtpDriveModuleCacheMaxAgeSParam[];
 // Parameter for communicating the experiment group of the Drive module
 // experiment.
 extern const char kNtpDriveModuleExperimentGroupParam[];
-// Parameter determining the fake data to request to surface a particular
-// visual layout.
-extern const char kNtpHistoryClustersModuleDataParam[];
-// Parameter determining the fake data to request to surface a particular
-// cart tile layout in history cluster module.
-extern const char kNtpChromeCartInHistoryClustersModuleDataParam[];
 // Parameter determining the type of middle slot promo data to render.
 extern const char kNtpMiddleSlotPromoDismissalParam[];
 // Parameter determining the modules that are eligigle for HaTS.
@@ -209,6 +203,9 @@ extern const char kNtpTabResumptionModuleResultTypesParam[];
 // Parameter determining the recency of tabs in the Tab Resumption module.
 extern const char kNtpTabResumptionModuleTimeLimitParam[];
 extern const char kNtpTabResumptionModuleVisibilityThresholdDataParam[];
+// Parameter determining the number of times to animate the NTP Wallpaper Search
+// button.
+extern const char kNtpWallpaperSearchButtonAnimationShownThresholdParam[];
 // Parameter determining the trigger delay of the Wallpaper Search HaTS survey.
 extern const char kWallpaperSearchHatsDelayParam[];
 
@@ -246,11 +243,9 @@ int GetMultipleLoadedModulesMaxModuleInstanceCount();
 // Returns a list of module IDs ordered by how they should appear on the NTP.
 std::vector<std::string> GetModulesOrder();
 
-// Returns whether the NTP redesigned launchpad experience is enabled for the
-// given locale and country code.
-bool IsNtpModulesRedesignedEnabled(std::string application_locale,
-                                   std::string country_code);
-
+// Returns the maximum number of times to show animation for NTP wallpaper
+// search button.
+int GetWallpaperSearchButtonAnimationShownThreshold();
 }  // namespace ntp_features
 
 #endif  // COMPONENTS_SEARCH_NTP_FEATURES_H_

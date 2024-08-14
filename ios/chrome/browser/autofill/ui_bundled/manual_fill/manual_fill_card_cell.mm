@@ -290,9 +290,20 @@ CGFloat GPayIconTopAnchorOffset() {
   [self verticallyArrangeViews:card];
 
   if (IsKeyboardAccessoryUpgradeEnabled()) {
-    self.accessibilityLabel =
+    NSString* accessibilityLabel =
         [NSString stringWithFormat:@"%@, %@", cellIndexAccessibilityLabel,
                                    self.cardLabel.attributedText.string];
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+    if (ShouldShowGPayIcon(self.card.recordType)) {
+      accessibilityLabel =
+          [NSString stringWithFormat:@"%@, %@", accessibilityLabel,
+                                     l10n_util::GetNSString(
+                                         IDS_IOS_AUTOFILL_WALLET_SERVER_NAME)];
+    }
+#endif
+    GiveAccessibilityContextToCellAndButton(self, self.overflowMenuButton,
+                                            self.autofillFormButton,
+                                            accessibilityLabel);
   }
 }
 
@@ -373,13 +384,11 @@ CGFloat GPayIconTopAnchorOffset() {
     [self.contentView addSubview:self.cardholderButton];
   }
 
-  if (ShouldCreateAutofillFormButton(_showAutofillFormButton)) {
-    self.autofillFormButton = CreateAutofillFormButton();
-    [self.contentView addSubview:self.autofillFormButton];
-    [self.autofillFormButton addTarget:self
-                                action:@selector(onAutofillFormButtonTapped)
-                      forControlEvents:UIControlEventTouchUpInside];
-  }
+  self.autofillFormButton = CreateAutofillFormButton();
+  [self.contentView addSubview:self.autofillFormButton];
+  [self.autofillFormButton addTarget:self
+                              action:@selector(onAutofillFormButtonTapped)
+                    forControlEvents:UIControlEventTouchUpInside];
 
   [self horizontallyArrangeViews:expirationDateSeparatorLabel];
 }
@@ -447,10 +456,8 @@ CGFloat GPayIconTopAnchorOffset() {
                                      constant:GPayIconTopAnchorOffset()]];
   }
 
-  if (ShouldCreateAutofillFormButton(_showAutofillFormButton)) {
-    AppendHorizontalConstraintsForViews(
-        staticConstraints, @[ self.autofillFormButton ], self.layoutGuide);
-  }
+  AppendHorizontalConstraintsForViews(
+      staticConstraints, @[ self.autofillFormButton ], self.layoutGuide);
 
   // Without this set, Voice Over will read the content vertically instead of
   // horizontally.
@@ -658,10 +665,14 @@ CGFloat GPayIconTopAnchorOffset() {
   AddChipGroupsToVerticalLeadViews(@[ cardInfoGroupVerticalLeadChips ],
                                    verticalLeadViews);
 
-  if (ShouldCreateAutofillFormButton(_showAutofillFormButton)) {
+  if (_showAutofillFormButton) {
+    CHECK(IsKeyboardAccessoryUpgradeEnabled());
     AddViewToVerticalLeadViews(self.autofillFormButton,
                                ManualFillCellView::ElementType::kOther,
                                verticalLeadViews);
+    self.autofillFormButton.hidden = NO;
+  } else {
+    self.autofillFormButton.hidden = YES;
   }
 
   // Set and activate constraints.

@@ -4,15 +4,22 @@
 
 package org.chromium.chrome.browser.tasks.tab_management;
 
+import android.view.View;
+
+import androidx.core.util.Function;
+import androidx.core.util.Pair;
+
+import org.chromium.base.Callback;
+import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
 import org.chromium.ui.modelutil.PropertyKey;
 import org.chromium.ui.modelutil.PropertyModel;
+import org.chromium.ui.modelutil.PropertyModel.ReadableObjectPropertyKey;
+import org.chromium.ui.modelutil.PropertyModel.WritableObjectPropertyKey;
 
 class TabListContainerProperties {
     public static final PropertyModel.WritableBooleanPropertyKey BLOCK_TOUCH_INPUT =
-            new PropertyModel.WritableBooleanPropertyKey();
-
-    public static final PropertyModel.WritableBooleanPropertyKey IS_INCOGNITO =
             new PropertyModel.WritableBooleanPropertyKey();
 
     public static final PropertyModel.ReadableObjectPropertyKey<BrowserControlsStateProvider>
@@ -42,15 +49,29 @@ class TabListContainerProperties {
     public static final PropertyModel.WritableIntPropertyKey BOTTOM_PADDING =
             new PropertyModel.WritableIntPropertyKey();
 
+    /** Get root view for a given recycler view index. Can be null. */
+    public static final ReadableObjectPropertyKey<Callback<Function<Integer, View>>>
+            FETCH_VIEW_BY_INDEX_CALLBACK = new ReadableObjectPropertyKey<>();
+
+    /** Inclusive start and stop indexes for fully visible items. */
+    public static final ReadableObjectPropertyKey<Callback<Supplier<Pair<Integer, Integer>>>>
+            GET_VISIBLE_RANGE_CALLBACK = new ReadableObjectPropertyKey<>();
+
+    /** Whether the recycler view is currently being scrolled. */
+    public static final ReadableObjectPropertyKey<Callback<ObservableSupplier<Boolean>>>
+            IS_SCROLLING_SUPPLIER_CALLBACK = new WritableObjectPropertyKey<>();
+
     /** Keys for {@link TabSwitcherPaneCoordinator}. */
     public static final PropertyKey[] ALL_KEYS =
             new PropertyKey[] {
                 BLOCK_TOUCH_INPUT,
-                IS_INCOGNITO,
                 BROWSER_CONTROLS_STATE_PROVIDER,
                 INITIAL_SCROLL_INDEX,
                 MODE,
                 FOCUS_TAB_INDEX_FOR_ACCESSIBILITY,
                 BOTTOM_PADDING,
+                FETCH_VIEW_BY_INDEX_CALLBACK,
+                GET_VISIBLE_RANGE_CALLBACK,
+                IS_SCROLLING_SUPPLIER_CALLBACK,
             };
 }

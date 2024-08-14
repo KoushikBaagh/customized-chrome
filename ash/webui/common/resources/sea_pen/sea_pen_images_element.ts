@@ -11,6 +11,7 @@ import 'chrome://resources/ash/common/personalization/common.css.js';
 import 'chrome://resources/ash/common/personalization/personalization_shared_icons.html.js';
 import 'chrome://resources/ash/common/personalization/wallpaper.css.js';
 import 'chrome://resources/ash/common/sea_pen/sea_pen.css.js';
+import 'chrome://resources/ash/common/sea_pen/sea_pen_icons.html.js';
 import 'chrome://resources/ash/common/sea_pen/surface_effects/sparkle_placeholder.js';
 import 'chrome://resources/ash/common/cr_elements/cr_auto_img/cr_auto_img.js';
 import 'chrome://resources/ash/common/cr_elements/cr_icon_button/cr_icon_button.js';
@@ -33,7 +34,8 @@ import {logSeaPenTemplateFeedback, logSeaPenThumbnailClicked} from './sea_pen_me
 import {WithSeaPenStore} from './sea_pen_store.js';
 import {isNonEmptyArray, isPersonalizationApp, isSeaPenImageId} from './sea_pen_utils.js';
 
-const kLoadingPlaceholderCount = 8;
+const kFreeformLoadingPlaceholderCount = 4;
+const kTemplateLoadingPlaceholderCount = 8;
 
 type Tile = 'loading'|SeaPenThumbnail;
 
@@ -120,7 +122,7 @@ export class SeaPenImagesElement extends WithSeaPenStore {
         type: Array,
         value() {
           // Pre-populate the tiles with placeholders.
-          return new Array(kLoadingPlaceholderCount).fill('loading');
+          return new Array(kTemplateLoadingPlaceholderCount).fill('loading');
         },
       },
 
@@ -308,11 +310,15 @@ export class SeaPenImagesElement extends WithSeaPenStore {
       return;
     }
 
+    const placeholderCount = this.templateId === QUERY ?
+        kFreeformLoadingPlaceholderCount :
+        kTemplateLoadingPlaceholderCount;
+
     this.updateList(
         /*propertyPath=*/ 'tiles_',
         /*identityGetter=*/
         () => 'loading',
-        /*newList=*/ new Array(kLoadingPlaceholderCount).fill('loading'),
+        /*newList=*/ new Array(placeholderCount).fill('loading'),
         /*identityBasedUpdate=*/ false,
     );
   }

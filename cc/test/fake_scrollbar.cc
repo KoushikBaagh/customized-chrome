@@ -28,16 +28,7 @@ bool FakeScrollbar::IsSolidColor() const {
   return is_solid_color_;
 }
 
-SkColor4f FakeScrollbar::GetSolidColor() const {
-  DCHECK(IsSolidColor());
-  return solid_color_;
-}
-
 bool FakeScrollbar::IsOverlay() const { return is_overlay_; }
-
-bool FakeScrollbar::IsFluent() const {
-  return is_fluent_;
-}
 
 bool FakeScrollbar::IsRunningWebTest() const {
   return true;
@@ -83,11 +74,16 @@ float FakeScrollbar::Opacity() const {
   return thumb_opacity_;
 }
 
-bool FakeScrollbar::NeedsRepaintPart(ScrollbarPart part) const {
-  if (part == ScrollbarPart::kThumb) {
-    return needs_repaint_thumb_;
-  }
-  return needs_repaint_track_;
+bool FakeScrollbar::ThumbNeedsRepaint() const {
+  return thumb_needs_repaint_;
+}
+
+void FakeScrollbar::ClearThumbNeedsRepaint() {
+  set_thumb_needs_repaint(false);
+}
+
+bool FakeScrollbar::TrackAndButtonsNeedRepaint() const {
+  return track_and_buttons_need_repaint_;
 }
 
 bool FakeScrollbar::NeedsUpdateDisplay() const {
@@ -102,9 +98,16 @@ bool FakeScrollbar::HasTickmarks() const {
   return has_tickmarks_;
 }
 
-void FakeScrollbar::PaintPart(PaintCanvas* canvas,
-                              ScrollbarPart part,
-                              const gfx::Rect& rect) {
+void FakeScrollbar::PaintThumb(PaintCanvas& canvas, const gfx::Rect& rect) {
+  Paint(canvas, rect);
+}
+
+void FakeScrollbar::PaintTrackAndButtons(PaintCanvas& canvas,
+                                         const gfx::Rect& rect) {
+  Paint(canvas, rect);
+}
+
+void FakeScrollbar::Paint(PaintCanvas& canvas, const gfx::Rect& rect) {
   if (!should_paint_)
     return;
 
@@ -114,15 +117,11 @@ void FakeScrollbar::PaintPart(PaintCanvas* canvas,
   flags.setAntiAlias(false);
   flags.setColor(paint_fill_color());
   flags.setStyle(PaintFlags::kFill_Style);
-  canvas->drawRect(RectToSkRect(rect), flags);
+  canvas.drawRect(RectToSkRect(rect), flags);
 }
 
-void FakeScrollbar::ClearThumbNeedsRepaint() {
-  set_needs_repaint_thumb(false);
-}
-
-SkColor4f FakeScrollbar::FluentThumbColor() const {
-  return SkColor4f::FromColor(SK_ColorRED);
+SkColor4f FakeScrollbar::ThumbColor() const {
+  return thumb_color_;
 }
 
 bool FakeScrollbar::UsesNinePatchThumbResource() const {
@@ -135,6 +134,14 @@ gfx::Size FakeScrollbar::NinePatchThumbCanvasSize() const {
 
 gfx::Rect FakeScrollbar::NinePatchThumbAperture() const {
   return uses_nine_patch_thumb_resource_ ? gfx::Rect(0, 0, 5, 5) : gfx::Rect();
+}
+
+bool FakeScrollbar::UsesSolidColorThumb() const {
+  return uses_solid_color_thumb_;
+}
+
+gfx::Insets FakeScrollbar::SolidColorThumbInsets() const {
+  return gfx::Insets();
 }
 
 bool FakeScrollbar::UsesNinePatchTrackAndButtonsResource() const {

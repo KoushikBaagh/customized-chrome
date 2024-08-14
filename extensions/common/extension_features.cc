@@ -75,7 +75,7 @@ BASE_FEATURE(kExtensionIconVariants,
 
 BASE_FEATURE(kExtensionManifestV2DeprecationWarning,
              "ExtensionManifestV2DeprecationWarning",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kExtensionManifestV2ExceptionList,
              "ExtensionManifestV2ExceptionList",
@@ -125,6 +125,13 @@ BASE_FEATURE(kForceWebRequestProxyForTest,
 BASE_FEATURE(kLaunchWindowsNativeHostsDirectly,
              "LaunchWindowsNativeHostsDirectly",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+#if BUILDFLAG(IS_MAC)
+// TODO(crbug.com/357636604): Remove this feature flag in M132.
+BASE_FEATURE(kMacRejectFilePathsEndingWithSeparator,
+             "MacRejectFilePathsEndingWithSeparator",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+#endif
 
 BASE_FEATURE(kNewExtensionFaviconHandling,
              "ExtensionsNewFaviconHandling",

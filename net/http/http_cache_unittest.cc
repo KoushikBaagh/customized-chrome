@@ -496,11 +496,10 @@ void RangeTransactionServer::RangeHandler(const HttpRequestInfo* request,
   }
 
   std::vector<HttpByteRange> ranges;
-  std::string range_header;
-  if (!request->extra_headers.GetHeader(HttpRequestHeaders::kRange,
-                                        &range_header) ||
-      !HttpUtil::ParseRangeHeader(range_header, &ranges) || bad_200_ ||
-      ranges.size() != 1 ||
+  std::optional<std::string> range_header =
+      request->extra_headers.GetHeader(HttpRequestHeaders::kRange);
+  if (!range_header || !HttpUtil::ParseRangeHeader(*range_header, &ranges) ||
+      bad_200_ || ranges.size() != 1 ||
       (modified_ && request->extra_headers.HasHeader("If-Range"))) {
     // This is not a byte range request, or a failed If-Range. We return 200.
     response_status->assign("HTTP/1.1 200 OK");
@@ -1921,10 +1920,11 @@ TEST_F(HttpCacheTest, SimpleGET_UnusedSincePrefetch) {
   EXPECT_TRUE(response_info.was_cached);
 }
 
-// Tests that requests made with the LOAD_RESTRICTED_PREFETCH load flag result
-// in HttpResponseInfo entries with the |restricted_prefetch| flag set. Also
-// tests that responses with |restricted_prefetch| flag set can only be used by
-// requests that have the LOAD_CAN_USE_RESTRICTED_PREFETCH load flag.
+// Tests that requests made with the LOAD_RESTRICTED_PREFETCH_FOR_MAIN_FRAME
+// load flag result in HttpResponseInfo entries with the |restricted_prefetch|
+// flag set. Also tests that responses with |restricted_prefetch| flag set can
+// only be used by requests that have the
+// LOAD_CAN_USE_RESTRICTED_PREFETCH_FOR_MAIN_FRAME load flag.
 TEST_F(HttpCacheTest, SimpleGET_RestrictedPrefetchIsRestrictedUntilReuse) {
   MockHttpCache cache;
   HttpResponseInfo response_info;
@@ -1940,7 +1940,7 @@ TEST_F(HttpCacheTest, SimpleGET_RestrictedPrefetchIsRestrictedUntilReuse) {
   // A restricted prefetch is marked as |restricted_prefetch|.
   MockTransaction prefetch_transaction(kSimpleGET_Transaction);
   prefetch_transaction.load_flags |= LOAD_PREFETCH;
-  prefetch_transaction.load_flags |= LOAD_RESTRICTED_PREFETCH;
+  prefetch_transaction.load_flags |= LOAD_RESTRICTED_PREFETCH_FOR_MAIN_FRAME;
   RunTransactionTestWithResponseInfoAndGetTiming(
       cache.http_cache(), prefetch_transaction, &response_info,
       NetLogWithSource::Make(NetLogSourceType::NONE), nullptr);
@@ -1954,7 +1954,7 @@ TEST_F(HttpCacheTest, SimpleGET_RestrictedPrefetchIsRestrictedUntilReuse) {
   MockTransaction can_use_restricted_prefetch_transaction(
       kSimpleGET_Transaction);
   can_use_restricted_prefetch_transaction.load_flags |=
-      LOAD_CAN_USE_RESTRICTED_PREFETCH;
+      LOAD_CAN_USE_RESTRICTED_PREFETCH_FOR_MAIN_FRAME;
   RunTransactionTestWithResponseInfoAndGetTiming(
       cache.http_cache(), can_use_restricted_prefetch_transaction,
       &response_info, NetLogWithSource::Make(NetLogSourceType::NONE), nullptr);
@@ -1978,7 +1978,7 @@ TEST_F(HttpCacheTest, SimpleGET_RestrictedPrefetchReuseIsLimited) {
   // A restricted prefetch is marked as |restricted_prefetch|.
   MockTransaction prefetch_transaction(kSimpleGET_Transaction);
   prefetch_transaction.load_flags |= LOAD_PREFETCH;
-  prefetch_transaction.load_flags |= LOAD_RESTRICTED_PREFETCH;
+  prefetch_transaction.load_flags |= LOAD_RESTRICTED_PREFETCH_FOR_MAIN_FRAME;
   RunTransactionTestWithResponseInfoAndGetTiming(
       cache.http_cache(), prefetch_transaction, &response_info,
       NetLogWithSource::Make(NetLogSourceType::NONE), nullptr);
@@ -2038,7 +2038,8 @@ TEST_F(HttpCacheTest, PrefetchTruncateCancelInConnectedCallback) {
       "Content-Length: 20\n"
       "Etag: \"foopy\"\n";
   transaction.data = "01234567890123456789";
-  transaction.load_flags |= LOAD_PREFETCH | LOAD_CAN_USE_RESTRICTED_PREFETCH;
+  transaction.load_flags |=
+      LOAD_PREFETCH | LOAD_CAN_USE_RESTRICTED_PREFETCH_FOR_MAIN_FRAME;
 
   // Do a truncated read of a prefetch request.
   {
@@ -11955,9 +11956,9 @@ void HttpCacheHugeResourceTest::LargeResourceTransactionHandler(
     std::string* response_status,
     std::string* response_headers,
     std::string* response_data) {
-  std::string if_range;
-  if (!request->extra_headers.GetHeader(HttpRequestHeaders::kIfRange,
-                                        &if_range)) {
+  std::optional<std::string> if_range =
+      request->extra_headers.GetHeader(HttpRequestHeaders::kIfRange);
+  if (!if_range) {
     // If there were no range headers in the request, we are going to just
     // return the entire response body.
     *response_status = "HTTP/1.1 200 Success";
@@ -11970,11 +11971,10 @@ void HttpCacheHugeResourceTest::LargeResourceTransactionHandler(
   }
 
   // From this point on, we should be processing a valid byte-range request.
-  EXPECT_EQ("\"foo\"", if_range);
+  EXPECT_EQ("\"foo\"", *if_range);
 
-  std::string range_header;
-  EXPECT_TRUE(request->extra_headers.GetHeader(HttpRequestHeaders::kRange,
-                                               &range_header));
+  std::string range_header =
+      request->extra_headers.GetHeader(HttpRequestHeaders::kRange).value();
   std::vector<HttpByteRange> ranges;
 
   EXPECT_TRUE(HttpUtil::ParseRangeHeader(range_header, &ranges));

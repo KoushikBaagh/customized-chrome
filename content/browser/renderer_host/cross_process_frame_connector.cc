@@ -189,6 +189,7 @@ void CrossProcessFrameConnector::SynchronizeVisualProperties(
     const blink::FrameVisualProperties& visual_properties,
     bool propagate) {
   last_received_zoom_level_ = visual_properties.zoom_level;
+  last_received_css_zoom_factor_ = visual_properties.css_zoom_factor;
   last_received_local_frame_size_ = visual_properties.local_frame_size;
   screen_infos_ = visual_properties.screen_infos;
   local_surface_id_ = visual_properties.local_surface_id;
@@ -263,6 +264,7 @@ bool CrossProcessFrameConnector::TransformPointToCoordSpaceForView(
 
 void CrossProcessFrameConnector::ForwardAckedTouchpadZoomEvent(
     const blink::WebGestureEvent& event,
+    blink::mojom::InputEventResultSource ack_source,
     blink::mojom::InputEventResultState ack_result) {
   auto* root_view = GetRootRenderWidgetHostView();
   if (!root_view)
@@ -272,7 +274,7 @@ void CrossProcessFrameConnector::ForwardAckedTouchpadZoomEvent(
   const gfx::PointF root_point =
       view_->TransformPointToRootCoordSpaceF(event.PositionInWidget());
   root_event.SetPositionInWidget(root_point);
-  root_view->GestureEventAck(root_event, ack_result);
+  root_view->GestureEventAck(root_event, ack_source, ack_result);
 }
 
 bool CrossProcessFrameConnector::BubbleScrollEvent(
@@ -360,7 +362,8 @@ void CrossProcessFrameConnector::OnSynchronizeVisualProperties(
   if ((last_received_local_frame_size_ != visual_properties.local_frame_size ||
        screen_infos_.current() != visual_properties.screen_infos.current() ||
        capture_sequence_number() != visual_properties.capture_sequence_number ||
-       last_received_zoom_level_ != visual_properties.zoom_level) &&
+       last_received_zoom_level_ != visual_properties.zoom_level ||
+       last_received_css_zoom_factor_ != visual_properties.css_zoom_factor) &&
       local_surface_id_ == visual_properties.local_surface_id) {
     bad_message::ReceivedBadMessage(
         frame_proxy_in_parent_renderer_->GetProcess(),

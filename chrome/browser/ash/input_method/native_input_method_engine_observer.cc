@@ -139,7 +139,7 @@ bool IsPhysicalKeyboardAutocorrectEnabled(PrefService* prefs,
 
 bool IsPredictiveWritingEnabled(PrefService* pref_service,
                                 const std::string& engine_id) {
-  return (IsPredictiveWritingPrefEnabled(pref_service, engine_id) &&
+  return (IsPredictiveWritingPrefEnabled(*pref_service, engine_id) &&
           IsUsEnglishEngine(engine_id));
 }
 
@@ -480,8 +480,8 @@ mojom::PhysicalKeyEventPtr CreatePhysicalKeyEventFromKeyEvent(
   }
 
   return mojom::PhysicalKeyEvent::New(
-      event.type() == ui::ET_KEY_PRESSED ? mojom::KeyEventType::kKeyDown
-                                         : mojom::KeyEventType::kKeyUp,
+      event.type() == ui::EventType::kKeyPressed ? mojom::KeyEventType::kKeyDown
+                                                 : mojom::KeyEventType::kKeyUp,
       std::move(key), DomCodeToMojom(event.code()),
       ModifierStateFromEvent(event));
 }
@@ -1028,7 +1028,7 @@ void NativeInputMethodEngineObserver::OnKeyEvent(
       ShouldRouteToNativeMojoEngine(engine_id)) {
     if (IsInputMethodBound() && IsInputMethodConnected()) {
       // CharacterComposer only takes KEY_PRESSED events.
-      const bool filtered = event.type() == ui::ET_KEY_PRESSED &&
+      const bool filtered = event.type() == ui::EventType::kKeyPressed &&
                             character_composer_.FilterKeyPress(event);
 
       // Don't send dead keys to the system IME. Dead keys should be handled

@@ -5,7 +5,6 @@
 <translation id="1036348656032585052">Desaktibatu</translation>
 <translation id="1044891598689252897">Webguneek ohiko moduan funtzionatuko dute</translation>
 <translation id="1073417869336441572">Lagun iezaguzu Chrome hobetzen: esan iezaguzu zergatik eman duzun hirugarrenen cookieak erabiltzeko baimena. <ph name="BEGIN_LINK" />Bidali oharrak<ph name="END_LINK" /></translation>
-<translation id="1113435009358629918">Ezkutatu prezio-jaitsieraren txartela</translation>
 <translation id="1178581264944972037">Pausatu</translation>
 <translation id="1181037720776840403">Kendu</translation>
 <translation id="1192844206376121885"><ph name="ORIGIN" /> webguneak gordetako datu eta cookie guztiak ezabatuko dira.</translation>
@@ -24,6 +23,7 @@
 <translation id="1415402041810619267">URLa moztuta dago</translation>
 <translation id="1448064542941920355">Gutxitu zooma</translation>
 <translation id="146867109637325312">{COUNT,plural, =1{<ph name="SITE_COUNT" /> webgune}other{<ph name="SITE_COUNT" /> webgune}}</translation>
+<translation id="1500473259453106018">Ezkutatu fitxetako prezio-jaitsieren txartela</translation>
 <translation id="1510341833810331442">Webguneek ez dute zure gailuan datuak gordetzeko baimenik</translation>
 <translation id="1547123415014299762">Hirugarrenen cookieak onartzen dira</translation>
 <translation id="1568470248891039841">Bisitatzen dituzun webguneek beste webgune batzuetako edukia kapsula dezakete; adibidez, irudiak, iragarkiak eta testua. Halaber, webgune horiek arakatu bitartean zuri buruz gorde duten informazioa erabiltzeko baimena eska dezakete. <ph name="BEGIN_LINK" />Lortu eduki kapsulatuari buruzko informazio gehiago<ph name="END_LINK" /></translation>
@@ -91,7 +91,6 @@
 <translation id="2498359688066513246">Laguntza eta iritziak</translation>
 <translation id="2501278716633472235">Egin atzera</translation>
 <translation id="2546283357679194313">Cookieak eta webguneetako datuak</translation>
-<translation id="2550801787432930915">Prezio-jaitsieraren txartela</translation>
 <translation id="2570922361219980984">Kokapenerako sarbidea desaktibatuta dago gailu honetan ere. Aktiba ezazu <ph name="BEGIN_LINK" />Android-en ezarpenetan<ph name="END_LINK" />.</translation>
 <translation id="257931822824936280">Zabalduta; egin klik tolesteko.</translation>
 <translation id="2586657967955657006">Arbela</translation>
@@ -113,6 +112,7 @@
 <translation id="2891975107962658722">Ez utzi webgune bati zure gailuan datuak gordetzen</translation>
 <translation id="2903493209154104877">Helbideak</translation>
 <translation id="2910701580606108292">Webguneei eduki babestua erreproduzitzeko baimena eman aurretik, eskatu onespena</translation>
+<translation id="2918484639460781603">Joan ezarpenetara</translation>
 <translation id="2932883381142163287">Eman erabilera okerren berri</translation>
 <translation id="2939338015096024043">Aktibatuta dagoenean, webguneek kameraren posizioaren jarraipena egiteko eta zure inguruari buruzko informazioa lortzeko baimena eska dezakete. Desaktibatuta dagoenean, webguneek ezin dute egin kameraren posizioaren jarraipena, ezta zure inguruari buruzko informazioa lortu ere.</translation>
 <translation id="2968755619301702150">Ziurtagiri-ikustailea</translation>
@@ -133,6 +133,7 @@
 <translation id="3227137524299004712">Mikrofonoa</translation>
 <translation id="3232293466644486101">Ezabatu arakatze-datuak…</translation>
 <translation id="3242646949159196181">Aktibatuta dagoenean, webguneek soinua erreproduzi dezakete. Desaktibatuta dagoenean, webguneek ezin dute erreproduzitu soinurik.</translation>
+<translation id="3273479183583863618">Fitxetako prezio-jaitsierak</translation>
 <translation id="3277252321222022663">Eman sentsoreak erabiltzeko baimena webguneei (gomendatua)</translation>
 <translation id="3285500645985761267">Eman taldean egiten dituzun jarduerak ikusteko baimena erlazionatutako webguneei</translation>
 <translation id="3295019059349372795">11. kapitulua: Esmeraldazko Oz hiri harrigarria</translation>
@@ -161,6 +162,7 @@
 <translation id="3721953990244350188">Baztertu eta erakutsi erabilgarri dagoen hurrengo ekintza</translation>
 <translation id="3744111561329211289">Atzeko planoko sinkronizazioa</translation>
 <translation id="3763247130972274048">Sakatu birritan bideoaren ezkerreko edo eskuineko aldea 10 s saltatzeko</translation>
+<translation id="3779154269823594982">Aldatu pasahitzak</translation>
 <translation id="3797520601150691162">Ez aplikatu gai iluna webgune zehatz batean</translation>
 <translation id="3803367742635802571">Bisitatzen dituzun webguneek agian ez dute behar bezala funtzionatuko</translation>
 <translation id="3804247818991980532"><ph name="TYPE_1" />. <ph name="TYPE_2" />.</translation>
@@ -171,6 +173,7 @@
 <translation id="385051799172605136">Atzera</translation>
 <translation id="3859306556332390985">Aurreratu</translation>
 <translation id="3895926599014793903">Behartu zooma gaitzera</translation>
+<translation id="3905475044299942653">Gelditu gehiegizko jakinarazpenak</translation>
 <translation id="3908288065506437185">Blokeatu hirugarrenen cookieak ezkutuko moduan</translation>
 <translation id="3913461097001554748"><ph name="DOMAIN_URL" /> <ph name="SEPARATOR1" /> <ph name="DEVICE_NAME" /></translation>
 <translation id="3918378745482005425">Baliteke eginbide batzuek ez funtzionatzea. Erlazionatutako webguneek hirugarrenen cookieak erabili ahal izango dituzte.</translation>
@@ -218,6 +221,7 @@
 <translation id="4751476147751820511">Mugimenduaren eta argiaren sentsoreak</translation>
 <translation id="4755971844837804407">Aktibatuta dagoenean, webguneek edozein iragarki erakusteko aukera dute. Desaktibatuta dagoenean, webguneek ezin dituzte erakutsi iragarki oztopatzaileak edo engainagarriak.</translation>
 <translation id="4779083564647765204">Zooma</translation>
+<translation id="4807122856660838973">Aktibatu Arakatze segurua</translation>
 <translation id="4811450222531576619">Lortu haren iturburuari eta bertan jorratzen den gaiari buruzko informazio gehiago</translation>
 <translation id="4836046166855586901">Eman gailua erabiltzen ari zaren galdetzeko baimena webguneei</translation>
 <translation id="483914009762354899">Sartu domeinu honetako webgune guztiak</translation>
@@ -231,6 +235,7 @@
 <translation id="4994033804516042629">Ez da aurkitu kontakturik</translation>
 <translation id="4996978546172906250">Partekatu honen bidez:</translation>
 <translation id="5001526427543320409">Hirugarrenen cookieak</translation>
+<translation id="5007392906805964215">Berrikusi</translation>
 <translation id="5039804452771397117">Baimendu</translation>
 <translation id="5048398596102334565">Eman mugimendu-sentsoreak erabiltzeko baimena webguneei (gomendatua)</translation>
 <translation id="5050380848339752099">Webgunea informazioa partekatzera doa aplikazio batekin ezkutuko modutik kanpo.</translation>
@@ -346,7 +351,6 @@
 <translation id="6612358246767739896">Eduki babestua</translation>
 <translation id="662080504995468778">Jarraitu bertan</translation>
 <translation id="6653342741369270081">Pantaila osoko ikuspegitik irteteko, sakatu Atzera botoia.</translation>
-<translation id="6670377348676659110">{TILE_COUNT,plural, =1{Ezkutatu fitxa honekin aurrera egiteko aukera}other{Ezkutatu fitxa hauekin aurrera egiteko aukera}}</translation>
 <translation id="6689172468748959065">Profileko argazkiak</translation>
 <translation id="6697925417670533197">Deskarga aktiboak</translation>
 <translation id="6722828510648505498">Blokeatu identitate-zerbitzuek saioa hasteko bidalitako onarpen-mezuak.</translation>
@@ -356,7 +360,9 @@
 <translation id="6787751205395685251">Hautatu aukera bat <ph name="SITE_NAME" /> webgunerako</translation>
 <translation id="6790428901817661496">Erreproduzitu</translation>
 <translation id="6818926723028410516">Hautatu elementuak</translation>
+<translation id="6840760312327750441">Fitxak taldekatzeko, eduki fitxa bat sakatuta eta, ondoren, arrasta ezazu beste batera.</translation>
 <translation id="6864395892908308021">Gailu honek ezin du irakurri NFC</translation>
+<translation id="6870169401250095575">Ezkutatu segurtasun-egiaztapenaren txartela</translation>
 <translation id="6912998170423641340">Ez utzi webguneei arbeleko testua eta irudiak ikusten</translation>
 <translation id="6945221475159498467">Hautatu</translation>
 <translation id="6950072572526089586">Bisitatzen dituzun webguneek egiten ari zarenari buruzko informazioa gordetzen dute batzuetan, espero duzun moduan funtzionatu ahal izateko; adibidez, zure saioa hasita mantentzeko edo erosketa-saskian produktuak gordetzeko. Askotan, webguneek gailuan gordetzen dute informazio hori aldi baterako.</translation>
@@ -389,6 +395,7 @@
 <translation id="7366415735885268578">Gehitu webgune bat</translation>
 <translation id="7368695150573390554">Konexiorik gabeko datuak ezabatuko dira</translation>
 <translation id="7383715096023715447"><ph name="DOMAIN" /> domeinuaren ezarpenak</translation>
+<translation id="7399802613464275309">Segurtasun-egiaztapena</translation>
 <translation id="7406113532070524618">Ezarpen honek ez du zure identitatea desestaltzen, eta ez die uzten webguneei zure arakatze-historia ikusten, baina webguneek informazio pixka bat parteka dezakete, egiaztapena egiteko.</translation>
 <translation id="7423098979219808738">Galdetu lehenbizi</translation>
 <translation id="7423538860840206698">Blokeatuta dago arbeleko edukia irakurtzeko aukera</translation>
@@ -423,6 +430,7 @@
 <translation id="7986741934819883144">Hautatu kontaktu bat</translation>
 <translation id="7990211076305263060">Aktibatuta dagoenean, webguneek mikrofonoa erabiltzeko baimena eska dezakete. Desaktibatuta dagoenean, webguneek ezin dute erabili mikrofonoa.</translation>
 <translation id="8007176423574883786">Desaktibatu egin da gailu honetan</translation>
+<translation id="8010630645305864042">{TILE_COUNT,plural, =1{Ezkutatu fitxa honekin aurrera egiteko txartela}other{Ezkutatu fitxa hauekin aurrera egiteko txartela}}</translation>
 <translation id="802154636333426148">Ezin izan da deskargatu</translation>
 <translation id="8042586301629853791">Ordenatzeko irizpidea:</translation>
 <translation id="8067883171444229417">Erreproduzitu bideoa</translation>
@@ -511,5 +519,6 @@
 <translation id="9162462602695099906">Orri hau arriskutsua da</translation>
 <translation id="930525582205581608">Webgunea ahaztea nahi duzu?</translation>
 <translation id="947156494302904893">Bisitatzen dituzun webguneek benetako pertsona bat zarela eta robot bat ez zarela egiazta dezakete</translation>
+<translation id="959682366969460160">Antola zaitez</translation>
 <translation id="967624055006145463">Gordetako datuak</translation>
 </translationbundle>

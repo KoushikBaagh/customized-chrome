@@ -28,6 +28,7 @@
 #include "content/public/browser/preloading.h"
 #include "content/public/browser/weak_document_ptr.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/browser/web_contents_delegate.h"
 #include "third_party/blink/public/common/features.h"
 #include "third_party/blink/public/mojom/preloading/anchor_element_interaction_host.mojom.h"
 
@@ -181,10 +182,8 @@ PreloadingDecider::PreloadingDecider(RenderFrameHost* rfh)
             &OnPrefetchDestroyed, rfh->GetWeakDocumentPtr()));
   }
 
-  if (base::FeatureList::IsEnabled(features::kPrerender2NewLimitAndScheduler)) {
-    prerenderer_->SetPrerenderCancellationCallback(
-        base::BindRepeating(&OnPrerenderCanceled, rfh->GetWeakDocumentPtr()));
-  }
+  prerenderer_->SetPrerenderCancellationCallback(
+      base::BindRepeating(&OnPrerenderCanceled, rfh->GetWeakDocumentPtr()));
 }
 
 PreloadingDecider::~PreloadingDecider() = default;
@@ -362,8 +361,17 @@ void PreloadingDecider::UpdateSpeculationCandidates(
   preloading_data->SetIsNavigationInDomainCallback(
       content_preloading_predictor::kSpeculationRules,
       base::BindRepeating([](NavigationHandle* navigation_handle) -> bool {
+        // The page transition type check on activation can be relaxed by
+        // WebContentsDelegate. Calculating the navigation domain should follow
+        // the behavior. See comments in
+        // `AreInitialPrerenderNavigationParamsCompatibleWithNavigation()` on
+        // PrerenderHost for details.
         return ui::PageTransitionIsWebTriggerable(
-            navigation_handle->GetPageTransition());
+                   navigation_handle->GetPageTransition()) ||
+               navigation_handle->GetWebContents()
+                   ->GetDelegate()
+                   ->ShouldAllowPartialParamMismatchOfPrerender2(
+                       *navigation_handle);
       }));
   PredictorDomainCallback is_new_link_nav =
       base::BindRepeating([](NavigationHandle* navigation_handle) -> bool {
@@ -487,6 +495,7 @@ bool PreloadingDecider::MaybePrefetch(
       std::move(matched_candidate_pair.value().second), enacting_predictor);
 
   auto it = on_standby_candidates_.find(key);
+  CHECK(it != on_standby_candidates_.end());
   std::vector<blink::mojom::SpeculationCandidatePtr> candidates_for_key =
       std::move(it->second);
   RemoveStandbyCandidate(key);
@@ -616,6 +625,7 @@ std::pair<bool, bool> PreloadingDecider::MaybePrerender(
       result.first && PredictionOccursInOtherWebContents(*candidate);
 
   auto it = on_standby_candidates_.find(key);
+  CHECK(it != on_standby_candidates_.end());
   std::vector<blink::mojom::SpeculationCandidatePtr> processed =
       std::move(it->second);
   RemoveStandbyCandidate(it->first);

@@ -6,12 +6,17 @@
 #define CHROME_BROWSER_UI_VIEWS_SIDE_PANEL_READ_ANYTHING_READ_ANYTHING_SIDE_PANEL_CONTROLLER_H_
 
 #include "base/observer_list.h"
-#include "chrome/browser/ui/side_panel/side_panel_entry_observer.h"
-#include "chrome/browser/ui/views/side_panel/read_anything/read_anything_tab_helper.h"
+#include "chrome/browser/ui/views/side_panel/side_panel_entry_observer.h"
+
+class SidePanelRegistry;
 
 namespace content {
 class WebContents;
 }  // namespace content
+
+namespace tabs {
+class TabInterface;
+}  // namespace tabs
 
 namespace views {
 class View;
@@ -20,28 +25,28 @@ class View;
 class ReadAnythingUntrustedPageHandler;
 
 // A per-tab class that facilitates the showing of the Read Anything side panel.
-class ReadAnythingSidePanelController : public ReadAnythingTabHelper::Delegate,
-                                        public SidePanelEntryObserver {
+class ReadAnythingSidePanelController : public SidePanelEntryObserver {
  public:
   class Observer : public base::CheckedObserver {
    public:
     virtual void Activate(bool active) {}
     virtual void OnSidePanelControllerDestroyed() = 0;
   };
-  explicit ReadAnythingSidePanelController(content::WebContents* web_contents);
+  ReadAnythingSidePanelController(tabs::TabInterface* tab,
+                                  SidePanelRegistry* side_panel_registry);
   ReadAnythingSidePanelController(const ReadAnythingSidePanelController&) =
       delete;
   ReadAnythingSidePanelController& operator=(
       const ReadAnythingSidePanelController&) = delete;
   ~ReadAnythingSidePanelController() override;
 
-  // ReadAnythingTabHelper::Delegate:
-  void CreateAndRegisterEntry() override;
-  void DeregisterEntry() override;
+  // TODO(https://crbug.com/347770670): remove this.
+  void ResetForTabDiscard();
+
   void AddPageHandlerAsObserver(
-      base::WeakPtr<ReadAnythingUntrustedPageHandler> page_handler) override;
+      base::WeakPtr<ReadAnythingUntrustedPageHandler> page_handler);
   void RemovePageHandlerAsObserver(
-      base::WeakPtr<ReadAnythingUntrustedPageHandler> page_handler) override;
+      base::WeakPtr<ReadAnythingUntrustedPageHandler> page_handler);
 
   // SidePanelEntryObserver:
   void OnEntryShown(SidePanelEntry* entry) override;
@@ -58,7 +63,8 @@ class ReadAnythingSidePanelController : public ReadAnythingTabHelper::Delegate,
 
   base::ObserverList<ReadAnythingSidePanelController::Observer> observers_;
 
-  const raw_ptr<content::WebContents> web_contents_;
+  const raw_ptr<tabs::TabInterface> tab_;
+  raw_ptr<SidePanelRegistry> side_panel_registry_;
 };
 
 #endif  // CHROME_BROWSER_UI_VIEWS_SIDE_PANEL_READ_ANYTHING_READ_ANYTHING_SIDE_PANEL_CONTROLLER_H_

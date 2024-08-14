@@ -73,7 +73,9 @@ class BrowserTabStripController : public TabStripController,
   void ExtendSelectionTo(int model_index) override;
   void ToggleSelected(int model_index) override;
   void AddSelectionFromAnchorTo(int model_index) override;
-  bool BeforeCloseTab(int model_index, CloseTabSource source) override;
+  void OnCloseTab(int model_index,
+                  CloseTabSource source,
+                  base::OnceCallback<void()> callback) override;
   void CloseTab(int model_index) override;
   void ToggleTabAudioMute(int model_index) override;
   void AddTabToGroup(int model_index,
@@ -119,6 +121,9 @@ class BrowserTabStripController : public TabStripController,
   std::u16string GetAccessibleTabName(const Tab* tab) const override;
   Profile* GetProfile() const override;
   const Browser* GetBrowser() const override;
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  bool IsLockedForOnTask() override;
+#endif
 
   // TabStripModelObserver implementation:
   void OnTabStripModelChanged(

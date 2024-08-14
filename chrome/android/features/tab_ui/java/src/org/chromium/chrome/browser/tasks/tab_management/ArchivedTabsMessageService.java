@@ -33,6 +33,11 @@ import org.chromium.chrome.browser.tasks.tab_management.TabListCoordinator.TabLi
 import org.chromium.chrome.browser.tasks.tab_management.TabListModel.CardProperties.ModelType;
 import org.chromium.chrome.browser.tasks.tab_management.TabSwitcherMessageManager.MessageUpdateObserver;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
+import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter;
+import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter.HighlightParams;
+import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter.HighlightShape;
+import org.chromium.components.feature_engagement.Tracker;
+import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.ui.modelutil.PropertyModelChangeProcessor;
 
@@ -68,6 +73,7 @@ public class ArchivedTabsMessageService extends MessageService
                     mCustomCardView =
                             LayoutInflater.from(mContext)
                                     .inflate(R.layout.archived_tabs_message_card_view, null);
+                    mEndIconView = mCustomCardView.findViewById(R.id.end_image);
                     mCustomCardModel =
                             new PropertyModel.Builder(ArchivedTabsCardViewProperties.ALL_KEYS)
                                     .with(
@@ -107,11 +113,15 @@ public class ArchivedTabsMessageService extends MessageService
     private final @NonNull SnackbarManager mSnackbarManager;
     private final @NonNull TabCreator mRegularTabCreator;
     private final @NonNull BackPressManager mBackPressManager;
+    private final @NonNull ModalDialogManager mModalDialogManager;
+    private final @NonNull Tracker mTracker;
+    private final @NonNull Runnable mAppendMessageRunnable;
 
     private TabArchiveSettings mTabArchiveSettings;
     private ArchivedTabsDialogCoordinator mArchivedTabsDialogCoordinator;
     private TabModel mArchivedTabModel;
     private View mCustomCardView;
+    private View mEndIconView;
     private PropertyModel mCustomCardModel;
     private boolean mMessageSentToQueue;
     private OnTabSelectingListener mOnTabSelectingListener;
@@ -125,9 +135,11 @@ public class ArchivedTabsMessageService extends MessageService
             @NonNull ViewGroup rootView,
             @NonNull SnackbarManager snackbarManager,
             @NonNull TabCreator regularTabCreator,
-            @NonNull BackPressManager backPressManager) {
+            @NonNull BackPressManager backPressManager,
+            @NonNull ModalDialogManager modalDialogManager,
+            @NonNull Tracker tracker,
+            @NonNull Runnable appendMessageRunnable) {
         super(MessageType.ARCHIVED_TABS_MESSAGE);
-
         mContext = context;
         mArchivedTabModelOrchestrator = archivedTabModelOrchestrator;
         mBrowserControlsStateProvider = browserControlStateProvider;
@@ -137,6 +149,9 @@ public class ArchivedTabsMessageService extends MessageService
         mSnackbarManager = snackbarManager;
         mRegularTabCreator = regularTabCreator;
         mBackPressManager = backPressManager;
+        mModalDialogManager = modalDialogManager;
+        mTracker = tracker;
+        mAppendMessageRunnable = appendMessageRunnable;
 
         if (mArchivedTabModelOrchestrator.isTabModelInitialized()) {
             mArchivedTabModelOrchestratorObserver.onTabModelCreated(
@@ -151,6 +166,10 @@ public class ArchivedTabsMessageService extends MessageService
     public void destroy() {
         if (mTabArchiveSettings != null) {
             mTabArchiveSettings.removeObserver(mTabArchiveSettingsObserver);
+        }
+
+        if (mArchivedTabsDialogCoordinator != null) {
+            mArchivedTabsDialogCoordinator.destroy();
         }
     }
 
@@ -210,9 +229,20 @@ public class ArchivedTabsMessageService extends MessageService
         if (mMessageSentToQueue) return;
         if (mArchivedTabModel == null) return;
         if (mArchivedTabModel.getCount() <= 0) return;
+        if (TabArchiveSettings.getIphShownThisSession()) {
+            mEndIconView.post(
+                    () -> {
+                        HighlightParams params = new HighlightParams(HighlightShape.CIRCLE);
+                        params.setBoundsRespectPadding(false);
+                        ViewHighlighter.turnOnHighlight(mEndIconView, params);
+                        // Only highlight the view once per session.
+                    });
+            TabArchiveSettings.setIphShownThisSession(false);
+        }
         updateModelProperties();
         sendAvailabilityNotification(new ArchivedTabsMessageData(this));
         mMessageSentToQueue = true;
+        mAppendMessageRunnable.run();
     }
 
     @VisibleForTesting
@@ -226,7 +256,9 @@ public class ArchivedTabsMessageService extends MessageService
         if (mArchivedTabsDialogCoordinator == null) {
             createArchivedTabsDialogCoordinator();
         }
+        mTracker.notifyEvent("android_tab_declutter_button_clicked");
         mArchivedTabsDialogCoordinator.show(mOnTabSelectingListener);
+        ViewHighlighter.turnOffHighlight(mEndIconView);
     }
 
     private void createArchivedTabsDialogCoordinator() {
@@ -238,10 +270,12 @@ public class ArchivedTabsMessageService extends MessageService
                         mTabContentManager,
                         mTabListMode,
                         mRootView,
+                        mRootView.findViewById(R.id.tab_switcher_view_holder),
                         mSnackbarManager,
                         mRegularTabCreator,
                         mBackPressManager,
-                        mTabArchiveSettings);
+                        mTabArchiveSettings,
+                        mModalDialogManager);
     }
 
     private void updateModelProperties() {

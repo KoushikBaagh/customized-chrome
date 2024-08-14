@@ -652,6 +652,18 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Omnibox.CompanyEntityImageAblated" enum="Boolean"
+    expires_after="2025-08-04">
+  <owner>jennserrano@google.com</owner>
+  <owner>chrome-omnibox-team@google.com</owner>
+  <summary>
+    Records whether any company entity image was ablated. This histogram is
+    logged to once per autocomplete pass when there exists a suggestion of
+    entity type. Recorded after attempting to find matching domains between a
+    historical URL and a company entity website URI.
+  </summary>
+</histogram>
+
 <histogram name="Omnibox.CutOrCopyAllText" units="count"
     expires_after="2024-12-08">
   <owner>jdonnelly@chromium.org</owner>
@@ -888,16 +900,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Omnibox.FocusToEditTime" units="ms" expires_after="2022-06-30">
-  <owner>jdonnelly@chromium.org</owner>
-  <owner>mpearson@chromium.org</owner>
-  <owner>chrome-omnibox-team@google.com</owner>
-  <summary>
-    The length of time between when a user focused on the omnibox and first
-    modifies the omnibox.
-  </summary>
-</histogram>
-
 <histogram name="Omnibox.FocusToOpenTimeAnyPopupState3" units="ms"
     expires_after="2025-01-05">
   <owner>jdonnelly@chromium.org</owner>
@@ -1001,18 +1003,6 @@ chromium-metrics-reviews@google.com.
     Context: Fuzzy match conversion produces modified matches from other
     synchronous autocomplete providers (sub-providers) using alternative inputs:
     what the user might have typed, the automatic corrections.
-  </summary>
-</histogram>
-
-<histogram name="Omnibox.HoverTime" units="ms" expires_after="2021-10-31">
-  <owner>estark@chromium.org</owner>
-  <owner>carlosil@chromium.org</owner>
-  <summary>
-    The time duration that the user hovers the mouse over the omnibox before
-    exiting the hover or focusing the omnibox. Whenever the user's mouse enters
-    the omnibox, this histogram is recorded when the mouse next exits or the
-    omnibox is focused, whichever comes first. The recorded value is a delta
-    from a timestamp noted when the user's mouse first entered the omnibox.
   </summary>
 </histogram>
 
@@ -1328,26 +1318,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Omnibox.OnDeviceHeadSuggest.AsyncQueryTime" units="ms"
-    expires_after="2021-12-12">
-  <owner>cch@chromium.org</owner>
-  <owner>suggest-2g@google.com</owner>
-  <summary>
-    Time it takes for omnibox on device head provider to fulfill the
-    asynchronous suggest request.
-  </summary>
-</histogram>
-
-<histogram name="Omnibox.OnDeviceHeadSuggest.ResultCount" units="count"
-    expires_after="2021-12-12">
-  <owner>cch@chromium.org</owner>
-  <owner>suggest-2g@google.com</owner>
-  <summary>
-    The number of results returned by the on device head model which matches the
-    user input. Note all numbers greater than 5 are recorded in bucket 5.
-  </summary>
-</histogram>
-
 <histogram name="Omnibox.PaintTime" units="ms" expires_after="2025-01-05">
   <owner>manukh@chromium.org</owner>
   <owner>mpearson@chromium.org</owner>
@@ -1657,7 +1627,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Omnibox.SearchSuggest.Requests"
-    enum="SearchSuggestRequestEvent" expires_after="2024-11-17">
+    enum="SearchSuggestRequestEvent" expires_after="2025-01-26">
   <owner>mpearson@chromium.org</owner>
   <owner>jdonnelly@chromium.org</owner>
   <owner>cch@chromium.org</owner>
@@ -1668,7 +1638,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Omnibox.Shortcuts.NumberOfDuplicatesPerShortcutIterated"
-    units="matches" expires_after="2024-11-30">
+    units="matches" expires_after="2025-02-02">
   <owner>manukh@chromium.org</owner>
   <owner>chrome-omnibox-team@google.com</owner>
   <summary>
@@ -1689,7 +1659,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Omnibox.Shortcuts.NumberOfUniqueShortcutsIterated"
-    units="matches" expires_after="2024-11-30">
+    units="matches" expires_after="2025-02-02">
   <owner>manukh@chromium.org</owner>
   <owner>chrome-omnibox-team@google.com</owner>
   <summary>
@@ -2015,7 +1985,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Omnibox.SuggestionUsed.URL.Experimental.NavigationToFirstMeaningfulPaint"
-    units="ms" expires_after="2024-11-24">
+    units="ms" expires_after="2025-01-26">
   <owner>jdonnelly@chromium.org</owner>
   <owner>mpearson@chromium.org</owner>
   <owner>chrome-omnibox-team@google.com</owner>
@@ -2253,20 +2223,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Omnibox.TimeSpentBeforeDismissLens" units="ms"
-    expires_after="2022-06-26">
-  <owner>yusuyoutube@google.com</owner>
-  <owner>benwgold@google.com</owner>
-  <owner>fgorski@chromium.org</owner>
-  <owner>wylieb@chromium.org</owner>
-  <owner>lens-chrome@google.com</owner>
-  <summary>
-    Logs the elapsed time between the time when user enters the Google Lens and
-    the time when user dismisses Lens and returns to Chrome. Only logged on
-    Android.
-  </summary>
-</histogram>
-
 <histogram name="Omnibox.URLNavigationScheme" enum="NavigationScheme"
     expires_after="2024-12-08">
   <owner>mpearson@chromium.org</owner>
@@ -2343,10 +2299,12 @@ chromium-metrics-reviews@google.com.
 <!--
   Keep consistent:
   - omnibox_event.proto `ScoringSignals`
+  - omnibox_scoring_signals.proto `OmniboxScoringSignals`
   - autocomplete_scoring_model_handler.cc
     `AutocompleteScoringModelHandler::ExtractInputFromScoringSignals()`
   - autocomplete_match.cc `AutocompleteMatch::MergeScoringSignals()`
   - autocomplete_controller.cc `RecordScoringSignalCoverageForProvider()`
+  - omnibox_metrics_provider.cc `GetScoringSignalsForLogging()`
   - omnibox.mojom `struct Signals`
   - omnibox_page_handler.cc `TypeConverter<AutocompleteMatch::ScoringSignals,
     mojom::SignalsPtr>`
@@ -2386,12 +2344,23 @@ chromium-metrics-reviews@google.com.
                  'www'."/>
     <variant name="host_match_at_word_boundary"
         summary="One word matches host at a word boundary."/>
+    <variant name="is_answer_suggest"
+        summary="Whether this match is a Search suggestion that contains an
+                 answer."/>
+    <variant name="is_calculator_suggest"
+        summary="Whether this match is a CALCULATOR suggestion."/>
     <variant name="is_host_only"
         summary="URL points to the root page of a website, i.e., no query,
                  path words, or references after '/'."/>
+    <variant name="is_navsuggest"
+        summary="Whether this match is a NAVSUGGEST suggestion."/>
     <variant name="is_search_suggest_entity"
         summary="Whether this match is a Search suggestion that describes an
                  entity."/>
+    <variant name="is_search_suggest_tail"
+        summary="Whether this match is a SEARCH_SUGGEST_TAIL suggestion."/>
+    <variant name="is_verbatim"
+        summary="Whether this match is a verbatim suggestion."/>
     <variant name="length_of_url" summary="Length of url."/>
     <variant name="num_bookmarks_of_url"
         summary="Number of bookmarks for this profile with this URL."/>

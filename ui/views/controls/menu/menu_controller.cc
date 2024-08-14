@@ -592,7 +592,7 @@ void MenuController::Run(Widget* parent,
     View* root_view = parent->GetRootView();
     if (root_view) {
       event = static_cast<internal::RootView*>(root_view)->current_event();
-      if (event && event->type() == ui::ET_MOUSE_PRESSED) {
+      if (event && event->type() == ui::EventType::kMousePressed) {
         menu_start_mouse_press_loc_ = View::ConvertPointToScreen(
             static_cast<View*>(event->target()),
             static_cast<const ui::MouseEvent*>(event)->location());
@@ -1011,8 +1011,9 @@ void MenuController::OnGestureEvent(SubmenuView* source,
     owner()->OnGestureEvent(event);
 #endif  // defined(USE_AURA)
     // Reset |send_gesture_events_to_owner_| when the first gesture ends.
-    if (event->type() == ui::ET_GESTURE_END)
+    if (event->type() == ui::EventType::kGestureEnd) {
       send_gesture_events_to_owner_ = false;
+    }
     return;
   }
 
@@ -1027,10 +1028,10 @@ void MenuController::OnGestureEvent(SubmenuView* source,
   }
 
   MenuPart part = GetMenuPart(source, event->location());
-  if (event->type() == ui::ET_GESTURE_TAP_DOWN) {
+  if (event->type() == ui::EventType::kGestureTapDown) {
     SetSelectionOnPointerDown(source, event);
     event->StopPropagation();
-  } else if (event->type() == ui::ET_GESTURE_LONG_PRESS) {
+  } else if (event->type() == ui::EventType::kGestureLongPress) {
     if (part.type == MenuPartType::kMenuItem && part.menu) {
       if (ShowContextMenu(part.menu,
                           ConvertToScreen(*source, event->location()),
@@ -1038,7 +1039,7 @@ void MenuController::OnGestureEvent(SubmenuView* source,
         event->StopPropagation();
       }
     }
-  } else if (event->type() == ui::ET_GESTURE_TAP) {
+  } else if (event->type() == ui::EventType::kGestureTap) {
     if (!part.is_scroll() && part.menu &&
         !(part.should_submenu_show && part.menu->HasSubmenu())) {
       const int command = part.menu->GetCommand();
@@ -1058,7 +1059,7 @@ void MenuController::OnGestureEvent(SubmenuView* source,
                    SELECTION_OPEN_SUBMENU | SELECTION_UPDATE_IMMEDIATELY);
       event->StopPropagation();
     }
-  } else if (event->type() == ui::ET_GESTURE_TAP_CANCEL && part.menu &&
+  } else if (event->type() == ui::EventType::kGestureTapCancel && part.menu &&
              part.type == MenuPartType::kMenuItem) {
     // Move the selection to the parent menu so that the selection in the
     // current menu is unset. Make sure the submenu remains open by sending the
@@ -1081,7 +1082,7 @@ void MenuController::OnTouchEvent(SubmenuView* source, ui::TouchEvent* event) {
   if (owner_ && send_gesture_events_to_owner())
     return;
 
-  if (event->type() == ui::ET_TOUCH_PRESSED) {
+  if (event->type() == ui::EventType::kTouchPressed) {
     MenuPart part = GetMenuPart(source, event->location());
     if (part.type == MenuPartType::kNone) {
       if (MaybeForwardToAnnotation(source, *event)) {
@@ -1330,7 +1331,7 @@ ui::PostDispatchAction MenuController::OnWillDispatchKeyEvent(
   }
 
   base::WeakPtr<MenuController> this_ref = AsWeakPtr();
-  if (event->type() == ui::ET_KEY_PRESSED) {
+  if (event->type() == ui::EventType::kKeyPressed) {
     bool key_handled = false;
 #if BUILDFLAG(IS_MAC)
     // Special handling for Option-Up and Option-Down, which should behave like
@@ -1653,7 +1654,7 @@ void MenuController::StartDrag(SubmenuView* source,
 }
 
 bool MenuController::OnKeyPressed(const ui::KeyEvent& event) {
-  DCHECK_EQ(event.type(), ui::ET_KEY_PRESSED);
+  DCHECK_EQ(event.type(), ui::EventType::kKeyPressed);
 
   // Do not process while performing drag-and-drop.
   if (for_drop_)
@@ -2604,20 +2605,21 @@ gfx::Rect MenuController::CalculateBubbleMenuBounds(
     // First the size gets reduced to the possible space.
     const bool is_anchored_bubble = MenuItemView::IsBubble(state_.anchor);
     if (!monitor_bounds.IsEmpty()) {
-      int max_width = monitor_bounds.width();
-      int max_height = monitor_bounds.height();
+      int max_width = monitor_bounds.width() + border_insets.width();
+      int max_height = monitor_bounds.height() + border_insets.height();
       // In case of bubbles, the maximum width is limited by the space
       // between the display corner and the target area + the tip size.
       const bool is_bubble_menu =
           menu_config.use_bubble_border && corner_radius;
       if (is_anchored_bubble || is_bubble_menu ||
           item->actual_menu_position() == MenuPosition::kAboveBounds) {
-        // Don't consider `border_insets` because when the max size is enforced,
-        // the scroll view is shown and the md shadows are not applied.
+        // menu_size is expected to include not just the content size
+        // but also the (border and shadow) insets, which can go offscreen.
         max_height =
             std::max(anchor_bounds.y() - monitor_bounds.y(),
                      monitor_bounds.bottom() - anchor_bounds.bottom()) -
-            (is_bubble_menu ? 0 : menu_config.touchable_anchor_offset);
+            (is_bubble_menu ? 0 : menu_config.touchable_anchor_offset) +
+            border_insets.height();
       }
       // The menu should always have a non-empty available area.
       DCHECK_GE(max_width, kBubbleTipSizeLeftRight);
@@ -2679,14 +2681,16 @@ gfx::Rect MenuController::CalculateBubbleMenuBounds(
       case MenuAnchorPosition::kBubbleBottomLeft:
       case MenuAnchorPosition::kTopRight:
       case MenuAnchorPosition::kBottomCenter:
-        x = x_menu_on_left >= monitor_bounds.x() ? x_menu_on_left
-                                                 : x_menu_on_right;
+        x = x_menu_on_left + border_insets.left() >= monitor_bounds.x()
+                ? x_menu_on_left
+                : x_menu_on_right;
         break;
       case MenuAnchorPosition::kBubbleTopRight:
       case MenuAnchorPosition::kBubbleRight:
       case MenuAnchorPosition::kBubbleBottomRight:
       case MenuAnchorPosition::kTopLeft:
-        x = x_menu_on_right + menu_size.width() <= monitor_bounds.right()
+        x = x_menu_on_right + menu_size.width() - border_insets.right() <=
+            monitor_bounds.right()
                 ? x_menu_on_right
                 : x_menu_on_left;
         break;
@@ -2694,8 +2698,10 @@ gfx::Rect MenuController::CalculateBubbleMenuBounds(
 
     // Choose the most appropriate y coordinate.
     const bool able_to_show_menu_below =
-        y_menu_below + menu_size.height() <= monitor_bounds.bottom();
-    const bool able_to_show_menu_above = y_menu_above >= monitor_bounds.y();
+        y_menu_below + menu_size.height() - border_insets.bottom() <=
+        monitor_bounds.bottom();
+    const bool able_to_show_menu_above =
+        y_menu_above + border_insets.top() >= monitor_bounds.y();
     switch (state_.anchor) {
       case MenuAnchorPosition::kBubbleLeft:
       case MenuAnchorPosition::kBubbleRight:
@@ -2716,7 +2722,8 @@ gfx::Rect MenuController::CalculateBubbleMenuBounds(
           item->set_actual_menu_position(MenuPosition::kAboveBounds);
         } else {
           // No room above or below. Show the menu as low as possible.
-          y = monitor_bounds.bottom() - menu_size.height();
+          y = monitor_bounds.bottom() + border_insets.bottom() -
+              menu_size.height();
           item->set_actual_menu_position(MenuPosition::kBestFit);
         }
         break;
@@ -2734,7 +2741,7 @@ gfx::Rect MenuController::CalculateBubbleMenuBounds(
           item->set_actual_menu_position(MenuPosition::kBelowBounds);
         } else {
           // No room above or below. Show the menu as high as possible.
-          y = monitor_bounds.y();
+          y = monitor_bounds.y() - border_insets.top();
           item->set_actual_menu_position(MenuPosition::kBestFit);
         }
         break;
@@ -2763,6 +2770,7 @@ gfx::Rect MenuController::CalculateBubbleMenuBounds(
 
     const int width_with_right_inset =
         menu_size.width() - border_insets.right();
+    const int x_min = monitor_bounds.x() - border_insets.left();
     const int x_max = monitor_bounds.right() - width_with_right_inset;
     const int x_left = anchor_bounds.x() - width_with_right_inset +
                        menu_config.submenu_horizontal_overlap;
@@ -2772,7 +2780,7 @@ gfx::Rect MenuController::CalculateBubbleMenuBounds(
       if (monitor_bounds.width() == 0 || x_right <= x_max) {
         // Enough room on the right, show normally.
         x = x_right;
-      } else if (x_left >= monitor_bounds.x()) {
+      } else if (x_left >= x_min) {
         // Enough room on the left, show there.
         *resulting_direction = preferred_open_direction;
         x = x_left;
@@ -2781,7 +2789,7 @@ gfx::Rect MenuController::CalculateBubbleMenuBounds(
         x = x_max;
       }
     } else {
-      if (monitor_bounds.width() == 0 || x_left >= monitor_bounds.x()) {
+      if (monitor_bounds.width() == 0 || x_left >= x_min) {
         // Enough room on the left, show normally.
         x = x_left;
       } else if (x_right <= x_max) {
@@ -2793,7 +2801,7 @@ gfx::Rect MenuController::CalculateBubbleMenuBounds(
         x = x_right;
       } else {
         // No room on either side. Flush the menu to the left edge.
-        x = monitor_bounds.x();
+        x = x_min;
       }
     }
 
@@ -3178,13 +3186,13 @@ void MenuController::UpdateActiveMouseView(SubmenuView* event_source,
     if (active_mouse_view) {
       gfx::Point target_point(target_menu_loc);
       View::ConvertPointToTarget(target_menu, active_mouse_view, &target_point);
-      ui::MouseEvent mouse_entered_event(ui::ET_MOUSE_ENTERED, target_point,
-                                         target_point, ui::EventTimeForNow(), 0,
-                                         0);
+      ui::MouseEvent mouse_entered_event(ui::EventType::kMouseEntered,
+                                         target_point, target_point,
+                                         ui::EventTimeForNow(), 0, 0);
       active_mouse_view->OnMouseEntered(mouse_entered_event);
 
       ui::MouseEvent mouse_pressed_event(
-          ui::ET_MOUSE_PRESSED, target_point, target_point,
+          ui::EventType::kMousePressed, target_point, target_point,
           ui::EventTimeForNow(), event.flags(), event.changed_button_flags());
       active_mouse_view->OnMousePressed(mouse_pressed_event);
     }
@@ -3194,8 +3202,8 @@ void MenuController::UpdateActiveMouseView(SubmenuView* event_source,
     gfx::Point target_point(target_menu_loc);
     View::ConvertPointToTarget(target_menu, active_mouse_view, &target_point);
     ui::MouseEvent mouse_dragged_event(
-        ui::ET_MOUSE_DRAGGED, target_point, target_point, ui::EventTimeForNow(),
-        event.flags(), event.changed_button_flags());
+        ui::EventType::kMouseDragged, target_point, target_point,
+        ui::EventTimeForNow(), event.flags(), event.changed_button_flags());
     active_mouse_view->OnMouseDragged(mouse_dragged_event);
   }
 }
@@ -3208,8 +3216,8 @@ void MenuController::SendMouseReleaseToActiveView(SubmenuView* event_source,
 
   const gfx::Point target_loc = View::ConvertPointFromScreen(
       active_mouse_view, ConvertToScreen(*event_source, event.location()));
-  ui::MouseEvent release_event(ui::ET_MOUSE_RELEASED, target_loc, target_loc,
-                               ui::EventTimeForNow(), event.flags(),
+  ui::MouseEvent release_event(ui::EventType::kMouseReleased, target_loc,
+                               target_loc, ui::EventTimeForNow(), event.flags(),
                                event.changed_button_flags());
   // Reset the active mouse view before sending mouse released. That way if it
   // calls back to us, we aren't in a weird state.

@@ -449,7 +449,7 @@ void OptimizationGuideKeyedService::Initialize() {
       model_execution_features_controller_ = std::make_unique<
           optimization_guide::ModelExecutionFeaturesController>(
           profile->GetPrefs(), IdentityManagerFactory::GetForProfile(profile),
-          dogfood_status);
+          g_browser_process->local_state(), dogfood_status);
 
       // Don't create logs uploader service when feature is disabled. All the
       // logs upload get route through this service which exists one per
@@ -474,6 +474,10 @@ void OptimizationGuideKeyedService::Initialize() {
               model_quality_logs_uploader_service_
                   ? model_quality_logs_uploader_service_->GetWeakPtr()
                   : nullptr);
+
+      RecordModelExecutionFeatureSyntheticFieldTrial(
+          optimization_guide::UserVisibleFeatureKey::kHistorySearch,
+          "HistorySearch");
     }
   }
 
@@ -719,15 +723,6 @@ void OptimizationGuideKeyedService::
   model_quality_logs_uploader_service_ = std::move(uploader);
 }
 
-bool OptimizationGuideKeyedService::IsSettingVisible(
-    optimization_guide::UserVisibleFeatureKey feature) const {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!model_execution_features_controller_) {
-    return false;
-  }
-  return model_execution_features_controller_->IsSettingVisible(feature);
-}
-
 bool OptimizationGuideKeyedService::ShouldFeatureBeCurrentlyEnabledForUser(
     optimization_guide::UserVisibleFeatureKey feature) const {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
@@ -755,6 +750,15 @@ bool OptimizationGuideKeyedService::ShouldFeatureBeCurrentlyAllowedForFeedback(
   bool is_dogfood_client =
       !!variations_service && variations_service->IsLikelyDogfoodClient();
   return is_dogfood_client && ShouldFeatureBeCurrentlyEnabledForUser(feature);
+}
+
+bool OptimizationGuideKeyedService::IsSettingVisible(
+    optimization_guide::UserVisibleFeatureKey feature) const {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  if (!model_execution_features_controller_) {
+    return false;
+  }
+  return model_execution_features_controller_->IsSettingVisible(feature);
 }
 
 bool OptimizationGuideKeyedService::ShouldShowExperimentalAIPromo() const {
@@ -801,4 +805,14 @@ void OptimizationGuideKeyedService::RemoveModelExecutionSettingsEnabledObserver(
     return;
   }
   model_execution_features_controller_->RemoveObserver(observer);
+}
+
+void OptimizationGuideKeyedService::
+    RecordModelExecutionFeatureSyntheticFieldTrial(
+        optimization_guide::UserVisibleFeatureKey feature,
+        const std::string_view feature_name) {
+  ChromeMetricsServiceAccessor::RegisterSyntheticFieldTrial(
+      base::StrCat({"SyntheticModelExecutionFeature", feature_name}),
+      ShouldFeatureBeCurrentlyEnabledForUser(feature) ? "Enabled" : "Disabled",
+      variations::SyntheticTrialAnnotationMode::kCurrentLog);
 }

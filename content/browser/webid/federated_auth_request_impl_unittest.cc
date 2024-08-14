@@ -535,6 +535,8 @@ class TestIdpNetworkRequestManager : public MockIdpNetworkRequestManager {
 
   void FetchClientMetadata(const GURL& endpoint,
                            const std::string& client_id,
+                           int rp_brand_icon_ideal_size,
+                           int rp_brand_icon_minimum_size,
                            FetchClientMetadataCallback callback) override {
     ++num_fetched_[FetchedEndpoint::CLIENT_METADATA];
 
@@ -670,11 +672,14 @@ class IdpNetworkRequestManagerParamChecker
 
   void FetchClientMetadata(const GURL& endpoint,
                            const std::string& client_id,
+                           int rp_brand_icon_ideal_size,
+                           int rp_brand_icon_minimum_size,
                            FetchClientMetadataCallback callback) override {
     if (expected_client_id_)
       EXPECT_EQ(expected_client_id_, client_id);
-    TestIdpNetworkRequestManager::FetchClientMetadata(endpoint, client_id,
-                                                      std::move(callback));
+    TestIdpNetworkRequestManager::FetchClientMetadata(
+        endpoint, client_id, rp_brand_icon_ideal_size,
+        rp_brand_icon_minimum_size, std::move(callback));
   }
 
   void SendAccountsRequest(const GURL& accounts_url,
@@ -1651,7 +1656,7 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
     std::unique_ptr<WebContents> modal(CreateTestWebContents());
 
     base::RunLoop loop;
-    EXPECT_CALL(*weak_dialog_controller, ShowModalDialog(_, _))
+    EXPECT_CALL(*weak_dialog_controller, ShowModalDialog)
         .WillOnce(::testing::WithArg<0>([&modal, &loop](const GURL& url) {
           loop.Quit();
           return modal.get();
@@ -3649,6 +3654,8 @@ class IdpNetworkRequestManagerClientMetadataTaskRunner
 
   void FetchClientMetadata(const GURL& client_metadata_endpoint_url,
                            const std::string& client_id,
+                           int rp_brand_icon_ideal_size,
+                           int rp_brand_icon_minimum_size,
                            FetchClientMetadataCallback callback) override {
     // Make copies because running the task might destroy
     // FederatedAuthRequestImpl and invalidate the references.
@@ -3658,7 +3665,9 @@ class IdpNetworkRequestManagerClientMetadataTaskRunner
     if (client_metadata_task_)
       std::move(client_metadata_task_).Run();
     TestIdpNetworkRequestManager::FetchClientMetadata(
-        client_metadata_endpoint_url_copy, client_id_copy, std::move(callback));
+        client_metadata_endpoint_url_copy, client_id_copy,
+        rp_brand_icon_ideal_size, rp_brand_icon_minimum_size,
+        std::move(callback));
   }
 
  private:
@@ -5763,7 +5772,10 @@ TEST_F(FederatedAuthRequestImplTest, SuccessfulAuthZRequestNoPopUpWindow) {
 // windows.
 TEST_F(FederatedAuthRequestImplTest, SuccessfulAuthZRequestWithPopUpWindow) {
   base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmAuthz);
+  list.InitWithFeatures(
+      /*enabled_features=*/{features::kFedCmAuthz,
+                            features::kFedCmMetricsEndpoint},
+      /*disabled_features=*/{});
 
   RequestParameters parameters = kDefaultRequestParameters;
   parameters.identity_providers[0].fields = {"non_default_field"};
@@ -5776,6 +5788,12 @@ TEST_F(FederatedAuthRequestImplTest, SuccessfulAuthZRequestWithPopUpWindow) {
   // rather than the typical idtoken response.
   GURL continue_on = GURL(kProviderUrlFull).Resolve("/more-permissions.php");
   config.continue_on = std::move(continue_on);
+
+  std::unique_ptr<IdpNetworkRequestMetricsRecorder> unique_metrics_recorder =
+      std::make_unique<IdpNetworkRequestMetricsRecorder>();
+  IdpNetworkRequestMetricsRecorder* metrics_recorder =
+      unique_metrics_recorder.get();
+  SetNetworkRequestManager(std::move(unique_metrics_recorder));
 
   // Set up the UI dialog controller to show a pop-up window, rather
   // than the typical mediated authorization prompt that generates
@@ -5790,7 +5808,7 @@ TEST_F(FederatedAuthRequestImplTest, SuccessfulAuthZRequestWithPopUpWindow) {
   // producing an access token.
   std::unique_ptr<WebContents> modal(CreateTestWebContents());
   auto impl = federated_auth_request_impl_;
-  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog(_, _))
+  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog)
       .WillOnce(::testing::WithArg<0>([&modal, &impl](const GURL& url) {
         impl->OnResolve(GURL(kProviderUrlFull), std::nullopt,
                         "an-access-token");
@@ -5812,6 +5830,11 @@ TEST_F(FederatedAuthRequestImplTest, SuccessfulAuthZRequestWithPopUpWindow) {
       "Blink.FedCm.Timing.ContinueOn.TurnaroundTime", 1);
   histogram_tester_.ExpectTotalCount("Blink.FedCm.Timing.IdTokenResponse", 0);
   histogram_tester_.ExpectTotalCount("Blink.FedCm.Timing.TurnaroundTime", 0);
+
+  EXPECT_THAT(metrics_recorder->get_metrics_endpoints_notified_success(),
+              ElementsAre("https://idp.example/metrics"));
+  EXPECT_TRUE(
+      metrics_recorder->get_metrics_endpoints_notified_failure().empty());
 
   // When the authorization is delegated and the feature is enabled
   // we don't fetch the client metadata endpoint (which is used to
@@ -5848,7 +5871,7 @@ TEST_F(FederatedAuthRequestImplTest, ContinuationPopupCallingClose) {
   // producing an access token.
   std::unique_ptr<WebContents> modal(CreateTestWebContents());
   auto impl = federated_auth_request_impl_;
-  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog(_, _))
+  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog)
       .WillOnce(::testing::WithArg<0>([&modal, &impl](const GURL& url) {
         impl->OnClose();
         return modal.get();
@@ -6040,7 +6063,7 @@ TEST_F(FederatedAuthRequestImplTest, ButtonFlowWithUnknownLoginStatus) {
   SetDialogController(std::move(dialog_controller));
 
   // Check that the pop-up window is displayed.
-  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog(_, _))
+  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog)
       .WillOnce(Return(nullptr));
 
   RequestParameters parameters = kDefaultRequestParameters;
@@ -6069,7 +6092,7 @@ TEST_F(FederatedAuthRequestImplTest, ButtonFlowSkipsMismatchUI) {
       dialog_controller->AsWeakPtr();
   SetDialogController(std::move(dialog_controller));
   // Check that the pop-up window is displayed.
-  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog(_, _))
+  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog)
       .WillOnce(Return(nullptr));
 
   RequestParameters parameters = kDefaultRequestParameters;
@@ -6926,7 +6949,7 @@ TEST_F(FederatedAuthRequestImplTest, DomainHintInLoginUrl) {
 
   std::unique_ptr<WebContents> modal(CreateTestWebContents());
   GURL login_url;
-  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog(_, _))
+  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog)
       .WillOnce(::testing::WithArg<0>([&modal, &login_url](const GURL& url) {
         login_url = url;
         return modal.get();
@@ -6960,7 +6983,7 @@ TEST_F(FederatedAuthRequestImplTest, LoginHintInLoginUrl) {
 
   std::unique_ptr<WebContents> modal(CreateTestWebContents());
   GURL login_url;
-  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog(_, _))
+  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog)
       .WillOnce(::testing::WithArg<0>([&modal, &login_url](const GURL& url) {
         login_url = url;
         return modal.get();
@@ -6995,7 +7018,7 @@ TEST_F(FederatedAuthRequestImplTest, DomainHintAndLoginHintInLoginUrl) {
 
   std::unique_ptr<WebContents> modal(CreateTestWebContents());
   GURL login_url;
-  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog(_, _))
+  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog)
       .WillOnce(::testing::WithArg<0>([&modal, &login_url](const GURL& url) {
         login_url = url;
         return modal.get();
@@ -7035,7 +7058,7 @@ TEST_F(FederatedAuthRequestImplTest,
 
   std::unique_ptr<WebContents> modal(CreateTestWebContents());
   GURL login_url;
-  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog(_, _))
+  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog)
       .WillOnce(::testing::WithArg<0>([&modal, &login_url](const GURL& url) {
         login_url = url;
         return modal.get();
@@ -7070,7 +7093,7 @@ TEST_F(FederatedAuthRequestImplTest, DomainHintAddAccount) {
 
   std::unique_ptr<WebContents> modal(CreateTestWebContents());
   GURL login_url;
-  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog(_, _))
+  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog)
       .WillOnce(::testing::WithArg<0>([&modal, &login_url](const GURL& url) {
         login_url = url;
         return modal.get();
@@ -7083,7 +7106,7 @@ TEST_F(FederatedAuthRequestImplTest, DomainHintAddAccount) {
   EXPECT_EQ(login_url, kIdpLoginUrl);
 }
 
-// Test that auto re-authn in button mode does not show any UI.
+// Test that auto re-authn works in button mode.
 TEST_F(FederatedAuthRequestImplTest, AutoReauthnInButtonMode) {
   base::test::ScopedFeatureList list;
   list.InitAndEnableFeature(features::kFedCmButtonMode);
@@ -7102,13 +7125,13 @@ TEST_F(FederatedAuthRequestImplTest, AutoReauthnInButtonMode) {
   // The following checks work in button mode.
   EXPECT_CALL(*test_auto_reauthn_permission_delegate_,
               IsAutoReauthnEmbargoed(OriginFromString(kRpUrl)))
-      .Times(1);
+      .WillOnce(Return(false));
   EXPECT_CALL(*test_auto_reauthn_permission_delegate_,
               RequiresUserMediation(url::Origin::Create(GURL(kRpUrl))))
-      .Times(1);
+      .WillOnce(Return(false));
   EXPECT_CALL(*test_auto_reauthn_permission_delegate_,
               IsAutoReauthnSettingEnabled())
-      .Times(1);
+      .WillOnce(Return(true));
 
   static_cast<TestRenderFrameHost*>(web_contents()->GetPrimaryMainFrame())
       ->SimulateUserActivation();
@@ -7122,7 +7145,7 @@ TEST_F(FederatedAuthRequestImplTest, AutoReauthnInButtonMode) {
   EXPECT_EQ(all_accounts_for_display()[0].browser_trusted_login_state,
             LoginState::kSignIn);
   EXPECT_EQ(CountNumLoginStateIsSignin(), 1);
-  EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kExplicit);
+  EXPECT_EQ(dialog_controller_state_.sign_in_mode, SignInMode::kAuto);
 }
 
 // Test that IdP claimed SignUp takes precedence over browser observed SignIn.
@@ -7462,7 +7485,7 @@ TEST_F(FederatedAuthRequestImplTest, UseOtherAccountAccountOrder) {
   SetDialogController(std::move(dialog_controller));
 
   std::unique_ptr<WebContents> modal(CreateTestWebContents());
-  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog(_, _))
+  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog)
       .WillOnce(::testing::WithArg<0>([&modal, this](const GURL& url) {
         // The user signs in with account, kAccountIdPeter. User now has
         // accounts, kAccountIdNicolas, kAccountIdPeter and kAccountIdZach,
@@ -7501,7 +7524,7 @@ TEST_F(FederatedAuthRequestImplTest, UseOtherAccountMultipleNewAccounts) {
   SetDialogController(std::move(dialog_controller));
 
   std::unique_ptr<WebContents> modal(CreateTestWebContents());
-  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog(_, _))
+  EXPECT_CALL(*weak_dialog_controller, ShowModalDialog)
       .WillOnce(::testing::WithArg<0>([&modal, this](const GURL& url) {
         // The user signs in with kAccountIdNicolas and kAccountIdZach. User now
         // has accounts kAccountId, kAccountIdNicolas, and kAccountIdZach, in

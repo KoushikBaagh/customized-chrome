@@ -10,6 +10,7 @@
 #include "components/autofill/core/browser/autofill_ablation_study.h"
 #include "components/autofill/core/browser/autofill_compose_delegate.h"
 #include "components/autofill/core/browser/autofill_plus_address_delegate.h"
+#include "components/autofill/core/browser/autofill_prediction_improvements_delegate.h"
 #include "components/autofill/core/browser/filling_product.h"
 #include "components/autofill/core/browser/payments/credit_card_access_manager.h"
 #include "components/autofill/core/browser/payments/mandatory_reauth_manager.h"
@@ -77,6 +78,11 @@ AutofillPlusAddressDelegate* AutofillClient::GetPlusAddressDelegate() {
   return nullptr;
 }
 
+AutofillPredictionImprovementsDelegate*
+AutofillClient::GetAutofillPredictionImprovementsDelegate() {
+  return nullptr;
+}
+
 void AutofillClient::OfferPlusAddressCreation(
     const url::Origin& main_frame_origin,
     PlusAddressCallback callback) {}
@@ -85,13 +91,16 @@ payments::PaymentsAutofillClient* AutofillClient::GetPaymentsAutofillClient() {
   return nullptr;
 }
 
-AutofillOfferManager* AutofillClient::GetAutofillOfferManager() {
-  return nullptr;
-}
-
-const AutofillOfferManager* AutofillClient::GetAutofillOfferManager() const {
-  return const_cast<const AutofillOfferManager*>(
-      const_cast<AutofillClient*>(this)->GetAutofillOfferManager());
+const payments::PaymentsAutofillClient*
+AutofillClient::GetPaymentsAutofillClient() const {
+  // Gets a pointer to a non-const implementation of
+  // payments::PaymentsAutofillClient for the given platform this is called on,
+  // which is then converted to a pointer to a const implementation. The
+  // implementation returned will already be an existing object that is created
+  // when the given implementation of AutofillClient is created. If there is no
+  // payments::PaymentsAutofillClient for a given platform this will return
+  // nullptr.
+  return const_cast<AutofillClient*>(this)->GetPaymentsAutofillClient();
 }
 
 GeoIpCountryCode AutofillClient::GetVariationConfigCountryCode() const {
@@ -119,12 +128,6 @@ AutofillClient::CreateCreditCardInternalAuthenticator(AutofillDriver* driver) {
   return nullptr;
 }
 #endif
-
-bool AutofillClient::ShowTouchToFillIban(
-    base::WeakPtr<TouchToFillDelegate> delegate,
-    base::span<const autofill::Iban> ibans_to_suggest) {
-  return false;
-}
 
 LogManager* AutofillClient::GetLogManager() const {
   return nullptr;
@@ -174,11 +177,11 @@ base::span<const AutofillProfile> AutofillClient::GetTestAddresses() const {
   return {};
 }
 
-AutofillClient::PasswordFormType AutofillClient::ClassifyAsPasswordForm(
-    AutofillManager& manager,
-    FormGlobalId form_id,
-    FieldGlobalId field_id) const {
-  return PasswordFormType::kNoPasswordForm;
+AutofillClient::PasswordFormClassification
+AutofillClient::ClassifyAsPasswordForm(AutofillManager& manager,
+                                       FormGlobalId form_id,
+                                       FieldGlobalId field_id) const {
+  return {};
 }
 
 }  // namespace autofill

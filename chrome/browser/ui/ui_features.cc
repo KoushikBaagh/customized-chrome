@@ -29,17 +29,6 @@ BASE_FEATURE(kAllowEyeDropperWGCScreenCapture,
 #endif  // BUILDFLAG(IS_WIN)
 );
 
-#if !defined(ANDROID)
-// Enables experiment were the cast item in the app menu may be reordered and
-// its subgroup renamed.
-BASE_FEATURE(kCastAppMenuExperiment,
-             "CastAppMenuExperiment",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-const base::FeatureParam<bool> kCastListedFirst{&kCastAppMenuExperiment,
-                                                "cast_listed_first", false};
-
-#endif
-
 // Enables icon in titlebar for web apps.
 BASE_FEATURE(kWebAppIconInTitlebar,
              "WebAppIconInTitlebar",
@@ -113,11 +102,6 @@ BASE_FEATURE(kAccessCodeCastUI,
              "AccessCodeCastUI",
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
-
-// Enables showing the EV certificate details in the Page Info bubble.
-BASE_FEATURE(kEvDetailsInPageInfo,
-             "EvDetailsInPageInfo",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 // Enables the feature to remove the last confirmation dialog when relaunching
@@ -316,6 +300,14 @@ bool IsTabOrganization() {
   return base::FeatureList::IsEnabled(features::kTabOrganization);
 }
 
+BASE_FEATURE(kTabstripDeclutter,
+             "TabstripDeclutter",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+bool IsTabstripDeclutter() {
+  return base::FeatureList::IsEnabled(features::kTabstripDeclutter);
+}
+
 BASE_FEATURE(kMultiTabOrganization,
              "MultiTabOrganization",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -453,10 +445,6 @@ BASE_FEATURE(kViewsFirstRunDialog,
              "ViewsFirstRunDialog",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kViewsTaskManager,
-             "ViewsTaskManager",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 BASE_FEATURE(kViewsJSAppModalDialog,
              "ViewsJSAppModalDialog",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -473,5 +461,7 @@ BASE_FEATURE(kUsePortalAccentColor,
              "UsePortalAccentColor",
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
+
+BASE_FEATURE(kCompactMode, "CompactMode", base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace features

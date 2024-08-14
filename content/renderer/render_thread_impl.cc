@@ -39,6 +39,7 @@
 #include "base/metrics/histogram_macros_local.h"
 #include "base/observer_list.h"
 #include "base/path_service.h"
+#include "base/process/process.h"
 #include "base/process/process_metrics.h"
 #include "base/ranges/algorithm.h"
 #include "base/run_loop.h"
@@ -668,6 +669,10 @@ void RenderThreadImpl::Init() {
 }
 
 RenderThreadImpl::~RenderThreadImpl() {
+  // The destructor should not run in multi-process mode because Shutdown()
+  // terminates the process. The destructor only needs to clean up for tests.
+  CHECK(IsSingleProcess());
+
   g_main_task_runner.Get() = nullptr;
 
   // Need to make sure this reference is removed on the correct task runner;
@@ -1352,6 +1357,9 @@ void RenderThreadImpl::SetProcessState(
       restrict_thread_pool_.emplace();
     }
   }
+  if (base::FeatureList::IsEnabled(features::kSetIsolatesPriority)) {
+    blink::WebV8Features::SetIsolatePriority(process_priority);
+  }
 
   if (!process_priority_.has_value() || is_backgrounded != was_backgrounded) {
     if (is_backgrounded) {
@@ -1381,9 +1389,7 @@ void RenderThreadImpl::SetProcessState(
 }
 
 void RenderThreadImpl::SetBatterySaverMode(bool battery_saver_mode_enabled) {
-  if (base::FeatureList::IsEnabled(features::kBatterySaverModeRenderTuning)) {
-    blink::SetBatterySaverModeForAllIsolates(battery_saver_mode_enabled);
-  }
+  blink::SetBatterySaverModeForAllIsolates(battery_saver_mode_enabled);
 }
 
 void RenderThreadImpl::SetIsLockedToSite() {
@@ -1484,9 +1490,21 @@ void RenderThreadImpl::TransferSharedLastForegroundTime(
     base::ReadOnlySharedMemoryRegion last_foreground_time_region) {
   last_foreground_time_mapping_ = last_foreground_time_region.Map();
   CHECK(last_foreground_time_mapping_.IsValid());
-  base::internal::SetSharedLastForegroundTimeForMetrics(
-      last_foreground_time_mapping_
-          .GetMemoryAs<std::atomic<base::TimeTicks>>());
+
+  if (!IsSingleProcess()) {
+    // The pointer will only be valid until `last_foreground_time_mapping_` is
+    // unmapped. In multi-process mode, that's on process exit, so it's safe to
+    // save the pointer and never reset it. In single-process mode, it's
+    // important that other threads not have a copy of the pointer after `this`
+    // is destroyed. But also, since base stores the pointer in a per-process
+    // global, in single-process-mode each RenderThreadImpl would overwrite it
+    // and the stored value would be wrong for most "renderers" anyway. So the
+    // easiest way to avoid accessing the pointer after it's unmapped is to
+    // never set it in the first place.
+    base::internal::SetSharedLastForegroundTimeForMetrics(
+        last_foreground_time_mapping_
+            .GetMemoryAs<std::atomic<base::TimeTicks>>());
+  }
 }
 
 void RenderThreadImpl::OnNetworkConnectionChanged(
@@ -1694,7 +1712,10 @@ bool RenderThreadImpl::RendererIsHidden() const {
 }
 
 void RenderThreadImpl::OnRendererHidden() {
-  blink::IsolateInBackgroundNotification();
+  if (!base::FeatureList::IsEnabled(features::kSetIsolatesPriority)) {
+    blink::WebV8Features::SetIsolatePriority(
+        base::Process::Priority::kBestEffort);
+  }
 
   // TODO(rmcilroy): Remove IdleHandler and replace it with an IdleTask
   // scheduled by the RendererScheduler - http://crbug.com/469210.
@@ -1704,7 +1725,10 @@ void RenderThreadImpl::OnRendererHidden() {
 }
 
 void RenderThreadImpl::OnRendererVisible() {
-  blink::IsolateInForegroundNotification();
+  if (!base::FeatureList::IsEnabled(features::kSetIsolatesPriority)) {
+    blink::WebV8Features::SetIsolatePriority(
+        base::Process::Priority::kUserBlocking);
+  }
 
   if (!GetContentClient()->renderer()->RunIdleHandlerWhenWidgetsHidden())
     return;

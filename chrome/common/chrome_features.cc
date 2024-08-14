@@ -222,10 +222,6 @@ BASE_FEATURE(kDMServerOAuthForChildUser,
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
-BASE_FEATURE(kEnableWatermarkView,
-             "EnableWatermarkView",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 #if !BUILDFLAG(IS_ANDROID)
 // Whether to allow installed-by-default web apps to be installed or not.
 BASE_FEATURE(kPreinstalledWebAppInstallation,
@@ -426,7 +422,7 @@ BASE_FEATURE(kHappinessTrackingSurveysConfiguration,
 
 const base::FeatureParam<std::string> kHappinessTrackingSurveysHostedUrl{
     &kHappinessTrackingSurveysConfiguration, "custom-url",
-    "https://www.google.com/chrome/hats/index.html"};
+    "https://www.google.com/chrome/hats/index_m129.html"};
 
 // Enables or disables the Happiness Tracking System for COEP issues in Chrome
 // DevTools on Desktop.
@@ -457,27 +453,6 @@ BASE_FEATURE(kHaTSDesktopDevToolsIssuesHeavyAd,
 BASE_FEATURE(kHaTSDesktopDevToolsIssuesCSP,
              "HaTSDesktopDevToolsIssuesCSP",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables or disables the Happiness Tracking System for Chrome extensions page.
-BASE_FEATURE(kHappinessTrackingSurveysExtensionsSafetyHub,
-             "HappinessTrackingSurveysExtensionsSafetyHub",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-const base::FeatureParam<ExtensionsSafetyHubHaTSArms>::Option survey_arms[] = {
-    {ExtensionsSafetyHubHaTSArms::kReviewPanelNotShown, "0"},
-    {ExtensionsSafetyHubHaTSArms::kReviewPanelShown, "1"},
-    {ExtensionsSafetyHubHaTSArms::kReviewPanelInteraction, "2"}};
-const base::FeatureParam<base::TimeDelta>
-    kHappinessTrackingSurveysExtensionsSafetyHubTime{
-        &kHappinessTrackingSurveysExtensionsSafetyHub, "settings-time",
-        base::Seconds(15)};
-extern const base::FeatureParam<std::string>
-    kHappinessTrackingSurveysExtensionsSafetyHubTriggerId{
-        &kHappinessTrackingSurveysExtensionsSafetyHub,
-        "extension-page-trigger-id", ""};
-extern const base::FeatureParam<ExtensionsSafetyHubHaTSArms>
-    kHappinessTrackingSurveysExtensionsSurveyArm{
-        &kHappinessTrackingSurveysExtensionsSafetyHub, "extension-survey-arm",
-        ExtensionsSafetyHubHaTSArms::kReviewPanelNotShown, &survey_arms};
 
 // Enables or disables the Happiness Tracking System for Desktop Privacy Guide.
 BASE_FEATURE(kHappinessTrackingSurveysForDesktopPrivacyGuide,
@@ -542,6 +517,14 @@ constexpr base::FeatureParam<int>
     kHappinessTrackingSurveysForDesktopWhatsNewJpActivationPercentage{
         &kHappinessTrackingSurveysForDesktopWhatsNew,
         "jp_activation_percentage", 80};
+// Enables or disables the Happiness Tracking System for Chrome What's New v2.
+BASE_FEATURE(kHappinessTrackingSurveysForDesktopWhatsNewV2,
+             "HappinessTrackingSurveysForDesktopWhatsNewV2",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+const base::FeatureParam<base::TimeDelta>
+    kHappinessTrackingSurveysForDesktopWhatsNewV2Time{
+        &kHappinessTrackingSurveysForDesktopWhatsNewV2, "whats-new-v2-time",
+        base::Seconds(20)};
 
 // Happiness tracking surveys for the M1 Privacy Sandbox settings.
 BASE_FEATURE(kHappinessTrackingSurveysForDesktopM1AdPrivacyPage,
@@ -728,9 +711,20 @@ BASE_FEATURE(kHttpsFirstBalancedMode,
              "HttpsFirstBalancedMode",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Automatically enables HTTPS-First Mode in a balanced configuration when
+// possible.
+BASE_FEATURE(kHttpsFirstBalancedModeAutoEnable,
+             "HttpsFirstBalancedModeAutoEnable",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables a dialog-based UI for HTTPS-First Mode.
 BASE_FEATURE(kHttpsFirstDialogUi,
              "HttpsFirstDialogUi",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables the new interstitial UI for HTTPS-First Mode.
+BASE_FEATURE(kHttpsFirstModeInterstitialAugust2024Refresh,
+             "HttpsFirstModeInterstitialAugust2024Refresh",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Kill switch for crbug.com/1414633.
@@ -954,7 +948,6 @@ const base::FeatureParam<std::string>
 // Enables the use of system notification centers instead of using the Message
 // Center for displaying the toasts. The feature is hardcoded to enabled for
 // Chrome OS.
-#if BUILDFLAG(ENABLE_SYSTEM_NOTIFICATIONS) && !BUILDFLAG(IS_CHROMEOS_ASH)
 BASE_FEATURE(kNativeNotifications,
              "NativeNotifications",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -962,7 +955,6 @@ BASE_FEATURE(kNativeNotifications,
 BASE_FEATURE(kSystemNotifications,
              "SystemNotifications",
              base::FEATURE_ENABLED_BY_DEFAULT);
-#endif  // BUILDFLAG(ENABLE_SYSTEM_NOTIFICATIONS)
 
 #if BUILDFLAG(IS_MAC)
 // Enables the usage of Apple's new Notification API.
@@ -1133,6 +1125,18 @@ BASE_FEATURE(kSafetyHub,
 #endif  // BUILDFLAG(IS_ANDROID)
 );
 
+#if BUILDFLAG(IS_ANDROID)
+// Enables Safety Hub card in magic stack.
+BASE_FEATURE(kSafetyHubMagicStack,
+             "SafetyHubMagicStack",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables Safety Hub followup work.
+BASE_FEATURE(kSafetyHubFollowup,
+             "SafetyHubFollowup",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif  // BUILDFLAG(IS_ANDROID)
+
 // Enables or disables the Trust Safety Sentiment Survey for Safety Hub.
 BASE_FEATURE(kSafetyHubTrustSafetySentimentSurvey,
              "TrustSafetySentimentSurveyForSafetyHub",
@@ -1194,6 +1198,38 @@ const base::FeatureParam<int>
 const base::FeatureParam<int>
     kSafetyCheckNotificationPermissionsLowEnagementLimit{
         &kSafetyHub, "low-engagement-notification-count", 4};
+
+const char kPasswordCheckNotificationIntervalName[] =
+    "password-check-notification-interval";
+const char kRevokedPermissionsNotificationIntervalName[] =
+    "revoked-permissions-notification-interval";
+const char kNotificationPermissionsNotificationIntervalName[] =
+    "notification-permissions-notification-interval";
+const char kSafeBrowsingNotificationIntervalName[] =
+    "safe-browsing-notification-interval";
+
+// Interval to show notification for compromised password in Safety Hub
+// notifications.
+const base::FeatureParam<base::TimeDelta> kPasswordCheckNotificationInterval{
+    &kSafetyHub, kPasswordCheckNotificationIntervalName, base::Days(0)};
+
+// Interval to show notification for revoked permissions in Safety Hub
+// notifications.
+const base::FeatureParam<base::TimeDelta>
+    kRevokedPermissionsNotificationInterval{
+        &kSafetyHub, kRevokedPermissionsNotificationIntervalName,
+        base::Days(10)};
+
+// Interval to show notification for notification permissions in Safety Hub
+// notifications.
+const base::FeatureParam<base::TimeDelta>
+    kNotificationPermissionsNotificationInterval{
+        &kSafetyHub, kNotificationPermissionsNotificationIntervalName,
+        base::Days(10)};
+
+// Interval to show notification for safe browsing in Safety Hub notifications.
+const base::FeatureParam<base::TimeDelta> kSafeBrowsingNotificationInterval{
+    &kSafetyHub, kSafeBrowsingNotificationIntervalName, base::Days(90)};
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 // Enable support for multiple scheduler configurations.
@@ -1259,6 +1295,12 @@ BASE_FEATURE(kSitePerProcess,
 // kProcessPerSiteUpToMainFrameThreshold.
 BASE_FEATURE(kProcessPerSiteSkipDevtoolsUsers,
              "ProcessPerSiteSkipDevtoolsUsers",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+// The default behavior to opt enterprise users out of
+// kProcessPerSiteUpToMainFrameThreshold.
+BASE_FEATURE(kProcessPerSiteSkipEnterpriseUsers,
+             "ProcessPerSiteSkipEnterpriseUsers",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -1613,7 +1655,7 @@ BASE_FEATURE(kWebAppManifestPolicyAppIdentityUpdate,
 // which makes blink expose IWA APIs to be used by the web app.
 BASE_FEATURE(kWebKioskEnableIwaApis,
              "WebKioskEnableIwaApis",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -1637,7 +1679,7 @@ BASE_FEATURE(kWebShare, "WebShare", base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_MAC)
 // Enables Web Share (navigator.share) for macOS
-BASE_FEATURE(kWebShare, "WebShare", base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kWebShare, "WebShare", base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -1660,6 +1702,11 @@ BASE_FEATURE(kUserTypeByDeviceTypeMetricsProvider,
 BASE_FEATURE(kWin10AcceleratedDefaultBrowserFlow,
              "Win10AcceleratedDefaultBrowserFlow",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// When enabled, a UI pump is requested for the UtilWin utility process.
+BASE_FEATURE(kUtilWinProcessUsesUiPump,
+             "UtilWinProcessUsesUiPump",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_WIN)
 
 // Enables writing basic system profile to the persistent histograms files

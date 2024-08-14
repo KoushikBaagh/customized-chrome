@@ -18,6 +18,8 @@ using segmentation_platform::processing::ProcessedValue;
 
 namespace visited_url_ranking {
 
+constexpr int kNumAuxiliaryMetadataInputs = 3;
+
 class URLVisitUtilTest : public testing::Test,
                          public ::testing::WithParamInterface<Fetcher> {};
 
@@ -25,7 +27,8 @@ TEST_F(URLVisitUtilTest, CreateInputContextFromURLVisitAggregate) {
   auto aggregate = CreateSampleURLVisitAggregate(GURL(kSampleSearchUrl));
   scoped_refptr<InputContext> input_context =
       AsInputContext(kURLVisitAggregateSchema, aggregate);
-  ASSERT_EQ(input_context->metadata_args.size(), kNumInputs);
+  ASSERT_EQ(input_context->metadata_args.size(),
+            kNumInputs + kNumAuxiliaryMetadataInputs);
 
   for (const auto& field_schema : kURLVisitAggregateSchema) {
     EXPECT_TRUE(input_context->metadata_args.find(field_schema.name) !=
@@ -54,7 +57,8 @@ TEST_P(URLVisitUtilTest, CreateInputContextFromURLVisitAggregateSingleFetcher) {
                                                  base::Time::Now(), {fetcher});
   scoped_refptr<InputContext> input_context =
       AsInputContext(kURLVisitAggregateSchema, aggregate);
-  ASSERT_EQ(input_context->metadata_args.size(), kNumInputs);
+  ASSERT_EQ(input_context->metadata_args.size(),
+            kNumInputs + kNumAuxiliaryMetadataInputs);
 
   for (const auto& field_schema : kURLVisitAggregateSchema) {
     EXPECT_TRUE(input_context->metadata_args.find(field_schema.name) !=
@@ -72,6 +76,10 @@ TEST_P(URLVisitUtilTest, GettersReturnDataURLVisitAggregateSingleFetcher) {
     ASSERT_EQ(GURL(kSampleSearchUrl), visit->url_row.url());
     ASSERT_EQ(u"sample_title", visit->url_row.title());
   } else {
+    const URLVisitAggregate::TabData* tab_data = GetTabDataIfExists(aggregate);
+    EXPECT_EQ(1u, tab_data->tab_count);
+    EXPECT_FALSE(tab_data->pinned);
+
     const URLVisitAggregate::Tab* tab = GetTabIfExists(aggregate);
     ASSERT_EQ(GURL(kSampleSearchUrl), tab->visit.url);
     ASSERT_EQ(u"sample_title", tab->visit.title);

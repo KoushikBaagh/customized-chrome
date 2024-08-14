@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "ash/system/focus_mode/focus_mode_util.h"
 
 #include "ash/shell.h"
@@ -10,6 +15,7 @@
 #include "ash/system/focus_mode/focus_mode_controller.h"
 #include "ash/system/model/clock_model.h"
 #include "ash/system/model/system_tray_model.h"
+#include "base/check_op.h"
 #include "base/i18n/time_formatting.h"
 #include "base/i18n/unicodestring.h"
 #include "base/strings/string_number_conversions.h"
@@ -19,6 +25,25 @@
 #include "ui/base/l10n/l10n_util.h"
 
 namespace ash::focus_mode_util {
+namespace {
+
+constexpr std::pair<int, std::u16string>
+    congratulatory_pair[kCongratulatoryTitleNum] = {
+        std::make_pair(IDS_ASH_STATUS_TRAY_FOCUS_MODE_ENDING_MOMENT_TITLE,
+                       u"🎉"),
+        std::make_pair(IDS_ASH_STATUS_TRAY_FOCUS_MODE_ENDING_MOMENT_TITLE_1,
+                       u"⭐"),
+        std::make_pair(IDS_ASH_STATUS_TRAY_FOCUS_MODE_ENDING_MOMENT_TITLE_2,
+                       u"🎉"),
+        std::make_pair(IDS_ASH_STATUS_TRAY_FOCUS_MODE_ENDING_MOMENT_TITLE_3,
+                       u"⚡"),
+        std::make_pair(IDS_ASH_STATUS_TRAY_FOCUS_MODE_ENDING_MOMENT_TITLE_4,
+                       u"🎈"),
+        std::make_pair(IDS_ASH_STATUS_TRAY_FOCUS_MODE_ENDING_MOMENT_TITLE_5,
+                       u"☑"),
+};
+
+}
 
 SelectedPlaylist::SelectedPlaylist() = default;
 
@@ -129,12 +154,20 @@ std::string GetSourceTitleForMediaControls(const SelectedPlaylist& playlist) {
       base::UTF8ToUTF16(playlist_type), base::UTF8ToUTF16(playlist.title));
 }
 
-std::u16string GetCongratulatoryTextAndEmoji() {
+std::u16string GetCongratulatoryText(const size_t index) {
+  CHECK_LT(index, kCongratulatoryTitleNum);
+  return l10n_util::GetStringUTF16(congratulatory_pair[index].first);
+}
+
+std::u16string GetCongratulatoryEmoji(const size_t index) {
+  CHECK_LT(index, kCongratulatoryTitleNum);
+  return congratulatory_pair[index].second;
+}
+
+std::u16string GetCongratulatoryTextAndEmoji(const size_t index) {
+  CHECK_LT(index, kCongratulatoryTitleNum);
   return base::JoinString(
-      {l10n_util::GetStringUTF16(
-           IDS_ASH_STATUS_TRAY_FOCUS_MODE_ENDING_MOMENT_TITLE),
-       u"🎉"},
-      u" ");
+      {GetCongratulatoryText(index), GetCongratulatoryEmoji(index)}, u" ");
 }
 
 }  // namespace ash::focus_mode_util

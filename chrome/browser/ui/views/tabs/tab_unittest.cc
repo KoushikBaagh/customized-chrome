@@ -30,7 +30,6 @@
 #include "chrome/common/chrome_features.h"
 #include "chrome/test/views/chrome_views_test_base.h"
 #include "components/content_settings/core/common/features.h"
-#include "components/performance_manager/public/features.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -447,13 +446,37 @@ TEST_F(TabTest, CloseButtonFocus) {
   TabCloseButton* tab_close_button = GetCloseButton(tab);
 
   // Verify tab_close_button does not get focus on right click.
-  ui::MouseEvent right_click_event(ui::ET_KEY_PRESSED, gfx::Point(),
+  ui::MouseEvent right_click_event(ui::EventType::kKeyPressed, gfx::Point(),
                                    gfx::Point(), base::TimeTicks(),
                                    ui::EF_RIGHT_MOUSE_BUTTON, 0);
   tab_close_button->OnMousePressed(right_click_event);
   EXPECT_NE(tab_close_button,
             tab_close_button->GetFocusManager()->GetFocusedView());
 }
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+TEST_F(TabTest, CloseButtonHiddenWhenLockedForOnTask) {
+  const auto tab_slot_controller = std::make_unique<FakeTabSlotController>();
+  tab_slot_controller->SetLockedForOnTask(true);
+  const std::unique_ptr<views::Widget> widget =
+      CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET);
+  Tab* const tab =
+      widget->SetContentsView(std::make_unique<Tab>(tab_slot_controller.get()));
+  TabCloseButton* const tab_close_button = GetCloseButton(tab);
+  EXPECT_FALSE(tab_close_button->GetVisible());
+}
+
+TEST_F(TabTest, CloseButtonShownWhenNotLockedForOnTask) {
+  const auto tab_slot_controller = std::make_unique<FakeTabSlotController>();
+  tab_slot_controller->SetLockedForOnTask(false);
+  const std::unique_ptr<views::Widget> widget =
+      CreateTestWidget(views::Widget::InitParams::CLIENT_OWNS_WIDGET);
+  Tab* const tab =
+      widget->SetContentsView(std::make_unique<Tab>(tab_slot_controller.get()));
+  TabCloseButton* const tab_close_button = GetCloseButton(tab);
+  EXPECT_TRUE(tab_close_button->GetVisible());
+}
+#endif
 
 // Tests expected changes to the ThrobberView state when the WebContents loading
 // state changes or the animation timer (usually in BrowserView) triggers.
@@ -814,19 +837,7 @@ TEST_F(AlertIndicatorButtonTest, 1SecondFadeoutAnimationTest) {
             get_fadeout_animation_duration_for_testing_(media_tab));
 }
 
-class TabTestWithDiscardRingImprovements : public TabTest {
- public:
-  void SetUp() override {
-    scoped_feature_list_.InitAndEnableFeature(
-        performance_manager::features::kDiscardRingImprovements);
-    TabTest::SetUp();
-  }
-
- private:
-  base::test::ScopedFeatureList scoped_feature_list_;
-};
-
-TEST_F(TabTestWithDiscardRingImprovements, DiscardIndicatorResponsiveness) {
+TEST_F(TabTest, DiscardIndicatorResponsiveness) {
   auto controller = std::make_unique<FakeTabSlotController>();
   std::unique_ptr<views::Widget> widget =
       CreateTestWidget(views::Widget::InitParams::WIDGET_OWNS_NATIVE_WIDGET);

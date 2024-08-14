@@ -9,7 +9,7 @@ import {CrFeedbackOption} from '//resources/cr_elements/cr_feedback_buttons/cr_f
 import {HistoryEmbeddingsBrowserProxyImpl} from 'chrome://resources/cr_components/history_embeddings/browser_proxy.js';
 import type {HistoryEmbeddingsElement} from 'chrome://resources/cr_components/history_embeddings/history_embeddings.js';
 import {PageHandlerRemote, UserFeedback} from 'chrome://resources/cr_components/history_embeddings/history_embeddings.mojom-webui.js';
-import type {SearchResultItem} from 'chrome://resources/cr_components/history_embeddings/history_embeddings.mojom-webui.js';
+import type {SearchQuery, SearchResultItem} from 'chrome://resources/cr_components/history_embeddings/history_embeddings.mojom-webui.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {assertDeepEquals, assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {flushTasks} from 'chrome://webui-test/polymer_test_util.js';
@@ -28,6 +28,7 @@ suite('cr-history-embeddings', () => {
       relativeTime: '2 hours ago',
       sourcePassage: 'Google description',
       lastUrlVisitTimestamp: 1000,
+      answerData: null,
     },
     {
       title: 'Youtube',
@@ -36,6 +37,7 @@ suite('cr-history-embeddings', () => {
       relativeTime: '4 hours ago',
       sourcePassage: 'Youtube description',
       lastUrlVisitTimestamp: 2000,
+      answerData: null,
     },
   ];
 
@@ -43,10 +45,21 @@ suite('cr-history-embeddings', () => {
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
 
     handler = TestMock.fromClass(PageHandlerRemote);
+
+    const mockSearch = handler.search;
+    handler.search = (query: SearchQuery) => {
+      mockSearch(query);
+      // Simulate a response from browser. If some other results are needed,
+      // consider calling this directly from tests instead.
+      element.searchResultChangedForTesting({
+        query: query.query,
+        answer: '',
+        items: [...mockResults],
+      });
+    };
+
     HistoryEmbeddingsBrowserProxyImpl.setInstance(
         new HistoryEmbeddingsBrowserProxyImpl(handler));
-    handler.setResultFor(
-        'search', Promise.resolve({result: {items: [...mockResults]}}));
 
     element = document.createElement('cr-history-embeddings');
     document.body.appendChild(element);
@@ -144,6 +157,7 @@ suite('cr-history-embeddings', () => {
     const removeItemItem =
         moreActionsMenu.querySelector<HTMLElement>('#removeFromHistoryOption')!;
     removeItemItem.click();
+    await flushTasks();
     const removeItemEvent = await removeItemEventPromise;
     assertEquals(mockResults[1], removeItemEvent.detail);
     assertFalse(moreActionsMenu.open);
@@ -215,9 +229,7 @@ suite('cr-history-embeddings', () => {
         CrFeedbackOption.UNSPECIFIED, element.$.feedbackButtons.selectedOption);
     handler.reset();
 
-    // Set up a new query and result.
-    handler.setResultFor(
-        'search', Promise.resolve({result: {items: [...mockResults]}}));
+    // Search again with new query.
     element.searchQuery = 'new query';
 
     await handler.whenCalled('search');

@@ -232,6 +232,9 @@ alemate@chromium.org
 # mac
 bur@google.com
 mek@chromium.org
+# magic_stack
+ckitagawa@chromium.org
+hanxi@chromium.org
 # media
 evliu@google.com
 kron@chromium.org
@@ -276,6 +279,8 @@ toyoshim@chromium.org
 # new_tab_page
 dewittj@chromium.org
 tiborg@chromium.org
+hanxi@chromium.org
+romanarora@chromium.org
 # notifications
 peter@chromium.org
 mek@chromium.org
@@ -425,6 +430,7 @@ knollr@chromium.org
 dmurph@chromium.org
 # signin
 alexilin@chromium.org
+bsazonov@chromium.org
 rsult@google.com
 # simple
 wanderview@chromium.org
@@ -432,6 +438,9 @@ wanderview@chromium.org
 drubery@chromium.org
 thefrog@chromium.org
 xinghuilu@chromium.org
+# startup
+fdoray@chromium.org
+spvw@chromium.org
 # storage
 ayui@chromium.org
 wanderview@chromium.org
@@ -459,6 +468,7 @@ toyoshim@chromium.org
 poromov@chromium.org
 # user_education
 dfried@chromium.org
+mickeyburks@chromium.org
 # v8
 mlippautz@chromium.org
 # web_apk

@@ -29,7 +29,7 @@ class ProductSpecificationsEntryPointController
   class Observer : public base::CheckedObserver {
    public:
     // Called when entry points should show with `title`.
-    virtual void ShowEntryPointWithTitle(const std::string title) {}
+    virtual void ShowEntryPointWithTitle(const std::u16string& title) {}
 
     // Called when entry points should hide.
     virtual void HideEntryPoint() {}
@@ -64,6 +64,12 @@ class ProductSpecificationsEntryPointController
   // that the entry point (1) has been dismissed (2) has timed out (3) has
   // been clicked (4) is no longer valid.
   virtual void OnEntryPointHidden();
+
+  // The moment when (1) the entry point being triggered to show and (2) the
+  // entry point becoming eligible to show on the UI-side could be different.
+  // This method allows the entry point to check if it should still show when it
+  // becomes eligible to show on the UI side.
+  virtual bool ShouldExecuteEntryPointShow();
 
   // ClusterManager::Observer
   void OnClusterFinishedForNavigation(const GURL& url) override;

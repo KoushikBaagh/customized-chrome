@@ -21,7 +21,6 @@ import {
   PdfBuilderRemote,
   ScreenState,
   StorageMonitorStatus,
-  ToteMetricFormat,
   WifiConfig,
 } from './mojo/type.js';
 import {fakeEndpoint} from './mojo/util.js';
@@ -111,10 +110,6 @@ export class ChromeHelperFake extends ChromeHelper {
     /* Do nothing. */
   }
 
-  override notifyTote(_format: ToteMetricFormat, _name: string): void {
-    /* Do nothing. */
-  }
-
   override async monitorFileDeletion(_name: string, _callback: () => void):
       Promise<void> {
     /* Do nothing. */
@@ -163,6 +158,11 @@ export class ChromeHelperFake extends ChromeHelper {
   override async initLidStateMonitor(_onChange: (lidStatus: LidState) => void):
       Promise<LidState> {
     return LidState.kNotPresent;
+  }
+
+  override async initSWPrivacySwitchMonitor(
+      _onChange: (is_sw_privacy_switch_on: boolean) => void): Promise<boolean> {
+    return false;
   }
 
   override async getEventsSender(): Promise<EventsSenderRemote> {

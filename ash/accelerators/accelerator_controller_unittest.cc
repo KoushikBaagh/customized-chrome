@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include <optional>
 #include <utility>
 
@@ -41,6 +46,7 @@
 #include "ash/public/cpp/window_properties.h"
 #include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
+#include "ash/strings/grit/ash_strings.h"
 #include "ash/system/brightness_control_delegate.h"
 #include "ash/system/keyboard_brightness_control_delegate.h"
 #include "ash/system/power/power_button_controller_test_api.h"
@@ -95,6 +101,7 @@
 #include "ui/base/ime/ash/mock_input_method_manager.h"
 #include "ui/base/ime/init/input_method_factory.h"
 #include "ui/base/ime/mock_input_method.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/base/ui_base_features.h"
 #include "ui/display/manager/display_manager.h"
 #include "ui/display/screen.h"
@@ -113,6 +120,7 @@
 #include "ui/events/types/event_type.h"
 #include "ui/message_center/message_center.h"
 #include "ui/message_center/public/cpp/notification_types.h"
+#include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/widget/widget.h"
 #include "ui/wm/core/accelerator_filter.h"
 
@@ -213,7 +221,9 @@ class DummyBrightnessControlDelegate : public BrightnessControlDelegate {
       base::OnceCallback<void(std::optional<double>)> callback) override {
     std::move(callback).Run(100.0);
   }
-  void SetAmbientLightSensorEnabled(bool enabled) override {}
+  void SetAmbientLightSensorEnabled(
+      bool enabled,
+      AmbientLightSensorEnabledChangeSource source) override {}
   void GetAmbientLightSensorEnabled(
       base::OnceCallback<void(std::optional<bool>)> callback) override {
     std::move(callback).Run(true);
@@ -275,7 +285,9 @@ class DummyKeyboardBrightnessControlDelegate
     std::move(callback).Run(100.0);
   }
 
-  void HandleSetKeyboardAmbientLightSensorEnabled(bool enabled) override {}
+  void HandleSetKeyboardAmbientLightSensorEnabled(
+      bool enabled,
+      KeyboardAmbientLightSensorEnabledChangeSource source) override {}
 
   void HandleGetKeyboardAmbientLightSensorEnabled(
       base::OnceCallback<void(std::optional<bool>)> callback) override {}
@@ -461,6 +473,10 @@ class AcceleratorControllerTest : public AshTestBase {
     ewh->TimerAction();
   }
   static bool is_ui_shown(ExitWarningHandler* ewh) { return !!ewh->widget_; }
+  // Adding a test API in test fixture to extract the view.
+  static views::View* GetContentsView(ExitWarningHandler* ewh) {
+    return ewh->widget_->GetContentsView();
+  }
   static bool is_idle(ExitWarningHandler* ewh) {
     return ewh->state_ == ExitWarningHandler::IDLE;
   }
@@ -557,6 +573,20 @@ TEST_F(AcceleratorControllerTest, LingeringExitWarningBubble) {
   EXPECT_TRUE(is_ui_shown(ewh));
 
   // Exit ash and there should be no crash
+}
+
+TEST_F(AcceleratorControllerTest,
+       ExitWarningWidgetDelegateViewAccessibleProperties) {
+  ExitWarningHandler* ewh = test_api_->GetExitWarningHandler();
+  ewh->HandleAccelerator();
+  auto* delegate_view = GetContentsView(ewh);
+  ui::AXNodeData data;
+
+  delegate_view->GetViewAccessibility().GetAccessibleNodeData(&data);
+  EXPECT_EQ(data.role, ax::mojom::Role::kAlert);
+  EXPECT_EQ(data.GetString16Attribute(ax::mojom::StringAttribute::kName),
+            l10n_util::GetStringUTF16(
+                IDS_ASH_SIGN_OUT_WARNING_POPUP_TEXT_ACCESSIBLE));
 }
 
 TEST_F(AcceleratorControllerTest, Register) {
@@ -1368,7 +1398,7 @@ TEST_F(AcceleratorControllerTest, ProcessOnce) {
   ui::EventSink* sink =
       Shell::GetPrimaryRootWindow()->GetHost()->GetEventSink();
 
-  ui::KeyEvent key_event1(ui::ET_KEY_PRESSED, ui::VKEY_A, ui::EF_NONE);
+  ui::KeyEvent key_event1(ui::EventType::kKeyPressed, ui::VKEY_A, ui::EF_NONE);
   ui::EventDispatchDetails details = sink->OnEventFromSource(&key_event1);
   EXPECT_TRUE(key_event1.handled() || details.dispatcher_destroyed);
 
@@ -1377,7 +1407,7 @@ TEST_F(AcceleratorControllerTest, ProcessOnce) {
   details = sink->OnEventFromSource(&key_event2);
   EXPECT_FALSE(key_event2.handled() || details.dispatcher_destroyed);
 
-  ui::KeyEvent key_event3(ui::ET_KEY_RELEASED, ui::VKEY_A, ui::EF_NONE);
+  ui::KeyEvent key_event3(ui::EventType::kKeyReleased, ui::VKEY_A, ui::EF_NONE);
   details = sink->OnEventFromSource(&key_event3);
   EXPECT_FALSE(key_event3.handled() || details.dispatcher_destroyed);
   EXPECT_EQ(1, target.accelerator_count());
@@ -1712,7 +1742,8 @@ TEST_F(AcceleratorControllerTest, ImeGlobalAccelerators) {
 // TODO(nona|mazda): Remove this when crbug.com/139556 in a better way.
 TEST_F(AcceleratorControllerTest, ImeGlobalAcceleratorsWorkaround139556) {
   // The workaround for crbug.com/139556 depends on the fact that we don't
-  // use Shift+Alt+Enter/Space with ET_KEY_PRESSED as an accelerator. Test it.
+  // use Shift+Alt+Enter/Space with EventType::kKeyPressed as an accelerator.
+  // Test it.
   const ui::Accelerator shift_alt_return_press(
       ui::VKEY_RETURN, ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN);
   EXPECT_FALSE(ProcessInController(shift_alt_return_press));
@@ -1874,7 +1905,7 @@ TEST_P(SideVolumeButtonAcceleratorTest, FlipSideVolumeButtonAction) {
   EXPECT_EQ(1, user_action_tester.GetActionCount("Accel_VolumeDown_F9"));
   user_action_tester.ResetCounts();
 
-  ui::KeyEvent event(ui::ET_KEY_PRESSED, ui::VKEY_VOLUME_DOWN,
+  ui::KeyEvent event(ui::EventType::kKeyPressed, ui::VKEY_VOLUME_DOWN,
                      ui::DomCode::VOLUME_DOWN, /*flags=*/0, /*dom_key=*/2099727,
                      base::TimeTicks::Now());
   event.set_source_device_id(kSideVolumeButtonId);
@@ -1988,14 +2019,16 @@ TEST_F(AcceleratorControllerTest, PressAndReleasePowerButtonWithFunctionKey) {
 
   // Create an event with a keyboard that has function key. The controller
   // should not process the lock key event.
-  ui::KeyEvent press_event_with_function(ui::ET_KEY_PRESSED, ui::VKEY_F13,
+  ui::KeyEvent press_event_with_function(ui::EventType::kKeyPressed,
+                                         ui::VKEY_F13,
                                          /*flags=*/ui::EF_NONE);
   press_event_with_function.set_source_device_id(kKeyboardDeviceIdWithFunction);
   const ui::Accelerator press_f13_with_function(press_event_with_function);
   EXPECT_FALSE(ProcessInController(press_f13_with_function));
 
   // Test releasing F13 with fn key.
-  ui::KeyEvent release_event_with_function(ui::ET_KEY_RELEASED, ui::VKEY_F13,
+  ui::KeyEvent release_event_with_function(ui::EventType::kKeyReleased,
+                                           ui::VKEY_F13,
                                            /*flags=*/ui::EF_NONE);
   release_event_with_function.set_source_device_id(
       kKeyboardDeviceIdWithFunction);
@@ -2008,14 +2041,14 @@ TEST_F(AcceleratorControllerTest, PressAndReleasePowerButtonWithFunctionKey) {
       {keyboard_with_function, keyboard});
   // Create an event with a keyboard that does not have function key. The
   // controller should process the lock key event.
-  ui::KeyEvent press_event(ui::ET_KEY_PRESSED, ui::VKEY_F13,
+  ui::KeyEvent press_event(ui::EventType::kKeyPressed, ui::VKEY_F13,
                            /*flags=*/ui::EF_NONE);
   press_event.set_source_device_id(kKeyboardDeviceId);
   const ui::Accelerator press_f13(press_event);
   EXPECT_TRUE(ProcessInController(press_f13));
 
   // Test releaseing F13 without fn key.
-  ui::KeyEvent release_event(ui::ET_KEY_RELEASED, ui::VKEY_F13,
+  ui::KeyEvent release_event(ui::EventType::kKeyReleased, ui::VKEY_F13,
                              /*flags=*/ui::EF_NONE);
   release_event.set_source_device_id(kKeyboardDeviceId);
   const ui::Accelerator release_f13(press_event);
@@ -2059,13 +2092,13 @@ TEST_F(AcceleratorControllerTest, ToggleCapsLockAcceleratorsWithFunctionKey) {
 
   // Create an event with a keyboard that has function key. The controller
   // shouldn't process the capsLock key event.
-  ui::KeyEvent press_event(ui::ET_KEY_PRESSED, ui::VKEY_LWIN,
+  ui::KeyEvent press_event(ui::EventType::kKeyPressed, ui::VKEY_LWIN,
                            /*flags=*/ui::EF_ALT_DOWN);
   press_event.set_source_device_id(kKeyboardDeviceId);
   const ui::Accelerator press_search_after_alt(press_event);
   EXPECT_FALSE(ProcessInController(press_search_after_alt));
 
-  ui::KeyEvent release_event(ui::ET_KEY_RELEASED, ui::VKEY_LWIN,
+  ui::KeyEvent release_event(ui::EventType::kKeyReleased, ui::VKEY_LWIN,
                              /*flags=*/ui::EF_ALT_DOWN);
   release_event.set_source_device_id(kKeyboardDeviceId);
   const ui::Accelerator release_search_after_alt(release_event);
@@ -3667,7 +3700,7 @@ TEST_P(MediaSessionAcceleratorTest, MediaPlaybackAcceleratorsBehavior) {
     // be handled in ash.
     std::unique_ptr<aura::Window> window(CreateTestWindowInShellWithId(1));
     {
-      ui::KeyEvent press_key(ui::ET_KEY_PRESSED, key, ui::EF_NONE);
+      ui::KeyEvent press_key(ui::EventType::kKeyPressed, key, ui::EF_NONE);
       ui::Event::DispatcherApi dispatch_helper(&press_key);
       dispatch_helper.set_target(window.get());
       filter.OnKeyEvent(&press_key);
@@ -3678,7 +3711,7 @@ TEST_P(MediaSessionAcceleratorTest, MediaPlaybackAcceleratorsBehavior) {
     // through.
     WindowState::Get(window.get())->SetCanConsumeSystemKeys(true);
     {
-      ui::KeyEvent press_key(ui::ET_KEY_PRESSED, key, ui::EF_NONE);
+      ui::KeyEvent press_key(ui::EventType::kKeyPressed, key, ui::EF_NONE);
       ui::Event::DispatcherApi dispatch_helper(&press_key);
       dispatch_helper.set_target(window.get());
       filter.OnKeyEvent(&press_key);

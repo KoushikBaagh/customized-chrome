@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #ifndef UI_OZONE_PLATFORM_DRM_COMMON_DRM_UTIL_H_
 #define UI_OZONE_PLATFORM_DRM_COMMON_DRM_UTIL_H_
 
@@ -32,6 +37,8 @@ class DisplayMode;
 }  // namespace display
 
 namespace ui {
+class HardwareDisplayControllerInfo;
+
 // TODO(b/193019614): clean |kMaxDrmCount|'s and |kMaxDrmConnectors|'s
 // assignment up once EDID-based ID migration is complete and the flag is
 // removed.
@@ -88,75 +95,17 @@ constexpr std::
                               {"Disabled-locked", display::kDisabledLocked},
                               {"Enabled-locked", display::kEnabledLocked}}};
 
-// Representation of the information required to initialize and configure a
-// native display. |index| is the position of the connection and will be
-// used to generate a unique identifier for the display.
-class HardwareDisplayControllerInfo {
- public:
-  HardwareDisplayControllerInfo(
-      ScopedDrmConnectorPtr connector,
-      ScopedDrmCrtcPtr crtc,
-      uint8_t index,
-      std::optional<display::EdidParser> edid_parser,
-      std::optional<TileProperty> tile_property = std::nullopt);
-
-  HardwareDisplayControllerInfo(const HardwareDisplayControllerInfo&) = delete;
-  HardwareDisplayControllerInfo& operator=(
-      const HardwareDisplayControllerInfo&) = delete;
-
-  ~HardwareDisplayControllerInfo();
-
-  drmModeConnector* connector() const { return connector_.get(); }
-  drmModeCrtc* crtc() const { return crtc_.get(); }
-  uint8_t index() const { return index_; }
-  const std::optional<display::EdidParser>& edid_parser() const {
-    return edid_parser_;
-  }
-  const std::optional<TileProperty>& tile_property() const {
-    return tile_property_;
-  }
-
-  void AcquireNonprimaryTileInfo(
-      std::unique_ptr<HardwareDisplayControllerInfo> tile_info);
-
-  const std::vector<std::unique_ptr<HardwareDisplayControllerInfo>>&
-  nonprimary_tile_infos() const {
-    return nonprimary_tile_infos_;
-  }
-
-  ScopedDrmConnectorPtr ReleaseConnector() { return std::move(connector_); }
-
-  display::DisplaySnapshot::DisplayModeList GetModesOfSize(
-      const gfx::Size& size);
-
- private:
-  ScopedDrmConnectorPtr connector_;
-  ScopedDrmCrtcPtr crtc_;
-  uint8_t index_;
-  // This is an optional because reading the EDID can fail.
-  std::optional<display::EdidParser> edid_parser_;
-  // Only populated for tiled displays.
-  std::optional<TileProperty> tile_property_;
-
-  // HardwareDisplayControllerInfo of all the other tiles in the tiled display.
-  // Only populated for primary tile of the tiled display.
-  std::vector<std::unique_ptr<HardwareDisplayControllerInfo>>
-      nonprimary_tile_infos_;
-};
-
-using HardwareDisplayControllerInfoList =
-    std::vector<std::unique_ptr<HardwareDisplayControllerInfo>>;
-
 // Looks-up and parses the native display configurations returning all available
 // displays and CRTCs that weren't picked as best CRTC for each connector.
 // TODO(markyacoub): Create unit tests that tests the different bits and pieces
 // that this function goes through.
-std::pair<HardwareDisplayControllerInfoList, std::vector<uint32_t>>
+std::pair<std::vector<std::unique_ptr<HardwareDisplayControllerInfo>>,
+          std::vector<uint32_t>>
 GetDisplayInfosAndInvalidCrtcs(const DrmWrapper& drm);
 
 // Returns the display infos parsed in |GetDisplayInfosAndInvalidCrtcs|
-HardwareDisplayControllerInfoList GetAvailableDisplayControllerInfos(
-    const DrmWrapper& drm);
+std::vector<std::unique_ptr<HardwareDisplayControllerInfo>>
+GetAvailableDisplayControllerInfos(const DrmWrapper& drm);
 
 // Returns a bitmask of possible CRTCs for at least one encoder in
 // |encoder_ids|. The index in the bitmask corresponds to drm_crtc_index().
@@ -172,7 +121,15 @@ std::vector<uint32_t> GetPossibleCrtcIdsFromBitmask(
 bool SameMode(const drmModeModeInfo& lhs, const drmModeModeInfo& rhs);
 
 std::unique_ptr<display::DisplayMode> CreateDisplayMode(
-    const drmModeModeInfo& mode);
+    const drmModeModeInfo& mode,
+    const std::optional<uint16_t>& vsync_rate_min_from_edid);
+
+// Returns a virtual mode based on |base_mode| with its vtotal altered to
+// achieve the specified |virtual_refresh_rate|, or nullptr if it could not be
+// created.
+std::unique_ptr<drmModeModeInfo> CreateVirtualMode(
+    const drmModeModeInfo& base_mode,
+    float virtual_refresh_rate);
 
 // Extracts the display modes list from |info| as well as the current and native
 // display modes given the |active_pixel_size| which is retrieved from the first
@@ -208,6 +165,13 @@ const gfx::Size ModeSize(const drmModeModeInfo& mode);
 float ModeRefreshRate(const drmModeModeInfo& mode);
 
 bool ModeIsInterlaced(const drmModeModeInfo& mode);
+
+// Computes the precise minimum vsync rate using the mode's timing details.
+// The value obtained from the EDID has a loss of precision due to being an
+// integer. The precise rate must correspond to an integer valued vtotal.
+const std::optional<float> ModeVSyncRateMin(
+    const drmModeModeInfo& mode,
+    const std::optional<uint16_t>& vsync_rate_min_from_edid);
 
 bool IsVrrCapable(const DrmWrapper& drm, drmModeConnector* connector);
 
@@ -334,7 +298,7 @@ std::vector<const char*> GetPreferredDrmDrivers();
 // display into one HardwareDisplayControllerInfo. All non-tile
 // HardwareDisplayControllerInfo will not be altered.
 void ConsolidateTiledDisplayInfo(
-    HardwareDisplayControllerInfoList& display_infos);
+    std::vector<std::unique_ptr<HardwareDisplayControllerInfo>>& display_infos);
 
 // Get the total tile-composited size of a tiled display.
 gfx::Size GetTotalTileDisplaySize(const TileProperty& tile_property);

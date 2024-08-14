@@ -15,8 +15,10 @@
 #include "base/metrics/histogram_macros.h"
 #include "base/metrics/user_metrics.h"
 #include "base/strings/strcat.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "base/types/cxx23_to_underlying.h"
+#include "components/autofill/core/browser/autofill_client.h"
 #include "components/autofill/core/browser/autofill_data_util.h"
 #include "components/autofill/core/browser/autofill_field.h"
 #include "components/autofill/core/browser/autofill_type.h"
@@ -30,11 +32,13 @@
 #include "components/autofill/core/browser/metrics/autofill_metrics_utils.h"
 #include "components/autofill/core/browser/metrics/form_events/form_event_logger_base.h"
 #include "components/autofill/core/browser/payments/card_unmask_challenge_option.h"
+#include "components/autofill/core/browser/payments/payments_autofill_client.h"
 #include "components/autofill/core/browser/ui/popup_interaction.h"
 #include "components/autofill/core/browser/validation.h"
 #include "components/autofill/core/common/autofill_clock.h"
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/autofill/core/common/autofill_prefs.h"
+#include "components/autofill/core/common/autofill_regexes.h"
 #include "components/autofill/core/common/form_data.h"
 #include "components/autofill/core/common/form_interactions_flow.h"
 #include "components/language/core/browser/language_usage_metrics.h"
@@ -922,7 +926,7 @@ void AutofillMetrics::LogCardUnmaskAuthenticationSelectionDialogShown(
 void AutofillMetrics::LogCreditCardInfoBarMetric(
     InfoBarMetric metric,
     bool is_uploading,
-    AutofillClient::SaveCreditCardOptions options) {
+    payments::PaymentsAutofillClient::SaveCreditCardOptions options) {
   DCHECK_LT(metric, NUM_INFO_BAR_METRICS);
 
   std::string destination = is_uploading ? ".Server" : ".Local";
@@ -953,7 +957,7 @@ void AutofillMetrics::LogCreditCardInfoBarMetric(
   }
 
   if (options.card_save_type ==
-      AutofillClient::CardSaveType::kCardSaveWithCvc) {
+      payments::PaymentsAutofillClient::CardSaveType::kCardSaveWithCvc) {
     base::UmaHistogramEnumeration(base::StrCat({"Autofill.CreditCardInfoBar",
                                                 destination, ".SavingWithCvc"}),
                                   metric, NUM_INFO_BAR_METRICS);
@@ -1000,8 +1004,6 @@ void AutofillMetrics::LogProgressDialogShown(
 std::string_view AutofillMetrics::GetDialogTypeStringForLogging(
     AutofillProgressDialogType autofill_progress_dialog_type) {
   switch (autofill_progress_dialog_type) {
-    case AutofillProgressDialogType::kAndroidFIDOProgressDialog:
-      return "AndroidFIDO";
     case AutofillProgressDialogType::kVirtualCardUnmaskProgressDialog:
       return "VirtualCardUnmask";
     case AutofillProgressDialogType::kServerCardUnmaskProgressDialog:
@@ -2243,7 +2245,7 @@ void AutofillMetrics::FormInteractionsUkmLogger::
   // Set the fields with autofill information according to Autofill2.FieldInfo
   // UKM schema:
   // https://docs.google.com/document/d/1ZH0JbL6bES3cD4KqZWsGR6n8I-rhnkx6no6nQOgYq5w/
-  OptionalBoolean was_focused = OptionalBoolean::kFalse;
+  OptionalBoolean was_focused_by_tap_or_click = OptionalBoolean::kFalse;
   OptionalBoolean suggestion_was_available = OptionalBoolean::kUndefined;
   OptionalBoolean suggestion_was_shown = OptionalBoolean::kUndefined;
   OptionalBoolean suggestion_was_accepted = OptionalBoolean::kUndefined;
@@ -2341,7 +2343,7 @@ void AutofillMetrics::FormInteractionsUkmLogger::
                   "need to be updated.");
     if (auto* event =
             absl::get_if<AskForValuesToFillFieldLogEvent>(&log_event)) {
-      was_focused = OptionalBoolean::kTrue;
+      was_focused_by_tap_or_click = OptionalBoolean::kTrue;
       suggestion_was_available |= event->has_suggestion;
       suggestion_was_shown |= event->suggestion_is_shown;
       if (suggestion_was_shown == OptionalBoolean::kTrue &&
@@ -2467,8 +2469,9 @@ void AutofillMetrics::FormInteractionsUkmLogger::
   SetStatusVector(AutofillStatus::kIsFocusable, field.IsFocusable());
   SetStatusVector(AutofillStatus::kUserTypedIntoField,
                   OptionalBooleanToBool(user_typed_into_field));
-  SetStatusVector(AutofillStatus::kWasFocused,
-                  OptionalBooleanToBool(was_focused));
+  SetStatusVector(AutofillStatus::kWasFocused, field.was_focused());
+  SetStatusVector(AutofillStatus::kWasFocusedByTapOrClick,
+                  OptionalBooleanToBool(was_focused_by_tap_or_click));
   SetStatusVector(AutofillStatus::kIsInSubFrame,
                   form.ToFormData().host_frame() != field.host_frame());
 
@@ -2479,7 +2482,7 @@ void AutofillMetrics::FormInteractionsUkmLogger::
         OptionalBooleanToBool(filling_prevented_by_iframe_security_policy));
   }
 
-  if (was_focused == OptionalBoolean::kTrue) {
+  if (was_focused_by_tap_or_click == OptionalBoolean::kTrue) {
     SetStatusVector(AutofillStatus::kSuggestionWasAvailable,
                     OptionalBooleanToBool(suggestion_was_available));
     SetStatusVector(AutofillStatus::kSuggestionWasShown,
@@ -2594,8 +2597,6 @@ void AutofillMetrics::LogAutofillFieldInfoAfterSubmission(
       }
     }
 
-    // TODO(crbug.com/40225658): Modify the enum object of SubmissionSource by
-    // assigning values (= 0, = 1, ...) and adding a comment to not change it.
     builder.SetSubmittedType1(submitted_type1)
         .SetSubmissionSource(static_cast<int>(form.submission_source()))
         .SetMillisecondsFromFormParsedUntilSubmission(
@@ -2647,6 +2648,117 @@ void AutofillMetrics::FormInteractionsUkmLogger::
                 .InMilliseconds()));
   }
   builder.Record(ukm_recorder_);
+}
+
+void AutofillMetrics::FormInteractionsUkmLogger::
+    LogAutofillFormWithExperimentalFieldsCountAtFormRemove(
+        const FormStructure& form_structure) {
+  if (!CanLog()) {
+    return;
+  }
+
+  // Number of non-empty experimental fields found for each of the 5 buckets.
+  std::array<int, 5> num_experimental_fields = {0, 0, 0, 0, 0};
+
+  // Build icu::RegexPattern* from experiment parameters.
+  static base::NoDestructor<AutofillRegexCache> regex_cache(ThreadSafe(false));
+  auto compile_pattern =
+      [](const std::string& pattern) -> const icu::RegexPattern* {
+    return pattern.empty()
+               ? nullptr
+               : regex_cache->GetRegexPattern(base::UTF8ToUTF16(pattern));
+  };
+  std::array<const icu::RegexPattern*, 5> kRegexPatterns = {
+      compile_pattern(features::kAutofillUKMExperimentalFieldsBucket0.Get()),
+      compile_pattern(features::kAutofillUKMExperimentalFieldsBucket1.Get()),
+      compile_pattern(features::kAutofillUKMExperimentalFieldsBucket2.Get()),
+      compile_pattern(features::kAutofillUKMExperimentalFieldsBucket3.Get()),
+      compile_pattern(features::kAutofillUKMExperimentalFieldsBucket4.Get())};
+
+  // Determine whether `pattern` matches `value`.
+  auto matches = [](const std::u16string& value,
+                    const icu::RegexPattern& pattern) {
+    return !value.empty() && autofill::MatchesRegex(value, pattern);
+  };
+  // Count in `num_experimental_fields[i]` if `pattern[i]` matches the label,
+  // id_attribute or name_attribute of `field`. Returns true if any pattern
+  // matched.
+  auto count_experimental_field = [&](const AutofillField& field) {
+    bool found_experimental_fields = false;
+    for (size_t i = 0; i < kRegexPatterns.size(); ++i) {
+      const icu::RegexPattern* pattern = kRegexPatterns[i];
+      if (pattern && (matches(field.label(), *pattern) ||
+                      matches(field.id_attribute(), *pattern) ||
+                      matches(field.name_attribute(), *pattern))) {
+        ++num_experimental_fields[i];
+        found_experimental_fields = true;
+      }
+    }
+    return found_experimental_fields;
+  };
+
+  // Count which patterns matched for fields that were non-empty and had a
+  // typing or filling event.
+  bool found_experimental_fields = false;
+  for (const std::unique_ptr<AutofillField>& field : form_structure.fields()) {
+    OptionalBoolean has_typed_or_filled_value_at_submission =
+        OptionalBoolean::kUndefined;
+
+    const std::vector<AutofillField::FieldLogEventType>& field_log_events =
+        field->field_log_events();
+
+    for (const AutofillField::FieldLogEventType& log_event : field_log_events) {
+      if (auto* event = absl::get_if<FillFieldLogEvent>(&log_event)) {
+        if (event->filling_prevented_by_iframe_security_policy ==
+            OptionalBoolean::kFalse) {
+          has_typed_or_filled_value_at_submission =
+              event->had_value_after_filling;
+        }
+      }
+
+      if (auto* event = absl::get_if<TypingFieldLogEvent>(&log_event)) {
+        has_typed_or_filled_value_at_submission = event->has_value_after_typing;
+      }
+    }
+
+    // The value of has_typed_or_filled_value_at_submission does not capture
+    // correctly if javascript clears a field. It only indicates that the last
+    // user action (filling or autofill) led to a value.
+    if (has_typed_or_filled_value_at_submission == OptionalBoolean::kTrue) {
+      found_experimental_fields |= count_experimental_field(*field);
+    }
+  }
+
+  // Report the results.
+  if (found_experimental_fields) {
+    ukm::builders::Autofill2_SubmittedFormWithExperimentalFields builder(
+        GetSourceId());
+    builder
+        .SetFormSessionIdentifier(AutofillMetrics::FormGlobalIdToHash64Bit(
+            form_structure.global_id()))
+        .SetFormSignature(HashFormSignature(form_structure.form_signature()));
+    if (num_experimental_fields[0]) {
+      builder.SetNumberOfNonEmptyExperimentalFields0(
+          num_experimental_fields[0]);
+    }
+    if (num_experimental_fields[1]) {
+      builder.SetNumberOfNonEmptyExperimentalFields1(
+          num_experimental_fields[1]);
+    }
+    if (num_experimental_fields[2]) {
+      builder.SetNumberOfNonEmptyExperimentalFields2(
+          num_experimental_fields[2]);
+    }
+    if (num_experimental_fields[3]) {
+      builder.SetNumberOfNonEmptyExperimentalFields3(
+          num_experimental_fields[3]);
+    }
+    if (num_experimental_fields[4]) {
+      builder.SetNumberOfNonEmptyExperimentalFields4(
+          num_experimental_fields[4]);
+    }
+    builder.Record(ukm_recorder_);
+  }
 }
 
 void AutofillMetrics::FormInteractionsUkmLogger::
@@ -2978,20 +3090,6 @@ AutofillMetrics::UkmTimestampPin::UkmTimestampPin(
 AutofillMetrics::UkmTimestampPin::~UkmTimestampPin() {
   DCHECK(logger_->has_pinned_timestamp());
   logger_->set_pinned_timestamp(base::TimeTicks());
-}
-
-// static
-void AutofillMetrics::LogFieldParsingPageTranslationStatusMetric(bool metric) {
-  base::UmaHistogramBoolean("Autofill.ParsedFieldTypesWasPageTranslated",
-                            metric);
-}
-
-// static
-void AutofillMetrics::LogFieldParsingTranslatedFormLanguageMetric(
-    std::string_view locale) {
-  base::UmaHistogramSparse(
-      "Autofill.ParsedFieldTypesUsingTranslatedPageLanguage",
-      language::LanguageUsageMetrics::ToLanguageCodeHash(locale));
 }
 
 // static

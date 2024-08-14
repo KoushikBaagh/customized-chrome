@@ -19,6 +19,7 @@
 #include "ash/style/typography.h"
 #include "base/functional/bind.h"
 #include "base/time/time.h"
+#include "components/strings/grit/components_strings.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -72,8 +73,7 @@ PickerSearchFieldView::PickerSearchFieldView(
           views::Builder<views::ImageButton>(
               std::make_unique<IconButton>(
                   std::move(back_callback), IconButton::Type::kSmallFloating,
-                  &vector_icons::kArrowBackIcon,
-                  IDS_PICKER_SEARCH_FIELD_BACK_BUTTON_TOOLTIP_TEXT))
+                  &vector_icons::kArrowBackIcon, IDS_ACCNAME_BACK))
               .CopyAddressTo(&back_button_)
               .SetProperty(views::kMarginsKey, kButtonHorizontalMargin)
               .SetVisible(false),
@@ -96,7 +96,7 @@ PickerSearchFieldView::PickerSearchFieldView(
                             &PickerSearchFieldView::ClearButtonPressed,
                             base::Unretained(this)),
                         IconButton::Type::kSmallFloating, &views::kIcCloseIcon,
-                        IDS_PICKER_SEARCH_FIELD_CLEAR_BUTTON_TOOLTIP_TEXT))
+                        IDS_APP_LIST_CLEAR_SEARCHBOX))
                     .CopyAddressTo(&clear_button_)
                     .SetProperty(views::kMarginsKey, kButtonHorizontalMargin)
                     .SetVisible(false))
@@ -140,13 +140,20 @@ void PickerSearchFieldView::OnPaint(gfx::Canvas* canvas) {
 void PickerSearchFieldView::ContentsChanged(
     views::Textfield* sender,
     const std::u16string& new_contents) {
+  ContentsChangedInternal(new_contents);
+
+  search_callback_.Run(new_contents);
+}
+
+void PickerSearchFieldView::ContentsChangedInternal(
+    std::u16string_view new_contents) {
   performance_metrics_->MarkContentsChanged();
 
   // Show the clear button only when the query is not empty.
   clear_button_->SetVisible(!new_contents.empty());
   UpdateTextfieldBorder();
 
-  search_callback_.Run(new_contents);
+  ScheduleNotifyInitialActiveDescendantForA11y();
 }
 
 bool PickerSearchFieldView::HandleKeyEvent(views::Textfield* sender,
@@ -162,6 +169,8 @@ void PickerSearchFieldView::OnDidChangeFocus(View* focused_before,
   if (focused_now == textfield_) {
     performance_metrics_->MarkInputFocus();
   }
+
+  ScheduleNotifyInitialActiveDescendantForA11y();
 }
 
 const std::u16string& PickerSearchFieldView::GetPlaceholderText() const {
@@ -171,17 +180,27 @@ const std::u16string& PickerSearchFieldView::GetPlaceholderText() const {
 void PickerSearchFieldView::SetPlaceholderText(
     const std::u16string& new_placeholder_text) {
   textfield_->SetPlaceholderText(new_placeholder_text);
+  textfield_->GetViewAccessibility().SetName(new_placeholder_text);
 }
 
 void PickerSearchFieldView::SetTextfieldActiveDescendant(views::View* view) {
+  // If the initial active descendant has not been announced yet, then track
+  // this descendant so it can be announced when the timer fires.
+  if (!textfield_->HasFocus() ||
+      notify_initial_active_descendant_timer_.IsRunning()) {
+    active_descendant_tracker_.SetView(view);
+    return;
+  }
+
+  // The initial active descendant has been announced, so announce this
+  // descendant immediately.
   if (view) {
     textfield_->GetViewAccessibility().SetActiveDescendant(*view);
   } else {
     textfield_->GetViewAccessibility().ClearActiveDescendant();
   }
 
-  textfield_->NotifyAccessibilityEvent(
-      ax::mojom::Event::kActiveDescendantChanged, true);
+  active_descendant_tracker_.SetView(nullptr);
 }
 
 std::u16string_view PickerSearchFieldView::GetQueryText() const {
@@ -189,7 +208,10 @@ std::u16string_view PickerSearchFieldView::GetQueryText() const {
 }
 
 void PickerSearchFieldView::SetQueryText(std::u16string text) {
-  textfield_->SetText(std::move(text));
+  if (text != GetQueryText()) {
+    textfield_->SetText(std::move(text));
+    ContentsChangedInternal(GetQueryText());
+  }
 }
 
 void PickerSearchFieldView::SetBackButtonVisible(bool visible) {
@@ -215,6 +237,24 @@ void PickerSearchFieldView::UpdateTextfieldBorder() {
   textfield_->SetBorder(views::CreateEmptyBorder(gfx::Insets::TLBR(
       0, back_button_->GetVisible() ? 0 : kDefaultTextfieldHorizontalMargin, 0,
       clear_button_->GetVisible() ? 0 : kDefaultTextfieldHorizontalMargin)));
+}
+
+void PickerSearchFieldView::ScheduleNotifyInitialActiveDescendantForA11y() {
+  // Delay the active descendant change so that:
+  // (1) There's no jarring transition of the screen reader's focus rectangle.
+  // (2) There's time for the screen reader to read out the change to input
+  // field contents.
+  notify_initial_active_descendant_timer_.Start(
+      FROM_HERE, kNotifyInitialActiveDescendantA11yDelay,
+      base::BindOnce(
+          &PickerSearchFieldView::NotifyInitialActiveDescendantForA11y,
+          base::Unretained(this)));
+}
+
+void PickerSearchFieldView::NotifyInitialActiveDescendantForA11y() {
+  if (active_descendant_tracker_) {
+    SetTextfieldActiveDescendant(active_descendant_tracker_.view());
+  }
 }
 
 BEGIN_METADATA(PickerSearchFieldView)

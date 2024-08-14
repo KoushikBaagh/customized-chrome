@@ -5,7 +5,6 @@
 <translation id="1036348656032585052">Izslēgt</translation>
 <translation id="1044891598689252897">Vietnes darbosies normāli</translation>
 <translation id="1073417869336441572">Palīdziet mums uzlabot pārlūku Chrome, pastāstot, kāpēc atļāvāt trešo pušu sīkfailus. <ph name="BEGIN_LINK" />Sūtīt atsauksmes<ph name="END_LINK" /></translation>
-<translation id="1113435009358629918">Paslēpt cenas krituma kartīti</translation>
 <translation id="1178581264944972037">Pauzēt</translation>
 <translation id="1181037720776840403">Noņemt</translation>
 <translation id="1192844206376121885">Tiks izdzēsti visi dati un sīkfaili, ko glabā <ph name="ORIGIN" />.</translation>
@@ -24,6 +23,7 @@
 <translation id="1415402041810619267">URL ir saīsināts</translation>
 <translation id="1448064542941920355">Tuvināt</translation>
 <translation id="146867109637325312">{COUNT,plural, =1{<ph name="SITE_COUNT" /> vietne}zero{<ph name="SITE_COUNT" /> vietņu}one{<ph name="SITE_COUNT" /> vietne}other{<ph name="SITE_COUNT" /> vietnes}}</translation>
+<translation id="1500473259453106018">Paslēpt kartīti “Cenu kritums cilnēs”</translation>
 <translation id="1510341833810331442">Vietnēm nav atļauts saglabāt datus jūsu ierīcē</translation>
 <translation id="1547123415014299762">Trešo pušu sīkfaili ir atļauti</translation>
 <translation id="1568470248891039841">Jūsu apmeklētajās vietnēs var būt iegults citu vietņu saturs, piemēram, attēli, reklāmas un teksts. Šīs citas vietnes var lūgt atļauju izmantot par jums saglabāto informāciju, kamēr pārlūkojat vietni. <ph name="BEGIN_LINK" />Uzziniet vairāk par iegultu saturu<ph name="END_LINK" />.</translation>
@@ -91,7 +91,6 @@
 <translation id="2498359688066513246">Palīdzība un atsauksmes</translation>
 <translation id="2501278716633472235">Doties atpakaļ</translation>
 <translation id="2546283357679194313">Sīkfaili un vietņu dati</translation>
-<translation id="2550801787432930915">Cenas krituma kartīte</translation>
 <translation id="2570922361219980984">Arī piekļuve šīs ierīces atrašanās vietai ir izslēgta. Ieslēdziet to <ph name="BEGIN_LINK" />Android iestatījumos<ph name="END_LINK" />.</translation>
 <translation id="257931822824936280">Izvērsts — noklikšķiniet, lai sakļautu.</translation>
 <translation id="2586657967955657006">Starpliktuve</translation>
@@ -113,6 +112,7 @@
 <translation id="2891975107962658722">Neļaujiet vietnei saglabāt datus jūsu ierīcē</translation>
 <translation id="2903493209154104877">Adreses</translation>
 <translation id="2910701580606108292">Jautāt, pirms atļaut vietnēm atskaņot aizsargātu saturu</translation>
+<translation id="2918484639460781603">Pāriet uz iestatījumiem</translation>
 <translation id="2932883381142163287">Ziņot par ļaunprātīgu izmantošanu</translation>
 <translation id="2939338015096024043">Kad šis slēdzis ir ieslēgts, vietnes var pieprasīt atļauju izsekot kameras pozīciju un iegūt informāciju par jūsu apkārtni. Kad šis slēdzis ir izslēgts, vietnes nevar izsekot kameras pozīciju un iegūt informāciju par jūsu apkārtni.</translation>
 <translation id="2968755619301702150">Sertifikātu skatītājs</translation>
@@ -133,6 +133,7 @@
 <translation id="3227137524299004712">Mikrofons</translation>
 <translation id="3232293466644486101">Dzēst pārlūkošanas datus…</translation>
 <translation id="3242646949159196181">Kad šis slēdzis ir ieslēgts, vietnēs var atskaņot skaņu. Kad šis slēdzis ir izslēgts, vietnēs nevar atskaņot skaņu.</translation>
+<translation id="3273479183583863618">Cenu kritums cilnēs</translation>
 <translation id="3277252321222022663">Atļaut vietnēm piekļūt sensoriem (ieteicams)</translation>
 <translation id="3285500645985761267">Atļaut saistīto vietņu īpašniekiem skatīt jūsu darbības grupā</translation>
 <translation id="3295019059349372795">11. nodaļa: Oza zemes brīnumainā Smaragda pilsēta</translation>
@@ -161,6 +162,7 @@
 <translation id="3721953990244350188">Noraidīt un rādīt nākamo pieejamo darbību</translation>
 <translation id="3744111561329211289">Sinhronizācija fonā</translation>
 <translation id="3763247130972274048">Divreiz pieskarieties videoklipam pa labi vai pa kreisi, lai izlaistu 10 s.</translation>
+<translation id="3779154269823594982">Mainīt paroles</translation>
 <translation id="3797520601150691162">Varat tumšo motīvu nelietot konkrētās vietnēs</translation>
 <translation id="3803367742635802571">Apmeklētās vietnes var pārtraukt pienācīgi darboties</translation>
 <translation id="3804247818991980532"><ph name="TYPE_1" />. <ph name="TYPE_2" />.</translation>
@@ -171,6 +173,7 @@
 <translation id="385051799172605136">Atpakaļ</translation>
 <translation id="3859306556332390985">Pārtīt uz priekšu</translation>
 <translation id="3895926599014793903">Tālummaiņas piespiedu iespējošana</translation>
+<translation id="3905475044299942653">Apturiet pārmērīgus paziņojumus</translation>
 <translation id="3908288065506437185">Bloķēt trešo pušu sīkfailus inkognito režīmā</translation>
 <translation id="3913461097001554748"><ph name="DOMAIN_URL" /> <ph name="SEPARATOR1" /> <ph name="DEVICE_NAME" /></translation>
 <translation id="3918378745482005425">Dažas funkcijas var nedarboties. Saistītās vietnes joprojām var izmantot trešo pušu sīkfailus.</translation>
@@ -218,6 +221,7 @@
 <translation id="4751476147751820511">Kustību vai gaismas sensori</translation>
 <translation id="4755971844837804407">Kad šis slēdzis ir ieslēgts, vietnēs var tikt rādītas jebkādas reklāmas. Kad šis slēdzis ir izslēgts, vietnēs nevar rādīt traucējošas vai maldinošas reklāmas.</translation>
 <translation id="4779083564647765204">Tālummaiņa</translation>
+<translation id="4807122856660838973">Ieslēdziet drošu pārlūkošanu</translation>
 <translation id="4811450222531576619">Uzziniet par tās avotu un tēmu.</translation>
 <translation id="4836046166855586901">Vaicāt, ja vietne vēlas zināt, kad jūs aktīvi lietojat šo ierīci</translation>
 <translation id="483914009762354899">Iekļaut visas šī domēna vietnes</translation>
@@ -231,6 +235,7 @@
 <translation id="4994033804516042629">Nav atrasta neviena kontaktpersona</translation>
 <translation id="4996978546172906250">Kopīgošanas veids:</translation>
 <translation id="5001526427543320409">Trešo pušu sīkfaili</translation>
+<translation id="5007392906805964215">Pārskatīt</translation>
 <translation id="5039804452771397117">Atļaut</translation>
 <translation id="5048398596102334565">Atļaut vietnēm piekļūt kustību sensoriem (ieteicams)</translation>
 <translation id="5050380848339752099">Šī vietne tūlīt kopīgos informāciju ar lietotni, kas nav inkognito režīmā.</translation>
@@ -346,7 +351,6 @@
 <translation id="6612358246767739896">Aizsargāts saturs</translation>
 <translation id="662080504995468778">Palikt</translation>
 <translation id="6653342741369270081">Lai izietu no pilnekrāna režīma, nospiediet pogu Atpakaļ.</translation>
-<translation id="6670377348676659110">{TILE_COUNT,plural, =1{Paslēpt vienumu “Turpināt šajā cilnē”}zero{Paslēpt vienumu “Turpināt šajās cilnēs”}one{Paslēpt vienumu “Turpināt šajās cilnēs”}other{Paslēpt vienumu “Turpināt šajās cilnēs”}}</translation>
 <translation id="6689172468748959065">Profila fotoattēli</translation>
 <translation id="6697925417670533197">Aktīvas lejupielādes</translation>
 <translation id="6722828510648505498">Bloķēt identitātes pakalpojumu pierakstīšanās uzvednes.</translation>
@@ -356,7 +360,9 @@
 <translation id="6787751205395685251">Atlasiet opciju vietnei <ph name="SITE_NAME" />.</translation>
 <translation id="6790428901817661496">Atskaņot</translation>
 <translation id="6818926723028410516">Vienumu atlase</translation>
+<translation id="6840760312327750441">Lai sagrupētu cilnes, pieskarieties cilnei un turiet to. Pēc tam velciet to uz citas cilnes.</translation>
 <translation id="6864395892908308021">Šī ierīce nevar lasīt NFC</translation>
+<translation id="6870169401250095575">Paslēpt drošības pārbaudes kartīti</translation>
 <translation id="6912998170423641340">Bloķēt vietņu piekļuvi teksta un attēlu lasīšanai no starpliktuves</translation>
 <translation id="6945221475159498467">Atlasīt</translation>
 <translation id="6950072572526089586">Apmeklētā vietne var saglabāt informāciju par jūsu veiktajām darbībām, lai nodrošinātu pienācīgu tās darbību, piemēram, pierakstīšanos vietnē vai iepirkumu grozā ievietoto preču saglabāšanu. Bieži vien vietnes šo informāciju jūsu ierīcē saglabā īslaicīgi.</translation>
@@ -389,6 +395,7 @@
 <translation id="7366415735885268578">Vietnes pievienošana</translation>
 <translation id="7368695150573390554">Visi bezsaistes dati tiks izdzēsti</translation>
 <translation id="7383715096023715447">Domēna <ph name="DOMAIN" /> iestatījumi</translation>
+<translation id="7399802613464275309">Drošības pārbaude</translation>
 <translation id="7406113532070524618">Šis iestatījums darbojas, neidentificējot jūs vai neatļaujot vietnēm skatīt jūsu pārlūkošanas vēsturi, taču verifikācijas nolūkos vietnes var kopīgot nelielu informācijas daudzumu</translation>
 <translation id="7423098979219808738">Vispirms jautāt</translation>
 <translation id="7423538860840206698">Bloķēta starpliktuves satura lasīšana</translation>
@@ -423,6 +430,7 @@
 <translation id="7986741934819883144">Kontaktpersonas atlase</translation>
 <translation id="7990211076305263060">Kad šis slēdzis ir ieslēgts, vietnes var pieprasīt atļauju izmantot jūsu mikrofonu. Kad šis slēdzis ir izslēgts, vietnes nevar izmantot mikrofonu.</translation>
 <translation id="8007176423574883786">Izslēgts šai ierīcei</translation>
+<translation id="8010630645305864042">{TILE_COUNT,plural, =1{Paslēpt kartīti “Turpināt šajā cilnē”}zero{Paslēpt kartīti “Turpināt šajās cilnēs”}one{Paslēpt kartīti “Turpināt šajās cilnēs”}other{Paslēpt kartīti “Turpināt šajās cilnēs”}}</translation>
 <translation id="802154636333426148">Lejupielāde neizdevās</translation>
 <translation id="8042586301629853791">Kārtot pēc:</translation>
 <translation id="8067883171444229417">Atskaņot videoklipu</translation>
@@ -511,5 +519,6 @@
 <translation id="9162462602695099906">Šī lapa ir bīstama.</translation>
 <translation id="930525582205581608">Vai aizmirst šo vietni?</translation>
 <translation id="947156494302904893">Jūsu apmeklētās vietnes var apstiprināt, ka esat īsts cilvēks, nevis robots</translation>
+<translation id="959682366969460160">Informācijas kārtošana</translation>
 <translation id="967624055006145463">Saglabātie dati</translation>
 </translationbundle>

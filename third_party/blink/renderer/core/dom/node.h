@@ -30,6 +30,7 @@
 
 #include "base/dcheck_is_on.h"
 #include "base/notreached.h"
+#include "third_party/blink/public/mojom/devtools/console_message.mojom-blink.h"
 #include "third_party/blink/public/mojom/input/focus_type.mojom-blink-forward.h"
 #include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/css/counters_attachment_context.h"
@@ -352,17 +353,17 @@ class CORE_EXPORT Node : public EventTarget {
   DISABLE_CFI_PERF bool IsAfterPseudoElement() const {
     return GetPseudoId() == kPseudoIdAfter;
   }
-  DISABLE_CFI_PERF bool IsScrollMarkerGroupPseudoElement() const {
-    return GetPseudoIdForStyling() == kPseudoIdScrollMarkerGroup;
-  }
   DISABLE_CFI_PERF bool IsScrollMarkerGroupBeforePseudoElement() const {
     return GetPseudoId() == kPseudoIdScrollMarkerGroupBefore;
   }
   DISABLE_CFI_PERF bool IsScrollMarkerGroupAfterPseudoElement() const {
     return GetPseudoId() == kPseudoIdScrollMarkerGroupAfter;
   }
-  DISABLE_CFI_PERF bool IsScrollMarkerPseudoElement() const {
-    return GetPseudoId() == kPseudoIdScrollMarker;
+  DISABLE_CFI_PERF bool IsScrollNextButtonPseudoElement() const {
+    return GetPseudoId() == kPseudoIdScrollNextButton;
+  }
+  DISABLE_CFI_PERF bool IsScrollPrevButtonPseudoElement() const {
+    return GetPseudoId() == kPseudoIdScrollPrevButton;
   }
   DISABLE_CFI_PERF bool IsMarkerPseudoElement() const {
     return GetPseudoId() == kPseudoIdMarker;
@@ -389,6 +390,8 @@ class CORE_EXPORT Node : public EventTarget {
   void SetCustomElementState(CustomElementState);
 
   virtual bool IsPseudoElement() const { return false; }
+  virtual bool IsScrollMarkerPseudoElement() const { return false; }
+  virtual bool IsScrollMarkerGroupPseudoElement() const { return false; }
   virtual bool IsMediaControlElement() const { return false; }
   virtual bool IsMediaControls() const { return false; }
   virtual bool IsMediaElement() const { return false; }
@@ -1028,6 +1031,13 @@ class CORE_EXPORT Node : public EventTarget {
   bool HasNodePart() const { return GetFlag(kHasNodePart); }
   void SetHasNodePart() { SetFlag(kHasNodePart); }
   void ClearHasNodePart() { ClearFlag(kHasNodePart); }
+
+  // This method calls Document::AddConsoleMessage but also attaches this
+  // node to the console message so developers can see the relevant element
+  // in DevTools.
+  void AddConsoleMessage(mojom::blink::ConsoleMessageSource source,
+                         mojom::blink::ConsoleMessageLevel level,
+                         const String& message);
 
  private:
  private:

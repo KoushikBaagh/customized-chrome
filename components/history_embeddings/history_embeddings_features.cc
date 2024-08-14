@@ -67,13 +67,25 @@ const base::FeatureParam<double> kSearchScoreThreshold(&kHistoryEmbeddings,
                                                        "SearchScoreThreshold",
                                                        -1);
 
+const base::FeatureParam<bool> kEnableAnswers(&kHistoryEmbeddings,
+                                              "EnableAnswers",
+                                              false);
+
 const base::FeatureParam<bool> kUseMlAnswerer(&kHistoryEmbeddings,
                                               "UseMlAnswerer",
                                               false);
 
+const base::FeatureParam<double> kMlAnswererMinScore(&kHistoryEmbeddings,
+                                                     "MlAnswererMinScore",
+                                                     0.5);
+
 const base::FeatureParam<bool> kUseMlEmbedder(&kHistoryEmbeddings,
                                               "UseMlEmbedder",
                                               true);
+
+const base::FeatureParam<bool> kOmniboxScoped(&kHistoryEmbeddings,
+                                              "OmniboxScoped",
+                                              false);
 
 const base::FeatureParam<bool> kOmniboxUnscoped(&kHistoryEmbeddings,
                                                 "OmniboxUnscoped",
@@ -115,7 +127,16 @@ const base::FeatureParam<bool> kUseUrlFilter(&kHistoryEmbeddings,
                                              "UseUrlFilter",
                                              false);
 
-bool IsHistoryEmbeddingEnabled() {
+const base::FeatureParam<base::TimeDelta> kEmbeddingsServiceTimeout(
+    &kHistoryEmbeddings,
+    "EmbeddingsServiceTimeout",
+    base::Seconds(60));
+
+const base::FeatureParam<std::string> kFilterTerms(&kHistoryEmbeddings,
+                                                   "FilterTerms",
+                                                   "");
+
+bool IsHistoryEmbeddingsEnabled() {
 #if BUILDFLAG(IS_CHROMEOS)
   return chromeos::features::IsFeatureManagementHistoryEmbeddingEnabled() &&
          base::FeatureList::IsEnabled(kHistoryEmbeddings);

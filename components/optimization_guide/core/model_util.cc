@@ -133,6 +133,12 @@ std::string GetStringNameForOptimizationTarget(
       return "URLVisitResumptionRanker";
     case proto::OPTIMIZATION_TARGET_CAMERA_BACKGROUND_SEGMENTATION:
       return "CameraBackgroundSegmentation";
+    case proto::OPTIMIZATION_TARGET_MODEL_EXECUTION_FEATURE_HISTORY_SEARCH:
+      return "ModelExecutionFeatureHistorySearch";
+    case proto::OPTIMIZATION_TARGET_MODEL_EXECUTION_FEATURE_PROMPT_API:
+      return "ModelExecutionFeaturePromptAPI";
+    case proto::OPTIMIZATION_TARGET_SEGMENTATION_METRICS_CLUSTERING:
+      return "SegmentationMetricsClustering";
       // Whenever a new value is added, make sure to add it to the OptTarget
       // variant list in
       // //tools/metrics/histograms/metadata/optimization/histograms.xml.
@@ -264,11 +270,10 @@ base::FilePath ConvertToRelativePath(const base::FilePath& parent,
 std::string GetModelCacheKeyHash(proto::ModelCacheKey model_cache_key) {
   std::string bytes;
   model_cache_key.SerializeToString(&bytes);
-  uint64_t hash =
-      base::legacy::CityHash64(base::as_bytes(base::make_span(bytes)));
+  uint64_t hash = base::legacy::CityHash64(base::as_byte_span(bytes));
   // Convert the hash to hex encoding and not as base64 and other encodings,
   // since it will be used as filepath names.
-  return base::HexEncode(base::as_bytes(base::make_span(&hash, 1u)));
+  return base::HexEncode(base::byte_span_from_ref(hash));
 }
 
 void RecordPredictionModelStoreModelRemovalVersionHistogram(

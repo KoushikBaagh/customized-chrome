@@ -6,10 +6,10 @@
 
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chrome/browser/feedback/show_feedback_page.h"
 #include "chrome/browser/history_embeddings/history_embeddings_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
-#include "chrome/browser/ui/chrome_pages.h"
 #include "components/history_embeddings/history_embeddings_features.h"
 #include "components/history_embeddings/history_embeddings_service.h"
 #include "components/strings/grit/components_strings.h"
@@ -17,6 +17,7 @@
 #include "history_embeddings_handler.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/time_format.h"
+#include "url/gurl.h"
 
 namespace {
 
@@ -46,11 +47,15 @@ HistoryEmbeddingsHandler::HistoryEmbeddingsHandler(
 
 HistoryEmbeddingsHandler::~HistoryEmbeddingsHandler() = default;
 
+void HistoryEmbeddingsHandler::SetPage(
+    mojo::PendingRemote<history_embeddings::mojom::Page> pending_page) {
+  page_.Bind(std::move(pending_page));
+}
+
 void HistoryEmbeddingsHandler::Search(
-    history_embeddings::mojom::SearchQueryPtr query,
-    SearchCallback callback) {
+    history_embeddings::mojom::SearchQueryPtr query) {
   if (!profile_) {
-    std::move(callback).Run(history_embeddings::mojom::SearchResult::New());
+    OnReceivedSearchResult({});
     return;
   }
 
@@ -61,20 +66,26 @@ void HistoryEmbeddingsHandler::Search(
   service->Search(
       query->query, query->time_range_start,
       history_embeddings::kSearchResultItemCount.Get(),
-      base::BindOnce(&HistoryEmbeddingsHandler::OnReceivedSearchResult,
-                     weak_ptr_factory_.GetWeakPtr(), std::move(callback)));
+      base::BindRepeating(&HistoryEmbeddingsHandler::OnReceivedSearchResult,
+                          weak_ptr_factory_.GetWeakPtr()));
 }
 
 void HistoryEmbeddingsHandler::OnReceivedSearchResult(
-    SearchCallback callback,
     history_embeddings::SearchResult native_search_result) {
   last_result_ = native_search_result;
   user_feedback_ =
       optimization_guide::proto::UserFeedback::USER_FEEDBACK_UNSPECIFIED;
 
   auto mojom_search_result = history_embeddings::mojom::SearchResult::New();
-  for (history_embeddings::ScoredUrlRow& scored_url_row :
-       native_search_result.scored_url_rows) {
+  mojom_search_result->query = native_search_result.query;
+  bool has_answer = history_embeddings::kEnableAnswers.Get() &&
+                    !native_search_result.AnswerText().empty();
+  if (has_answer) {
+    mojom_search_result->answer = native_search_result.AnswerText();
+  }
+  for (size_t i = 0; i < native_search_result.scored_url_rows.size(); i++) {
+    history_embeddings::ScoredUrlRow& scored_url_row =
+        native_search_result.scored_url_rows[i];
     auto item = history_embeddings::mojom::SearchResultItem::New();
     item->title = base::UTF16ToUTF8(scored_url_row.row.title());
     item->url = scored_url_row.row.url();
@@ -91,6 +102,12 @@ void HistoryEmbeddingsHandler::OnReceivedSearchResult(
     item->url_for_display = base::UTF16ToUTF8(url_formatter::FormatUrl(
         scored_url_row.row.url(), format_types, base::UnescapeRule::SPACES,
         nullptr, nullptr, nullptr));
+    if (has_answer && i == native_search_result.AnswerIndex()) {
+      item->answer_data = history_embeddings::mojom::AnswerData::New();
+      item->answer_data->answer_text_directives.assign(
+          native_search_result.answerer_result.text_directives.begin(),
+          native_search_result.answerer_result.text_directives.end());
+    }
 
     if (history_embeddings::kShowSourcePassages.Get()) {
       item->source_passage = scored_url_row.GetBestPassage();
@@ -98,7 +115,7 @@ void HistoryEmbeddingsHandler::OnReceivedSearchResult(
 
     mojom_search_result->items.push_back(std::move(item));
   }
-  std::move(callback).Run(std::move(mojom_search_result));
+  page_->SearchResultChanged(std::move(mojom_search_result));
 }
 
 void HistoryEmbeddingsHandler::SendQualityLog(

@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 package org.chromium.chrome.browser.ui.edge_to_edge;
 
+import android.view.View;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
@@ -26,42 +28,62 @@ public class EdgeToEdgeBottomChinCoordinator implements Destroyable {
     /**
      * Build the coordinator that manages the edge-to-edge bottom chin.
      *
+     * @param androidView The Android view for the bottom chin.
      * @param layoutManager The {@link LayoutManager} for adding new scene overlays.
      * @param edgeToEdgeController The {@link EdgeToEdgeController} for observing the edge-to-edge
      *     status and window bottom insets.
+     * @param navigationBarColorProvider The {@link NavigationBarColorProvider} for observing the
+     *     color for the navigation bar.
      * @param bottomControlsStacker The {@link BottomControlsStacker} for observing and changing
      *     browser controls heights.
      */
     public EdgeToEdgeBottomChinCoordinator(
+            View androidView,
             @NonNull LayoutManager layoutManager,
             @NonNull EdgeToEdgeController edgeToEdgeController,
+            @NonNull NavigationBarColorProvider navigationBarColorProvider,
             @NonNull BottomControlsStacker bottomControlsStacker) {
         this(
+                androidView,
                 layoutManager,
                 edgeToEdgeController,
+                navigationBarColorProvider,
                 bottomControlsStacker,
                 new EdgeToEdgeBottomChinSceneLayer());
     }
 
     @VisibleForTesting
     EdgeToEdgeBottomChinCoordinator(
+            View androidView,
             @NonNull LayoutManager layoutManager,
             @NonNull EdgeToEdgeController edgeToEdgeController,
+            @NonNull NavigationBarColorProvider navigationBarColorProvider,
             @NonNull BottomControlsStacker bottomControlsStacker,
             @NonNull EdgeToEdgeBottomChinSceneLayer sceneLayer) {
         mLayoutManager = layoutManager;
         mSceneLayer = sceneLayer;
 
+        int initNavBarColor = navigationBarColorProvider.getNavigationBarColor();
         PropertyModel model =
-                new PropertyModel.Builder(EdgeToEdgeBottomChinProperties.ALL_KEYS).build();
+                new PropertyModel.Builder(EdgeToEdgeBottomChinProperties.ALL_KEYS)
+                        .with(EdgeToEdgeBottomChinProperties.IS_VISIBLE, false)
+                        .with(EdgeToEdgeBottomChinProperties.COLOR, initNavBarColor)
+                        .with(EdgeToEdgeBottomChinProperties.DIVIDER_COLOR, initNavBarColor)
+                        .build();
         PropertyModelChangeProcessor.create(
-                model, sceneLayer, EdgeToEdgeBottomChinViewBinder::bind);
+                model,
+                new EdgeToEdgeBottomChinViewBinder.ViewHolder(androidView, sceneLayer),
+                EdgeToEdgeBottomChinViewBinder::bind);
         mLayoutManager.createCompositorMCP(
                 model, sceneLayer, EdgeToEdgeBottomChinViewBinder::bindCompositorMCP);
 
         mMediator =
                 new EdgeToEdgeBottomChinMediator(
-                        model, mLayoutManager, edgeToEdgeController, bottomControlsStacker);
+                        model,
+                        mLayoutManager,
+                        edgeToEdgeController,
+                        navigationBarColorProvider,
+                        bottomControlsStacker);
 
         mLayoutManager.addSceneOverlay(sceneLayer);
     }

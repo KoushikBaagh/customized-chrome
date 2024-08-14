@@ -9,6 +9,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Rect;
@@ -34,7 +35,6 @@ import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.core.widget.ImageViewCompat;
 
-import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.Callback;
 import org.chromium.base.MathUtils;
 import org.chromium.base.ResettersForTesting;
@@ -47,7 +47,6 @@ import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.base.ViewUtils;
 import org.chromium.ui.interpolators.Interpolators;
 import org.chromium.ui.modelutil.PropertyModel;
-import org.chromium.ui.widget.ChromeImageButton;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -91,6 +90,7 @@ public class TabGridDialogView extends FrameLayout {
     private View mUngroupBar;
     private ViewGroup mSnackBarContainer;
     private ViewGroup mParent;
+    private ImageView mHairline;
     private TextView mUngroupBarTextView;
     private RelativeLayout mDialogContainerView;
     private PropertyModel mScrimPropertyModel;
@@ -122,8 +122,6 @@ public class TabGridDialogView extends FrameLayout {
     @ColorInt private int mUngroupBarTextColor;
     @ColorInt private int mUngroupBarHoveredTextColor;
     private Integer mBindingToken;
-    private boolean mShouldShowShare;
-    private boolean mIsTabGroupShared;
 
     public TabGridDialogView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -142,6 +140,12 @@ public class TabGridDialogView extends FrameLayout {
         mUngroupBarHoveredBackgroundColor =
                 TabUiThemeProvider.getTabGridDialogUngroupBarHoveredBackgroundColor(
                         mContext, false);
+    }
+
+    void forceAnimationToFinish() {
+        if (mCurrentDialogAnimator != null) {
+            mCurrentDialogAnimator.end();
+        }
     }
 
     @Override
@@ -210,6 +214,7 @@ public class TabGridDialogView extends FrameLayout {
         mBackgroundFrame.setLayoutParams(mContainerParams);
         mAnimationCardView = findViewById(R.id.dialog_animation_card_view);
         mSnackBarContainer = findViewById(R.id.dialog_snack_bar_container_view);
+        mHairline = findViewById(R.id.tab_grid_dialog_hairline);
         updateDialogWithOrientation(mContext.getResources().getConfiguration().orientation);
 
         prepareAnimation();
@@ -803,68 +808,63 @@ public class TabGridDialogView extends FrameLayout {
     }
 
     private void updateAnimationCardView(View view) {
+        View animationCard = mAnimationCardView;
+        TextView cardTitle = animationCard.findViewById(R.id.tab_title);
+        ImageView cardFavicon = animationCard.findViewById(R.id.tab_favicon);
+        TabThumbnailView cardThumbnail = animationCard.findViewById(R.id.tab_thumbnail);
+        ImageView cardActionButton = animationCard.findViewById(R.id.action_button);
+        View cardBackground = animationCard.findViewById(R.id.background_view);
+        cardBackground.setBackground(null);
+
         if (view == null) {
-            ((ImageView) mAnimationCardView.findViewById(R.id.tab_favicon)).setImageDrawable(null);
-            ((TextView) (mAnimationCardView.findViewById(R.id.tab_title))).setText("");
-            ((ImageView) (mAnimationCardView.findViewById(R.id.tab_thumbnail)))
-                    .setImageDrawable(null);
-            ((ImageView) mAnimationCardView.findViewById(R.id.action_button))
-                    .setImageDrawable(null);
-            mAnimationCardView.findViewById(R.id.background_view).setBackground(null);
+            cardFavicon.setImageDrawable(null);
+            cardTitle.setText("");
+            cardThumbnail.setImageDrawable(null);
+            cardActionButton.setImageDrawable(null);
             return;
         }
 
         // Update the stand-in animation card view with the actual item view from grid tab switcher
         // recyclerView.
         FrameLayout.LayoutParams params =
-                (FrameLayout.LayoutParams) mAnimationCardView.getLayoutParams();
+                (FrameLayout.LayoutParams) animationCard.getLayoutParams();
         params.width = view.getWidth();
         params.height = view.getHeight();
-        mAnimationCardView.setLayoutParams(params);
-        if (view.findViewById(R.id.tab_title) == null) return;
+        animationCard.setLayoutParams(params);
+        TextView viewTitle = view.findViewById(R.id.tab_title);
+        if (viewTitle == null) {
+            return;
+        }
 
         // Sometimes we get clip artifacting when sharing a drawable, unclear why, so make a copy.
         Drawable backgroundCopy =
                 view.findViewById(R.id.card_view).getBackground().getConstantState().newDrawable();
-        mAnimationCardView.findViewById(R.id.card_view).setBackground(backgroundCopy);
+        animationCard.findViewById(R.id.card_view).setBackground(backgroundCopy);
 
-        ImageView sourceCardFavicon = view.findViewById(R.id.tab_favicon);
-        ImageView animationCardFavicon = mAnimationCardView.findViewById(R.id.tab_favicon);
-        if (sourceCardFavicon.getDrawable() != null) {
+        Drawable faviconDrawable = ((ImageView) view.findViewById(R.id.tab_favicon)).getDrawable();
+        cardFavicon.setImageDrawable(faviconDrawable);
+        if (faviconDrawable != null) {
             int padding = (int) TabUiThemeProvider.getTabCardTopFaviconPadding(mContext);
-            animationCardFavicon.setPadding(padding, padding, padding, padding);
-            animationCardFavicon.setImageDrawable(sourceCardFavicon.getDrawable());
-        } else {
-            animationCardFavicon.setImageDrawable(null);
+            cardFavicon.setPadding(padding, padding, padding, padding);
         }
 
-        ((TextView) (mAnimationCardView.findViewById(R.id.tab_title)))
-                .setText(((TextView) (view.findViewById(R.id.tab_title))).getText());
-        ApiCompatibilityUtils.setTextAppearance(
-                (TextView) (mAnimationCardView.findViewById(R.id.tab_title)),
-                R.style.TextAppearance_TextMediumThick_Primary);
-        ((TextView) (mAnimationCardView.findViewById(R.id.tab_title)))
-                .setTextColor(((TextView) (view.findViewById(R.id.tab_title))).getTextColors());
+        cardTitle.setText(viewTitle.getText());
+        cardTitle.setTextAppearance(R.style.TextAppearance_TextMediumThick_Primary);
+        cardTitle.setTextColor(viewTitle.getTextColors());
 
         TabThumbnailView originalThumbnailView = view.findViewById(R.id.tab_thumbnail);
-        TabThumbnailView animationThumbnailView =
-                mAnimationCardView.findViewById(R.id.tab_thumbnail);
         if (originalThumbnailView.isPlaceholder()) {
-            animationThumbnailView.setImageDrawable(null);
+            cardThumbnail.setImageDrawable(null);
         } else {
-            animationThumbnailView.setImageDrawable(originalThumbnailView.getDrawable());
-            animationThumbnailView.setImageMatrix(originalThumbnailView.getImageMatrix());
-            animationThumbnailView.setScaleType(originalThumbnailView.getScaleType());
+            cardThumbnail.setImageDrawable(originalThumbnailView.getDrawable());
+            cardThumbnail.setImageMatrix(originalThumbnailView.getImageMatrix());
+            cardThumbnail.setScaleType(originalThumbnailView.getScaleType());
         }
 
-        ImageView actionButton = mAnimationCardView.findViewById(R.id.action_button);
-        actionButton.setImageDrawable(
-                ((ImageView) (view.findViewById(R.id.action_button))).getDrawable());
+        ImageView originalActionButton = view.findViewById(R.id.action_button);
+        cardActionButton.setImageDrawable(originalActionButton.getDrawable());
         ImageViewCompat.setImageTintList(
-                actionButton,
-                ImageViewCompat.getImageTintList((view.findViewById(R.id.action_button))));
-
-        mAnimationCardView.findViewById(R.id.background_view).setBackground(null);
+                cardActionButton, ImageViewCompat.getImageTintList(originalActionButton));
     }
 
     /**
@@ -889,17 +889,6 @@ public class TabGridDialogView extends FrameLayout {
     }
 
     /**
-     * Update whether the share bar should be shown.
-     *
-     * @param shouldShowShare Whether the share bar should be shown in the view.
-     */
-    void updateShouldShowShare(boolean shouldShowShare) {
-        assert getVisibility() != VISIBLE
-                : "ShouldShowShare state only changes when the dialog is hidden.";
-        mShouldShowShare = shouldShowShare;
-    }
-
-    /**
      * Reset the dialog content with {@code toolbarView} and {@code recyclerView}.
      *
      * @param toolbarView The toolbarview to be added to dialog.
@@ -912,27 +901,6 @@ public class TabGridDialogView extends FrameLayout {
         mRecyclerViewContainer.addView(recyclerView);
 
         recyclerView.setVisibility(View.VISIBLE);
-    }
-
-    /**
-     * Refresh the share bar view without resetting the whole dialog.
-     *
-     * @param isTabGroupShared Whether the tab group is shared.
-     */
-    void refreshShareBar(boolean isTabGroupShared) {
-        mIsTabGroupShared = isTabGroupShared;
-        ViewGroup manageBar = mDialogContainerView.findViewById(R.id.dialog_data_sharing_manage);
-
-        // Check for conditions which the sharebar should not show.
-        if (manageBar == null || !mShouldShowShare) {
-            return;
-        }
-
-        if (mIsTabGroupShared) {
-            manageBar.setVisibility(View.VISIBLE);
-        } else {
-            manageBar.setVisibility(View.GONE);
-        }
     }
 
     void refreshScrim() {
@@ -1027,6 +995,14 @@ public class TabGridDialogView extends FrameLayout {
         DrawableCompat.setTint(mBackgroundFrame.getBackground(), backgroundColor);
     }
 
+    void updateHairlineColor(@ColorInt int hairlineColor) {
+        mHairline.setImageTintList(ColorStateList.valueOf(hairlineColor));
+    }
+
+    void setHairlineVisibility(boolean visible) {
+        mHairline.setVisibility(visible ? View.VISIBLE : View.GONE);
+    }
+
     /**
      * Updates the background color for the animation card.
      *
@@ -1081,32 +1057,6 @@ public class TabGridDialogView extends FrameLayout {
     void setBindingToken(Integer bindingToken) {
         assert mBindingToken == null || bindingToken == null;
         mBindingToken = bindingToken;
-    }
-
-    /**
-     * Set click listener for the share bar image tiles.
-     *
-     * @param listener {@link android.view.View.OnClickListener} for the View.
-     */
-    void setShareImageTilesOnClickListener(OnClickListener listener) {
-        ViewGroup imageTilesView =
-                mDialogContainerView.findViewById(R.id.dialog_data_sharing_shared_image_tiles);
-        if (imageTilesView != null) {
-            imageTilesView.setOnClickListener(listener);
-        }
-    }
-
-    /**
-     * Set click listener for the share bar manage add button.
-     *
-     * @param listener {@link android.view.View.OnClickListener} for the button.
-     */
-    void setShareManageAddOnClickListener(OnClickListener listener) {
-        ChromeImageButton manageAddButton =
-                mDialogContainerView.findViewById(R.id.dialog_data_sharing_manage_add);
-        if (manageAddButton != null) {
-            manageAddButton.setOnClickListener(listener);
-        }
     }
 
     Integer getBindingToken() {

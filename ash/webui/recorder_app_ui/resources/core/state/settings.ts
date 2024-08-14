@@ -4,7 +4,6 @@
 
 import {bindSignal} from '../reactive/local_storage.js';
 import {signal} from '../reactive/signal.js';
-import {AudioSource} from '../recording_session.js';
 import * as localStorage from '../utils/local_storage.js';
 import {Infer, z} from '../utils/schema.js';
 
@@ -80,6 +79,44 @@ export enum SummaryEnableState {
   UNKNOWN = 'UNKNOWN',
 }
 
+/**
+ * The state of whether user have enabled speaker label.
+ *
+ * We need to ask for consent when user first transitions from UNKNOWN to
+ * ENABLED.
+ *
+ * Valid state transitions:
+ * * ENABLED -> DISABLED
+ * * DISABLED -> ENABLED
+ * * DISABLED_FIRST -> ENABLED
+ * * UNKNOWN -> DISABLED_FIRST, ENABLED.
+ */
+export enum SpeakerLabelEnableState {
+  /**
+   * Speaker label is enabled by user.
+   */
+  ENABLED = 'ENABLED',
+
+  /**
+   * The speaker label is disabled by user and user have never enabled
+   * speaker label.
+   *
+   * This is a separate state since an additional confirmation dialog will be
+   * shown only when user never enabled speaker label before.
+   */
+  DISABLED_FIRST = 'DISABLED_FIRST',
+
+  /**
+   * Speaker label is disabled by user.
+   */
+  DISABLED = 'DISABLED',
+
+  /**
+   * Speaker label enable/disable preference is still unknown.
+   */
+  UNKNOWN = 'UNKNOWN',
+}
+
 export enum ExportAudioFormat {
   // TODO: b/344784478 - Add other supported formats. Might need ffmpeg to
   // convert.
@@ -108,28 +145,33 @@ export const exportSettingsSchema = z.object({
 export type ExportSettings = Infer<typeof exportSettingsSchema>;
 
 export const settingsSchema = z.object({
-  audioSource: z.nativeEnum(AudioSource),
   exportSettings: exportSettingsSchema,
+  includeSystemAudio: z.boolean(),
   onboardingDone: z.boolean(),
   recordingSortType: z.nativeEnum(RecordingSortType),
   transcriptionEnabled: z.nativeEnum(TranscriptionEnableState),
   summaryEnabled: z.nativeEnum(SummaryEnableState),
+  speakerLabelEnabled: z.withDefault(
+    z.nativeEnum(SpeakerLabelEnableState),
+    SpeakerLabelEnableState.UNKNOWN,
+  ),
 });
 
 type Settings = Infer<typeof settingsSchema>;
 
 const defaultSettings: Settings = {
-  audioSource: AudioSource.USER_MEDIA,
   exportSettings: {
     audio: true,
     audioFormat: ExportAudioFormat.WEBM_ORIGINAL,
     transcription: false,
     transcriptionFormat: ExportTranscriptionFormat.TXT,
   },
+  includeSystemAudio: false,
   onboardingDone: false,
   recordingSortType: RecordingSortType.DATE,
   transcriptionEnabled: TranscriptionEnableState.UNKNOWN,
   summaryEnabled: SummaryEnableState.UNKNOWN,
+  speakerLabelEnabled: SpeakerLabelEnableState.UNKNOWN,
 };
 
 export const settings = signal(defaultSettings);

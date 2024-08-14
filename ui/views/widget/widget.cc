@@ -28,6 +28,7 @@
 #include "ui/base/l10n/l10n_font_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
+#include "ui/base/mojom/ui_base_types.mojom-shared.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/color/color_provider_manager.h"
 #include "ui/compositor/compositor.h"
@@ -377,12 +378,10 @@ bool Widget::RequiresNonClientView(InitParams::Type type) {
 
 // static
 bool Widget::IsWindowCompositingSupported() {
-#if BUILDFLAG(IS_WIN)
-  return true;
-#elif BUILDFLAG(IS_OZONE)
+#if BUILDFLAG(IS_OZONE)
   return ui::OzonePlatform::GetInstance()->IsWindowCompositingSupported();
 #else
-  return false;
+  return true;
 #endif
 }
 
@@ -427,11 +426,13 @@ void Widget::Init(InitParams params) {
   ViewsDelegate::GetInstance()->OnBeforeWidgetInit(&params, this);
 
   if (params.delegate) {
-    widget_delegate_ = params.delegate->AsWeakPtr();
+    widget_delegate_ = params.delegate->AttachWidgetAndGetHandle(this);
   } else {
     auto default_delegate = std::make_unique<DefaultWidgetDelegate>();
-    widget_delegate_ = default_delegate.release()->AsWeakPtr();
+    widget_delegate_ =
+        default_delegate.release()->AttachWidgetAndGetHandle(this);
   }
+
   DCHECK(widget_delegate_);
 
   if (params.opacity == views::Widget::InitParams::WindowOpacity::kInferred)
@@ -442,8 +443,6 @@ void Widget::Init(InitParams params) {
                                     : InitParams::Activatable::kNo;
 
   widget_delegate_->SetCanActivate(can_activate);
-
-  widget_delegate_->WidgetInitializing(this);
 
   ownership_ = params.ownership;
 
@@ -460,6 +459,17 @@ void Widget::Init(InitParams params) {
     owned_native_widget_ = base::WrapUnique(native_widget_raw_ptr);
   }
   root_view_.reset(CreateRootView());
+
+  // The root view must always be fully initialized so we at least expose one
+  // accessible element to the platform APIs. This is necessary for us to detect
+  // accessibility API usage and fully enable accessibility support for all
+  // views.
+  root_view_->GetViewAccessibility().CompleteCacheInitialization();
+
+  // Once the root view is added to the widget, it should be marked as ready to
+  // send accessible event notifications. From that point on, any view that is
+  // connected to the RootView will be able to send accessible events.
+  root_view_->GetViewAccessibility().SetRootViewIsReadyToNotifyEvents();
   // We need to add the RootView's ViewAccessibility as an observer of the
   // widget, so that when the widget is closed, the accessible data is set
   // accordingly.
@@ -1404,8 +1414,9 @@ void Widget::SynthesizeMouseMoveEvent() {
   // Convert: screen coordinate -> widget coordinate.
   View::ConvertPointFromScreen(root_view_.get(), &mouse_location);
   last_mouse_event_was_move_ = false;
-  ui::MouseEvent mouse_event(ui::ET_MOUSE_MOVED, mouse_location, mouse_location,
-                             ui::EventTimeForNow(), ui::EF_IS_SYNTHESIZED, 0);
+  ui::MouseEvent mouse_event(ui::EventType::kMouseMoved, mouse_location,
+                             mouse_location, ui::EventTimeForNow(),
+                             ui::EF_IS_SYNTHESIZED, 0);
   root_view_->OnMouseMoved(mouse_event);
 }
 
@@ -1581,7 +1592,7 @@ bool Widget::IsModal() const {
   if (!widget_delegate_)
     return false;
 
-  return widget_delegate_->GetModalType() != ui::MODAL_TYPE_NONE;
+  return widget_delegate_->GetModalType() != ui::mojom::ModalType::kNone;
 }
 
 bool Widget::IsDialogBox() const {
@@ -1819,7 +1830,7 @@ void Widget::OnMouseEvent(ui::MouseEvent* event) {
 
   View* root_view = GetRootView();
   switch (event->type()) {
-    case ui::ET_MOUSE_PRESSED: {
+    case ui::EventType::kMousePressed: {
       last_mouse_event_was_move_ = false;
 
       // We may get deleted by the time we return from OnMousePressed. So we
@@ -1851,7 +1862,7 @@ void Widget::OnMouseEvent(ui::MouseEvent* event) {
       return;
     }
 
-    case ui::ET_MOUSE_RELEASED:
+    case ui::EventType::kMouseReleased:
       last_mouse_event_was_move_ = false;
       is_mouse_button_pressed_ = false;
       // Release capture first, to avoid confusion if OnMouseReleased blocks.
@@ -1873,8 +1884,8 @@ void Widget::OnMouseEvent(ui::MouseEvent* event) {
       }
       return;
 
-    case ui::ET_MOUSE_MOVED:
-    case ui::ET_MOUSE_DRAGGED:
+    case ui::EventType::kMouseMoved:
+    case ui::EventType::kMouseDragged:
       if (native_widget_->HasCapture() && is_mouse_button_pressed_) {
         last_mouse_event_was_move_ = false;
         if (root_view)
@@ -1888,20 +1899,20 @@ void Widget::OnMouseEvent(ui::MouseEvent* event) {
       }
       return;
 
-    case ui::ET_MOUSE_ENTERED:
+    case ui::EventType::kMouseEntered:
       last_mouse_event_was_move_ = false;
       if (root_view) {
         root_view->OnMouseEntered(*event);
       }
       return;
 
-    case ui::ET_MOUSE_EXITED:
+    case ui::EventType::kMouseExited:
       last_mouse_event_was_move_ = false;
       if (root_view)
         root_view->OnMouseExited(*event);
       return;
 
-    case ui::ET_MOUSEWHEEL:
+    case ui::EventType::kMousewheel:
       if (root_view && root_view->OnMouseWheel(
                            static_cast<const ui::MouseWheelEvent&>(*event)))
         event->SetHandled();
@@ -1926,8 +1937,9 @@ void Widget::OnScrollEvent(ui::ScrollEvent* event) {
   ui::ScrollEvent event_copy(*event);
   SendEventToSink(&event_copy);
 
-  // Convert unhandled ui::ET_SCROLL events into ui::ET_MOUSEWHEEL events.
-  if (!event_copy.handled() && event_copy.type() == ui::ET_SCROLL) {
+  // Convert unhandled ui::EventType::kScroll events into
+  // ui::EventType::kMousewheel events.
+  if (!event_copy.handled() && event_copy.type() == ui::EventType::kScroll) {
     ui::MouseWheelEvent wheel(*event);
     OnMouseEvent(&wheel);
   }

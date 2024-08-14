@@ -10,8 +10,10 @@ import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.intent.Intents.intended;
 import static androidx.test.espresso.intent.Intents.intending;
+import static androidx.test.espresso.matcher.RootMatchers.isDialog;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
 
 import static org.hamcrest.CoreMatchers.allOf;
 import static org.hamcrest.CoreMatchers.is;
@@ -28,6 +30,7 @@ import android.app.Instrumentation.ActivityResult;
 import android.app.PendingIntent;
 
 import androidx.preference.Preference;
+import androidx.test.espresso.contrib.RecyclerViewActions;
 import androidx.test.espresso.intent.Intents;
 import androidx.test.espresso.intent.matcher.IntentMatchers;
 import androidx.test.filters.LargeTest;
@@ -69,6 +72,9 @@ import org.chromium.components.signin.AccountManagerFacadeProvider;
 import org.chromium.components.signin.base.CoreAccountInfo;
 import org.chromium.components.signin.base.GoogleServiceAuthError;
 import org.chromium.components.signin.test.util.FakeAccountManagerFacade;
+import org.chromium.components.sync.DataType;
+
+import java.util.Set;
 
 /** Test for ManageSyncSettings with FakeSyncServiceImpl. */
 @RunWith(ChromeJUnit4ClassRunner.class)
@@ -165,7 +171,7 @@ public class ManageSyncSettingsWithFakeSyncServiceImplTest {
         onViewWaiting(allOf(is(fragment.getView()), isDisplayed()));
 
         // The error card exists.
-        onView(withId(R.id.identity_error_card)).check(matches(isDisplayed()));
+        onView(withId(R.id.signin_settings_card)).check(matches(isDisplayed()));
         watchIdentityErrorCardShownHistogram.assertExpected();
     }
 
@@ -178,7 +184,7 @@ public class ManageSyncSettingsWithFakeSyncServiceImplTest {
         ManageSyncSettings fragment = startManageSyncPreferences();
         onViewWaiting(allOf(is(fragment.getView()), isDisplayed()));
 
-        onView(withId(R.id.identity_error_card)).check(doesNotExist());
+        onView(withId(R.id.signin_settings_card)).check(doesNotExist());
     }
 
     @Test
@@ -202,7 +208,7 @@ public class ManageSyncSettingsWithFakeSyncServiceImplTest {
         ManageSyncSettings fragment = startManageSyncPreferences();
         onViewWaiting(allOf(is(fragment.getView()), isDisplayed()));
 
-        onView(withId(R.id.identity_error_card)).check(doesNotExist());
+        onView(withId(R.id.signin_settings_card)).check(doesNotExist());
         watchIdentityErrorCardShownHistogram.assertExpected();
     }
 
@@ -225,7 +231,7 @@ public class ManageSyncSettingsWithFakeSyncServiceImplTest {
         onViewWaiting(allOf(is(fragment.getView()), isDisplayed()));
 
         // No error card exists right now.
-        onView(withId(R.id.identity_error_card)).check(doesNotExist());
+        onView(withId(R.id.signin_settings_card)).check(doesNotExist());
         watchIdentityErrorCardShownHistogram.assertExpected();
 
         watchIdentityErrorCardShownHistogram =
@@ -237,7 +243,7 @@ public class ManageSyncSettingsWithFakeSyncServiceImplTest {
         fakeSyncService.setRequiresClientUpgrade(true);
 
         // Error card is showing now.
-        onViewWaiting(withId(R.id.identity_error_card)).check(matches(isDisplayed()));
+        onViewWaiting(withId(R.id.signin_settings_card)).check(matches(isDisplayed()));
         watchIdentityErrorCardShownHistogram.assertExpected();
     }
 
@@ -267,7 +273,7 @@ public class ManageSyncSettingsWithFakeSyncServiceImplTest {
 
         // The error card exists right now.
         Assert.assertTrue(preference.isShown());
-        onView(withId(R.id.identity_error_card)).check(matches(isDisplayed()));
+        onView(withId(R.id.signin_settings_card)).check(matches(isDisplayed()));
         watchIdentityErrorCardShownHistogram.assertExpected();
 
         // Expect no records now.
@@ -299,7 +305,7 @@ public class ManageSyncSettingsWithFakeSyncServiceImplTest {
         onViewWaiting(allOf(is(fragment.getView()), isDisplayed()));
 
         // The error card exists.
-        onView(withId(R.id.identity_error_card)).check(matches(isDisplayed()));
+        onView(withId(R.id.signin_settings_card)).check(matches(isDisplayed()));
 
         FakeAccountManagerFacade fakeAccountManagerFacade =
                 spy((FakeAccountManagerFacade) AccountManagerFacadeProvider.getInstance());
@@ -315,10 +321,10 @@ public class ManageSyncSettingsWithFakeSyncServiceImplTest {
                 .updateCredentials(any(), any(), any());
 
         // Mimic the user tapping on the error card's button.
-        onView(withId(R.id.identity_error_card_button)).perform(click());
+        onView(withId(R.id.signin_settings_card_button)).perform(click());
 
         // No error card exists anymore.
-        onView(withId(R.id.identity_error_card)).check(doesNotExist());
+        onView(withId(R.id.signin_settings_card)).check(doesNotExist());
     }
 
     @Test
@@ -336,7 +342,7 @@ public class ManageSyncSettingsWithFakeSyncServiceImplTest {
         onViewWaiting(allOf(is(fragment.getView()), isDisplayed()));
 
         // The error card exists.
-        onView(withId(R.id.identity_error_card)).check(matches(isDisplayed()));
+        onView(withId(R.id.signin_settings_card)).check(matches(isDisplayed()));
 
         Intents.init();
         // Stub all external intents.
@@ -344,7 +350,7 @@ public class ManageSyncSettingsWithFakeSyncServiceImplTest {
                 .respondWith(new ActivityResult(Activity.RESULT_OK, null));
 
         // Mimic the user tapping on the error card's button.
-        onView(withId(R.id.identity_error_card_button)).perform(click());
+        onView(withId(R.id.signin_settings_card_button)).perform(click());
 
         intended(IntentMatchers.hasDataString(startsWith("market")));
         Intents.release();
@@ -354,6 +360,7 @@ public class ManageSyncSettingsWithFakeSyncServiceImplTest {
     @LargeTest
     @Feature({"Sync"})
     @EnableFeatures({ChromeFeatureList.REPLACE_SYNC_PROMOS_WITH_SIGN_IN_PROMOS})
+    @DisabledTest(message = "https://crbug.com/359644250")
     public void testTrustedVaultKeyRetrievalForSignedInUsers() {
         // TODO(crbug.com/334124078): Simplify the test using FakeTrustedVaultClientBackend once the
         // bug is resolved.
@@ -371,11 +378,37 @@ public class ManageSyncSettingsWithFakeSyncServiceImplTest {
         ManageSyncSettings fragment = startManageSyncPreferences();
         onViewWaiting(allOf(is(fragment.getView()), isDisplayed()));
 
-        // Mimic the user tapping on Encryption.
         Preference encryption = fragment.findPreference(ManageSyncSettings.PREF_ENCRYPTION);
+
+        // Check text summary.
+        String expectedSummary = fragment.getString(R.string.identity_error_card_button_verify);
+        Assert.assertEquals(encryption.getSummary().toString(), expectedSummary);
+
+        // Mimic the user tapping on Encryption.
         clickPreference(encryption);
 
         CriteriaHelper.pollUiThread(() -> backend.isSuccess());
+    }
+
+    @Test
+    @LargeTest
+    @Feature({"Sync"})
+    @EnableFeatures({ChromeFeatureList.REPLACE_SYNC_PROMOS_WITH_SIGN_IN_PROMOS})
+    public void testSignOutUnsavedDataDialogShown() {
+        final FakeSyncServiceImpl fakeSyncService =
+                (FakeSyncServiceImpl) mSyncTestRule.getSyncService();
+        fakeSyncService.setTypesWithUnsyncedData(Set.of(DataType.BOOKMARKS));
+        // Sign in and open settings.
+        mSyncTestRule.setUpAccountAndSignInForTesting();
+        ManageSyncSettings fragment = startManageSyncPreferences();
+        onViewWaiting(allOf(is(fragment.getView()), isDisplayed()));
+
+        onView(withId(R.id.recycler_view)).perform(RecyclerViewActions.scrollToLastPosition());
+        onView(withText(R.string.sign_out)).perform(click());
+
+        onView(withText(R.string.sign_out_unsaved_data_title))
+                .inRoot(isDialog())
+                .check(matches(isDisplayed()));
     }
 
     private ManageSyncSettings startManageSyncPreferences() {

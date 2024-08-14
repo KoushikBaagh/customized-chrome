@@ -144,6 +144,7 @@
 #include "chrome/browser/ui/tabs/tab_utils.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/unload_controller.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_web_view.h"
 #include "chrome/browser/ui/web_applications/app_browser_controller.h"
 #include "chrome/browser/ui/web_applications/web_app_launch_utils.h"
@@ -262,7 +263,7 @@
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 #include "ash/constants/ash_features.h"
 #include "chrome/browser/ash/guest_os/guest_os_terminal.h"
-#include "chrome/browser/ash/url_handler.h"
+#include "chrome/browser/ash/url_handler/url_handler.h"
 #include "chrome/browser/ui/settings_window_manager_chromeos.h"
 #include "components/session_manager/core/session_manager.h"
 #endif
@@ -698,6 +699,11 @@ Browser::~Browser() {
   // it doesn't act on any notifications that are sent as a result of removing
   // the browser.
   command_controller_.reset();
+
+  // Remove listeners associated with browser actions so that
+  // it doesn't act on any during browser destruction.
+  browser_actions_->RemoveListeners();
+
   // Destroy ExclusiveAccessManager, which depends on `window_` which may be
   // destroyed by RemoveBrowser().
   exclusive_access_manager_.reset();
@@ -725,7 +731,7 @@ Browser::~Browser() {
   if (tab_restore_service)
     tab_restore_service->BrowserClosed(live_tab_context());
 
-  profile_pref_registrar_.RemoveAll();
+  profile_pref_registrar_.Reset();
 
   // Destroy BrowserExtensionWindowController before the incognito profile
   // is destroyed to make sure the chrome.windows.onRemoved event is sent.
@@ -1104,6 +1110,10 @@ views::WebView* Browser::GetWebView() {
   return window_->GetContentsWebView();
 }
 
+Profile* Browser::GetProfile() {
+  return profile();
+}
+
 void Browser::OpenGURL(const GURL& gurl, WindowOpenDisposition disposition) {
   OpenURL(content::OpenURLParams(gurl, content::Referrer(), disposition,
                                  ui::PAGE_TRANSITION_LINK,
@@ -1116,7 +1126,7 @@ const SessionID& Browser::GetSessionID() {
 }
 
 bool Browser::IsTabStripVisible() {
-  return window_->IsToolbarShowing();
+  return window_ && window_->IsToolbarShowing();
 }
 
 views::View* Browser::TopContainer() {
@@ -1135,6 +1145,49 @@ web_modal::WebContentsModalDialogHost*
 Browser::GetWebContentsModalDialogHostForWindow() {
   return window_->GetWebContentsModalDialogHost();
 }
+
+bool Browser::IsActive() {
+  return window_->IsActive();
+}
+
+base::CallbackListSubscription Browser::RegisterDidBecomeActive(
+    DidBecomeActiveCallback callback) {
+  return did_become_active_callback_list_.Add(std::move(callback));
+}
+
+base::CallbackListSubscription Browser::RegisterDidBecomeInactive(
+    DidBecomeInactiveCallback callback) {
+  return did_become_inactive_callback_list_.Add(std::move(callback));
+}
+
+ExclusiveAccessManager* Browser::GetExclusiveAccessManager() {
+  return exclusive_access_manager();
+}
+
+BrowserActions* Browser::GetActions() {
+  return browser_actions();
+}
+
+void Browser::DidBecomeActive() {
+  BrowserList::SetLastActive(this);
+  did_become_active_callback_list_.Notify(this);
+}
+
+void Browser::DidBecomeInactive() {
+  BrowserList::NotifyBrowserNoLongerActive(this);
+  did_become_inactive_callback_list_.Notify(this);
+}
+
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+bool Browser::IsLockedForOnTask() {
+  return on_task_locked_;
+}
+
+void Browser::SetLockedForOnTask(bool locked) {
+  on_task_locked_ = locked;
+  OnLockedForOnTaskUpdated();
+}
+#endif
 
 void Browser::OnWindowClosing() {
   if (const auto closing_status = HandleBeforeClose();
@@ -1293,9 +1346,9 @@ void Browser::OpenFile() {
   ui::SelectFileDialog::FileTypeInfo file_types;
   file_types.allowed_paths =
       ui::SelectFileDialog::FileTypeInfo::ANY_PATH_OR_URL;
-  select_file_dialog_->SelectFile(
-      ui::SelectFileDialog::SELECT_OPEN_FILE, std::u16string(), directory,
-      &file_types, 0, base::FilePath::StringType(), parent_window, nullptr);
+  select_file_dialog_->SelectFile(ui::SelectFileDialog::SELECT_OPEN_FILE,
+                                  std::u16string(), directory, &file_types, 0,
+                                  base::FilePath::StringType(), parent_window);
 }
 
 void Browser::UpdateDownloadShelfVisibility(bool visible) {
@@ -1865,10 +1918,11 @@ void Browser::VisibleSecurityStateChanged(WebContents* source) {
   // bar to reflect the new state.
   DCHECK(source);
   if (tab_strip_model_->GetActiveWebContents() == source) {
-    UpdateToolbar(false);
+    UpdateToolbarSecurityState();
 
-    if (app_controller_)
+    if (app_controller_) {
       app_controller_->UpdateCustomTabBarVisibility(true);
+    }
   }
 }
 
@@ -1984,16 +2038,17 @@ void Browser::UpdateTargetURL(WebContents* source, const GURL& url) {
 
 void Browser::ContentsMouseEvent(WebContents* source, const ui::Event& event) {
   const ui::EventType type = event.type();
-  const bool exited = type == ui::ET_MOUSE_EXITED;
+  const bool exited = type == ui::EventType::kMouseExited;
   // Disregard synthesized events, and mouse enter and exit, which may occur
   // without explicit user input events during window state changes.
-  if (type != ui::ET_MOUSE_ENTERED && !exited && !event.IsSynthesized()) {
+  if (type != ui::EventType::kMouseEntered && !exited &&
+      !event.IsSynthesized()) {
     exclusive_access_manager_->OnUserInput();
   }
 
   // Mouse motion events update the status bubble, if it exists.
   if (GetStatusBubble() && source == tab_strip_model_->GetActiveWebContents() &&
-      (type == ui::ET_MOUSE_MOVED || exited)) {
+      (type == ui::EventType::kMouseMoved || exited)) {
     GetStatusBubble()->MouseMoved(exited);
     if (exited) {
       GetStatusBubble()->SetURL(GURL());
@@ -2354,8 +2409,7 @@ void Browser::RegisterProtocolHandler(
   // TODO(carlscab): This should probably be FromFrame() once it becomes
   // PageSpecificContentSettingsDelegate
   auto* page_content_settings_delegate =
-      chrome::PageSpecificContentSettingsDelegate::FromWebContents(
-          web_contents);
+      PageSpecificContentSettingsDelegate::FromWebContents(web_contents);
   if (!user_gesture && window_) {
     page_content_settings_delegate->set_pending_protocol_handler(handler);
     page_content_settings_delegate->set_previous_protocol_handler(
@@ -2801,7 +2855,7 @@ void Browser::OnActiveTabChanged(WebContents* old_contents,
     sessions::SessionTabHelper* session_tab_helper =
         sessions::SessionTabHelper::FromWebContents(new_contents);
     service->SetLastActiveTime(session_id(), session_tab_helper->session_id(),
-                               base::TimeTicks::Now());
+                               base::Time::Now());
   }
 
   SearchTabHelper::FromWebContents(new_contents)->OnTabActivated();
@@ -2848,6 +2902,15 @@ void Browser::OnDevToolsAvailabilityChanged() {
   }
 }
 
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+void Browser::OnLockedForOnTaskUpdated() {
+  bool is_locked = IsLockedForOnTask();
+  BrowserView* const browser_view = static_cast<BrowserView*>(window());
+  browser_view->SetCanMinimize(!is_locked);
+  browser_view->SetShowCloseButton(!is_locked);
+}
+#endif
+
 ///////////////////////////////////////////////////////////////////////////////
 // Browser, UI update coalescing and handling (private):
 
@@ -2856,6 +2919,11 @@ void Browser::UpdateToolbar(bool should_restore_state) {
   window_->UpdateToolbar(should_restore_state
                              ? tab_strip_model_->GetActiveWebContents()
                              : nullptr);
+}
+
+void Browser::UpdateToolbarSecurityState() {
+  TRACE_EVENT0("ui", "Browser::UpdateToolbarSecurityState");
+  window_->UpdateToolbarSecurityState();
 }
 
 void Browser::ScheduleUIUpdate(WebContents* source, unsigned changed_flags) {

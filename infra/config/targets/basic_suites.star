@@ -100,9 +100,9 @@ targets.legacy_basic_suite(
                 shards = 20,
             ),
         ),
-        "webview_instrumentation_test_apk": targets.legacy_test_config(
+        "webview_instrumentation_test_apk_multiple_process_mode": targets.legacy_test_config(
             swarming = targets.swarming(
-                shards = 9,
+                shards = 6,
             ),
         ),
     },
@@ -130,9 +130,9 @@ targets.legacy_basic_suite(
             ),
         ),
         "viz_unittests": targets.legacy_test_config(),
-        "webview_instrumentation_test_apk": targets.legacy_test_config(
+        "webview_instrumentation_test_apk_multiple_process_mode": targets.legacy_test_config(
             swarming = targets.swarming(
-                shards = 7,
+                shards = 5,
             ),
         ),
     },
@@ -179,9 +179,9 @@ targets.legacy_basic_suite(
         "gl_unittests": targets.legacy_test_config(),
         "mojo_test_apk": targets.legacy_test_config(),
         "ui_android_unittests": targets.legacy_test_config(),
-        "webview_instrumentation_test_apk": targets.legacy_test_config(
+        "webview_instrumentation_test_apk_multiple_process_mode": targets.legacy_test_config(
             swarming = targets.swarming(
-                shards = 7,
+                shards = 5,
             ),
         ),
     },
@@ -196,9 +196,14 @@ targets.legacy_basic_suite(
             ),
         ),
         "mojo_test_apk": targets.legacy_test_config(),
-        "webview_instrumentation_test_apk": targets.legacy_test_config(
+        "webview_instrumentation_test_apk_multiple_process_mode": targets.legacy_test_config(
             swarming = targets.swarming(
-                shards = 7,
+                shards = 5,
+            ),
+        ),
+        "webview_instrumentation_test_apk_single_process_mode": targets.legacy_test_config(
+            swarming = targets.swarming(
+                shards = 3,
             ),
         ),
     },
@@ -297,36 +302,6 @@ targets.legacy_basic_suite(
     name = "blink_web_tests_ppapi_isolated_scripts",
     tests = {
         "ppapi_blink_web_tests": targets.legacy_test_config(),
-    },
-)
-
-targets.legacy_basic_suite(
-    name = "cast_receiver_gtests",
-    tests = {
-        "cast_audio_backend_unittests": targets.legacy_test_config(),
-        "cast_base_unittests": targets.legacy_test_config(),
-        "cast_cast_core_unittests": targets.legacy_test_config(),
-        "cast_crash_unittests": targets.legacy_test_config(),
-        "cast_display_settings_unittests": targets.legacy_test_config(
-            experiment_percentage = 100,
-        ),
-        "cast_graphics_unittests": targets.legacy_test_config(),
-        "cast_media_unittests": targets.legacy_test_config(),
-        "cast_shell_browsertests": targets.legacy_test_config(
-            args = [
-                "--enable-local-file-accesses",
-                "--ozone-platform=headless",
-                "--no-sandbox",
-                "--test-launcher-jobs=1",
-            ],
-            swarming = targets.swarming(
-                enable = False,  # https://crbug.com/861753
-            ),
-        ),
-        "cast_shell_unittests": targets.legacy_test_config(),
-        "views_unittests": targets.legacy_test_config(
-            experiment_percentage = 100,
-        ),
     },
 )
 
@@ -681,7 +656,7 @@ targets.legacy_basic_suite(
             ],
             args = [
                 "--browser=cros-chrome",
-                "$$MAGIC_SUBSTITUTION_ChromeOSTelemetryRemote",
+                targets.magic_args.CROS_TELEMETRY_REMOTE,
                 "--xvfb",
                 # 3 is arbitrary, but if we're having more than 3 of these tests
                 # fail in a single shard, then something is probably wrong, so fail
@@ -700,7 +675,7 @@ targets.legacy_basic_suite(
             args = [
                 "--jobs=1",
                 "--browser=cros-chrome",
-                "$$MAGIC_SUBSTITUTION_ChromeOSTelemetryRemote",
+                targets.magic_args.CROS_TELEMETRY_REMOTE,
                 # 3 is arbitrary, but if we're having more than 3 of these tests
                 # fail in a single shard, then something is probably wrong, so fail
                 # fast.
@@ -1056,6 +1031,9 @@ targets.legacy_basic_suite(
         "cast_unittests": targets.legacy_test_config(),
         "components_browsertests": targets.legacy_test_config(),
         "components_unittests": targets.legacy_test_config(
+            swarming = targets.swarming(
+                shards = 3,
+            ),
             android_swarming = targets.swarming(
                 shards = 6,
             ),
@@ -1594,21 +1572,11 @@ targets.legacy_basic_suite(
     name = "chromium_webkit_isolated_scripts",
     tests = {
         "blink_web_tests": targets.legacy_test_config(
-            # TODO(crbug.com/337058844): uploading invocations is not supported
-            # by blink_web_tests yet.
-            remove_mixins = [
-                "upload_inv_extended_properties",
-            ],
             swarming = targets.swarming(
                 shards = 5,
             ),
         ),
         "blink_wpt_tests": targets.legacy_test_config(
-            # TODO(crbug.com/337058844): uploading invocations is not supported
-            # by blink_wpt_tests yet.
-            remove_mixins = [
-                "upload_inv_extended_properties",
-            ],
             swarming = targets.swarming(
                 shards = 7,
             ),
@@ -1622,43 +1590,6 @@ targets.legacy_basic_suite(
         "check_network_annotations": targets.legacy_test_config(),
         "metrics_python_tests": targets.legacy_test_config(),
         "webkit_lint": targets.legacy_test_config(),
-    },
-)
-
-targets.legacy_basic_suite(
-    name = "chromium_wpt_tests_isolated_scripts",
-    tests = {
-        "chrome_wpt_tests": targets.legacy_test_config(
-            args = [
-                "--test-type",
-                "testharness",
-                "reftest",
-                "crashtest",
-                "print-reftest",
-            ],
-            swarming = targets.swarming(
-                shards = 1,
-            ),
-        ),
-    },
-)
-
-targets.legacy_basic_suite(
-    name = "chromium_wpt_tests_headful_isolated_scripts",
-    tests = {
-        "chrome_wpt_tests_headful": targets.legacy_test_config(
-            args = [
-                "--no-headless",
-                "--test-type",
-                "testharness",
-                "reftest",
-                "crashtest",
-                "print-reftest",
-            ],
-            swarming = targets.swarming(
-                shards = 1,
-            ),
-        ),
     },
 )
 
@@ -1864,6 +1795,9 @@ targets.legacy_basic_suite(
                 shards = 7,
             ),
         ),
+        # TODO(crbug.com/328079854): Once the runner is ready, reintroduce
+        # `chrome_wpt_tests` and (CI-only) `chrome_wpt_tests_headful` for all
+        # desktop platforms here.
         "content_shell_crash_test": targets.legacy_test_config(),
         "flatbuffers_unittests": targets.legacy_test_config(),
         "grit_python_unittests": targets.legacy_test_config(),
@@ -1901,6 +1835,40 @@ targets.legacy_basic_suite(
     tests = {
         "test_env_py_unittests": targets.legacy_test_config(),
         "xvfb_py_unittests": targets.legacy_test_config(),
+    },
+)
+
+targets.legacy_basic_suite(
+    name = "desktop_chromium_mac_osxbeta_scripts",
+    tests = {
+        "content_shell_crash_test": targets.legacy_test_config(),
+        "flatbuffers_unittests": targets.legacy_test_config(),
+        "grit_python_unittests": targets.legacy_test_config(),
+        "telemetry_gpu_unittests": targets.legacy_test_config(
+            swarming = targets.swarming(
+                idempotent = False,  # https://crbug.com/549140
+            ),
+        ),
+        "telemetry_unittests": targets.legacy_test_config(
+            args = [
+                "--jobs=1",
+                # Disable GPU compositing, telemetry_unittests runs on VMs.
+                # https://crbug.com/871955
+                "--extra-browser-args=--disable-gpu",
+            ],
+            swarming = targets.swarming(
+                shards = 8,
+                idempotent = False,  # https://crbug.com/549140
+            ),
+            resultdb = targets.resultdb(
+                enable = True,
+            ),
+        ),
+        "views_perftests": targets.legacy_test_config(
+            args = [
+                "--gtest-benchmark-name=views_perftests",
+            ],
+        ),
     },
 )
 
@@ -2136,31 +2104,10 @@ targets.legacy_basic_suite(
     },
 )
 
-# This is a set of selected tests to test the test facility only. The
-# principle of the selection includes time cost, scenario coverage,
-# stability, etc; and it's subject to change. In theory, it should only be
-# used by the EngProd team to verify a new test facility setup.
-targets.legacy_basic_suite(
-    name = "fuchsia_facility_gtests",
-    tests = {
-        "aura_unittests": targets.legacy_test_config(),
-        "blink_common_unittests": targets.legacy_test_config(),
-        "courgette_unittests": targets.legacy_test_config(),
-        "crypto_unittests": targets.legacy_test_config(),
-        "filesystem_service_unittests": targets.legacy_test_config(),
-        "web_engine_integration_tests": targets.legacy_test_config(),
-        "web_engine_unittests": targets.legacy_test_config(),
-    },
-)
-
 targets.legacy_basic_suite(
     name = "fuchsia_sizes_tests",
     tests = {
-        "fuchsia_sizes": targets.legacy_test_config(
-            remove_mixins = [
-                "upload_inv_extended_properties",
-            ],
-        ),
+        "fuchsia_sizes": targets.legacy_test_config(),
     },
 )
 
@@ -2252,8 +2199,8 @@ targets.legacy_basic_suite(
                 "gpu_integration_test_common_args",
             ],
             args = [
-                "$$MAGIC_SUBSTITUTION_GPUExpectedVendorId",
-                "$$MAGIC_SUBSTITUTION_GPUExpectedDeviceId",
+                targets.magic_args.GPU_EXPECTED_VENDOR_ID,
+                targets.magic_args.GPU_EXPECTED_DEVICE_ID,
                 # On dual-GPU devices we want the high-performance GPU to be active
                 "--extra-browser-args=--force_high_performance_gpu",
             ],
@@ -2276,7 +2223,7 @@ targets.legacy_basic_suite(
             ],
             chromeos_args = [
                 "--stop-ui",
-                "$$MAGIC_SUBSTITUTION_ChromeOSGtestFilterFile",
+                targets.magic_args.CROS_GTEST_FILTER_FILE,
             ],
             desktop_args = [
                 "--use-gpu-in-tests",
@@ -2312,7 +2259,7 @@ targets.legacy_basic_suite(
         "gl_tests_validating": targets.legacy_test_config(
             chromeos_args = [
                 "--stop-ui",
-                "$$MAGIC_SUBSTITUTION_ChromeOSGtestFilterFile",
+                targets.magic_args.CROS_GTEST_FILTER_FILE,
             ],
             desktop_args = [
                 "--use-gpu-in-tests",
@@ -2884,8 +2831,8 @@ targets.legacy_basic_suite(
                 "gpu_integration_test_common_args",
             ],
             args = [
-                "$$MAGIC_SUBSTITUTION_GPUExpectedVendorId",
-                "$$MAGIC_SUBSTITUTION_GPUExpectedDeviceId",
+                targets.magic_args.GPU_EXPECTED_VENDOR_ID,
+                targets.magic_args.GPU_EXPECTED_DEVICE_ID,
                 # On dual-GPU devices we want the high-performance GPU to be active
                 "--extra-browser-args=--force_high_performance_gpu",
             ],
@@ -3099,24 +3046,10 @@ targets.legacy_basic_suite(
             mixins = [
                 "gpu_integration_test_common_args",
             ],
-            remove_mixins = [
-                # TODO(crbug.com/337058844): Android uses both
-                # gpu_passthrough_telemetry_tests and
-                # gpu_validating_telemetry_tests, so the upload_inv_extended_properties needs
-                # to be removed from both suites.
-                "upload_inv_extended_properties",
-            ],
         ),
         "hardware_accelerated_feature_tests": targets.legacy_test_config(
             mixins = [
                 "gpu_integration_test_common_args",
-            ],
-            remove_mixins = [
-                # TODO(crbug.com/337058844): Android uses both
-                # gpu_passthrough_telemetry_tests and
-                # gpu_validating_telemetry_tests, so the upload_inv_extended_properties needs
-                # to be removed from both suites.
-                "upload_inv_extended_properties",
             ],
         ),
         "pixel_skia_gold_passthrough_test": targets.legacy_test_config(
@@ -3229,23 +3162,14 @@ targets.legacy_basic_suite(
             mixins = [
                 "gpu_integration_test_common_args",
             ],
-            remove_mixins = [
-                # TODO(crbug.com/337058844): Merging upload_inv_extended_properties with
-                # has_native_resultdb_integration is not supported yet.
-                "upload_inv_extended_properties",
-            ],
             args = [
                 "--extra-browser-args=--use-cmd-decoder=validating",
             ],
         ),
         "expected_color_pixel_validating_test": targets.legacy_test_config(
             mixins = [
+                "skia_gold_test",
                 "gpu_integration_test_common_args",
-            ],
-            remove_mixins = [
-                # TODO(crbug.com/337058844): Merging upload_inv_extended_properties with
-                # has_native_resultdb_integration is not supported yet.
-                "upload_inv_extended_properties",
             ],
             args = [
                 "--dont-restore-color-profile-after-test",
@@ -3262,30 +3186,16 @@ targets.legacy_basic_suite(
             mixins = [
                 "gpu_integration_test_common_args",
             ],
-            remove_mixins = [
-                # TODO(crbug.com/337058844): Merging upload_inv_extended_properties with
-                # has_native_resultdb_integration is not supported yet.
-                "upload_inv_extended_properties",
-            ],
         ),
         "hardware_accelerated_feature_tests": targets.legacy_test_config(
             mixins = [
                 "gpu_integration_test_common_args",
             ],
-            remove_mixins = [
-                # TODO(crbug.com/337058844): Merging upload_inv_extended_properties with
-                # has_native_resultdb_integration is not supported yet.
-                "upload_inv_extended_properties",
-            ],
         ),
         "pixel_skia_gold_validating_test": targets.legacy_test_config(
             mixins = [
+                "skia_gold_test",
                 "gpu_integration_test_common_args",
-            ],
-            remove_mixins = [
-                # TODO(crbug.com/337058844): Merging upload_inv_extended_properties with
-                # has_native_resultdb_integration is not supported yet.
-                "upload_inv_extended_properties",
             ],
             args = [
                 "--dont-restore-color-profile-after-test",
@@ -3301,11 +3211,6 @@ targets.legacy_basic_suite(
         "screenshot_sync_validating_tests": targets.legacy_test_config(
             mixins = [
                 "gpu_integration_test_common_args",
-            ],
-            remove_mixins = [
-                # TODO(crbug.com/337058844): Merging upload_inv_extended_properties with
-                # has_native_resultdb_integration is not supported yet.
-                "upload_inv_extended_properties",
             ],
             args = [
                 "--dont-restore-color-profile-after-test",
@@ -3400,7 +3305,7 @@ targets.legacy_basic_suite(
             ],
             args = [
                 "--webgl-conformance-version=2.0.1",
-                "$$MAGIC_SUBSTITUTION_GPUWebGLRuntimeFile",
+                targets.magic_args.GPU_WEBGL_RUNTIME_FILE,
                 # On dual-GPU devices we want the high-performance GPU to be active
                 "--extra-browser-args=--use-gl=angle --use-angle=d3d11 --use-cmd-decoder=passthrough --force_high_performance_gpu",
             ],
@@ -3452,7 +3357,7 @@ targets.legacy_basic_suite(
             ],
             args = [
                 "--webgl-conformance-version=2.0.1",
-                "$$MAGIC_SUBSTITUTION_GPUWebGLRuntimeFile",
+                targets.magic_args.GPU_WEBGL_RUNTIME_FILE,
                 # On dual-GPU devices we want the high-performance GPU to be active
                 "--extra-browser-args=--use-gl=angle --use-angle=gles --use-cmd-decoder=passthrough --force_high_performance_gpu",
             ],
@@ -3488,7 +3393,7 @@ targets.legacy_basic_suite(
             ],
             args = [
                 "--webgl-conformance-version=2.0.1",
-                "$$MAGIC_SUBSTITUTION_GPUWebGLRuntimeFile",
+                targets.magic_args.GPU_WEBGL_RUNTIME_FILE,
                 # On dual-GPU devices we want the high-performance GPU to be active
                 "--extra-browser-args=--use-cmd-decoder=validating --force_high_performance_gpu",
             ],
@@ -3511,7 +3416,7 @@ targets.legacy_basic_suite(
             args = [
                 # On dual-GPU devices we want the high-performance GPU to be active
                 "--extra-browser-args=--use-gl=angle --use-angle=d3d11 --use-cmd-decoder=passthrough --force_high_performance_gpu",
-                "$$MAGIC_SUBSTITUTION_GPUWebGLRuntimeFile",
+                targets.magic_args.GPU_WEBGL_RUNTIME_FILE,
             ],
             swarming = targets.swarming(
                 shards = 2,
@@ -3530,7 +3435,7 @@ targets.legacy_basic_suite(
             args = [
                 # On dual-GPU devices we want the high-performance GPU to be active
                 "--extra-browser-args=--use-gl=angle --use-angle=d3d9 --use-cmd-decoder=passthrough --force_high_performance_gpu",
-                "$$MAGIC_SUBSTITUTION_GPUWebGLRuntimeFile",
+                targets.magic_args.GPU_WEBGL_RUNTIME_FILE,
             ],
             swarming = targets.swarming(
                 shards = 2,
@@ -3563,7 +3468,7 @@ targets.legacy_basic_suite(
             args = [
                 # On dual-GPU devices we want the high-performance GPU to be active
                 "--extra-browser-args=--use-gl=angle --use-angle=gl --use-cmd-decoder=passthrough --force_high_performance_gpu",
-                "$$MAGIC_SUBSTITUTION_GPUWebGLRuntimeFile",
+                targets.magic_args.GPU_WEBGL_RUNTIME_FILE,
             ],
             swarming = targets.swarming(
                 shards = 2,
@@ -3582,7 +3487,7 @@ targets.legacy_basic_suite(
             args = [
                 # On dual-GPU devices we want the high-performance GPU to be active
                 "--extra-browser-args=--use-gl=angle --use-angle=gles --use-cmd-decoder=passthrough --force_high_performance_gpu",
-                "$$MAGIC_SUBSTITUTION_GPUWebGLRuntimeFile",
+                targets.magic_args.GPU_WEBGL_RUNTIME_FILE,
             ],
             swarming = targets.swarming(
                 shards = 6,
@@ -3601,7 +3506,7 @@ targets.legacy_basic_suite(
             args = [
                 # On dual-GPU devices we want the high-performance GPU to be active
                 "--extra-browser-args=--use-gl=angle --use-angle=gles --use-cmd-decoder=passthrough --force_high_performance_gpu --enable-features=SkiaGraphite",
-                "$$MAGIC_SUBSTITUTION_GPUWebGLRuntimeFile",
+                targets.magic_args.GPU_WEBGL_RUNTIME_FILE,
             ],
             swarming = targets.swarming(
                 shards = 3,
@@ -3681,7 +3586,7 @@ targets.legacy_basic_suite(
             args = [
                 # On dual-GPU devices we want the high-performance GPU to be active
                 "--extra-browser-args=--force_high_performance_gpu",
-                "$$MAGIC_SUBSTITUTION_GPUWebGLRuntimeFile",
+                targets.magic_args.GPU_WEBGL_RUNTIME_FILE,
             ],
             swarming = targets.swarming(
                 shards = 2,
@@ -3706,7 +3611,7 @@ targets.legacy_basic_suite(
             args = [
                 # On dual-GPU devices we want the high-performance GPU to be active
                 "--extra-browser-args=--use-cmd-decoder=validating --force_high_performance_gpu",
-                "$$MAGIC_SUBSTITUTION_GPUWebGLRuntimeFile",
+                targets.magic_args.GPU_WEBGL_RUNTIME_FILE,
             ],
             swarming = targets.swarming(
                 shards = 2,
@@ -3834,9 +3739,24 @@ targets.legacy_basic_suite(
         "leveldb_unittests": targets.legacy_test_config(),
         "libjingle_xmpp_unittests": targets.legacy_test_config(),
         "liburlpattern_unittests": targets.legacy_test_config(),
-        "media_unittests": targets.legacy_test_config(),
-        "media_unittests_skia_graphite_dawn": targets.legacy_test_config(),
-        "media_unittests_skia_graphite_metal": targets.legacy_test_config(),
+        "media_unittests": targets.legacy_test_config(
+            args = [
+                "--test-launcher-bot-mode",
+                "--test-launcher-filter-file=testing/buildbot/filters/ios.media_unittests.filter",
+            ],
+        ),
+        "media_unittests_skia_graphite_dawn": targets.legacy_test_config(
+            args = [
+                "--test-launcher-bot-mode",
+                "--test-launcher-filter-file=testing/buildbot/filters/ios.media_unittests.filter",
+            ],
+        ),
+        "media_unittests_skia_graphite_metal": targets.legacy_test_config(
+            args = [
+                "--test-launcher-bot-mode",
+                "--test-launcher-filter-file=testing/buildbot/filters/ios.media_unittests.filter",
+            ],
+        ),
         "midi_unittests": targets.legacy_test_config(),
         "mojo_unittests": targets.legacy_test_config(
             args = [
@@ -4642,6 +4562,14 @@ targets.legacy_basic_suite(
 )
 
 targets.legacy_basic_suite(
+    name = "optimization_guide_cros_gtests",
+    tests = {
+        "optimization_guide_browser_tests": targets.legacy_test_config(),
+        "optimization_guide_components_unittests": targets.legacy_test_config(),
+    },
+)
+
+targets.legacy_basic_suite(
     name = "optimization_guide_nogpu_gtests",
     tests = {
         "chrome_ml_unittests": targets.legacy_test_config(
@@ -5336,6 +5264,18 @@ targets.legacy_basic_suite(
             ],
             swarming = targets.swarming(
                 shards = 2,
+            ),
+        ),
+    },
+)
+
+# This target is only to run on Android versions <= Android Q (10).
+targets.legacy_basic_suite(
+    name = "webview_instrumentation_test_apk_single_process_mode_gtests",
+    tests = {
+        "webview_instrumentation_test_apk_single_process_mode": targets.legacy_test_config(
+            swarming = targets.swarming(
+                shards = 3,
             ),
         ),
     },

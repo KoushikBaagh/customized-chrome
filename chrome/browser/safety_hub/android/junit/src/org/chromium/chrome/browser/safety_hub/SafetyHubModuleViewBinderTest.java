@@ -38,10 +38,10 @@ import java.util.List;
 @RunWith(BaseRobolectricTestRunner.class)
 @Batch(Batch.UNIT_TESTS)
 public class SafetyHubModuleViewBinderTest {
-    private static final @DrawableRes int SAFE_ICON = R.drawable.ic_checkmark_24dp;
+    private static final @DrawableRes int SAFE_ICON = R.drawable.material_ic_check_24dp;
     private static final @DrawableRes int WARNING_ICON = R.drawable.ic_error;
     private static final @DrawableRes int INFO_ICON = R.drawable.btn_info;
-    private static final @DrawableRes int MANAGED_ICON = R.drawable.ic_business_small;
+    private static final @DrawableRes int MANAGED_ICON = R.drawable.ic_business;
     private static final String TEST_ACCOUNT_EMAIL = "test@gmail.com";
     private Activity mActivity;
     private PropertyModel mPasswordCheckPropertyModel;
@@ -137,7 +137,8 @@ public class SafetyHubModuleViewBinderTest {
         mPasswordCheckPropertyModel.set(
                 SafetyHubModuleProperties.ACCOUNT_EMAIL, TEST_ACCOUNT_EMAIL);
 
-        String expectedTitle = mActivity.getString(R.string.safety_check_passwords_safe);
+        String expectedTitle =
+                mActivity.getString(R.string.safety_hub_no_compromised_passwords_title);
         String expectedSummary =
                 mActivity.getString(
                         R.string.safety_hub_password_check_time_recently, TEST_ACCOUNT_EMAIL);
@@ -161,7 +162,8 @@ public class SafetyHubModuleViewBinderTest {
         assertEquals(expectedManagedSummary, mPasswordCheckPreference.getSummary().toString());
         assertEquals(SAFE_ICON, shadowOf(mPasswordCheckPreference.getIcon()).getCreatedFromResId());
         assertNull(mPasswordCheckPreference.getPrimaryButtonText());
-        assertNull(mPasswordCheckPreference.getSecondaryButtonText());
+        assertEquals(
+                expectedSecondaryButtonText, mPasswordCheckPreference.getSecondaryButtonText());
         assertFalse(mPasswordCheckPreference.isExpanded());
     }
 
@@ -183,7 +185,12 @@ public class SafetyHubModuleViewBinderTest {
                                 compromisedPasswordsCount,
                                 compromisedPasswordsCount);
         String expectedSummary =
-                mActivity.getString(R.string.safety_hub_compromised_passwords_summary);
+                mActivity
+                        .getResources()
+                        .getQuantityString(
+                                R.plurals.safety_hub_compromised_passwords_summary,
+                                compromisedPasswordsCount,
+                                compromisedPasswordsCount);
         String expectedPrimaryButtonText =
                 mActivity.getString(R.string.safety_hub_passwords_navigation_button);
 
@@ -196,6 +203,9 @@ public class SafetyHubModuleViewBinderTest {
         assertTrue(mPasswordCheckPreference.isExpanded());
 
         // Verify the managed state.
+        String expectedSecondaryButtonText =
+                mActivity.getString(R.string.safety_hub_passwords_navigation_button);
+
         mPasswordCheckPropertyModel.set(SafetyHubModuleProperties.IS_CONTROLLED_BY_POLICY, true);
         String expectedManagedSummary =
                 mActivity.getString(R.string.safety_hub_no_passwords_summary_managed);
@@ -204,8 +214,9 @@ public class SafetyHubModuleViewBinderTest {
         assertEquals(expectedManagedSummary, mPasswordCheckPreference.getSummary().toString());
         assertEquals(
                 MANAGED_ICON, shadowOf(mPasswordCheckPreference.getIcon()).getCreatedFromResId());
-        assertEquals(expectedPrimaryButtonText, mPasswordCheckPreference.getPrimaryButtonText());
-        assertNull(mPasswordCheckPreference.getSecondaryButtonText());
+        assertNull(mPasswordCheckPreference.getPrimaryButtonText());
+        assertEquals(
+                expectedSecondaryButtonText, mPasswordCheckPreference.getSecondaryButtonText());
         assertFalse(mPasswordCheckPreference.isExpanded());
     }
 
@@ -237,7 +248,8 @@ public class SafetyHubModuleViewBinderTest {
         assertEquals(
                 MANAGED_ICON, shadowOf(mPasswordCheckPreference.getIcon()).getCreatedFromResId());
         assertNull(mPasswordCheckPreference.getPrimaryButtonText());
-        assertNull(mPasswordCheckPreference.getSecondaryButtonText());
+        assertEquals(
+                expectedSecondaryButtonText, mPasswordCheckPreference.getSecondaryButtonText());
         assertFalse(mPasswordCheckPreference.isExpanded());
     }
 
@@ -289,7 +301,8 @@ public class SafetyHubModuleViewBinderTest {
         assertEquals(
                 MANAGED_ICON, shadowOf(mPasswordCheckPreference.getIcon()).getCreatedFromResId());
         assertNull(mPasswordCheckPreference.getPrimaryButtonText());
-        assertNull(mPasswordCheckPreference.getSecondaryButtonText());
+        assertEquals(
+                expectedSecondaryButtonText, mPasswordCheckPreference.getSecondaryButtonText());
         assertFalse(mPasswordCheckPreference.isExpanded());
     }
 
@@ -492,7 +505,7 @@ public class SafetyHubModuleViewBinderTest {
         assertEquals(expectedManagedSummary, mSafeBrowsingPreference.getSummary().toString());
         assertEquals(SAFE_ICON, shadowOf(mSafeBrowsingPreference.getIcon()).getCreatedFromResId());
         assertNull(mSafeBrowsingPreference.getPrimaryButtonText());
-        assertNull(mSafeBrowsingPreference.getSecondaryButtonText());
+        assertEquals(expectedSecondaryButtonText, mSafeBrowsingPreference.getSecondaryButtonText());
         assertFalse(mSafeBrowsingPreference.isExpanded());
     }
 
@@ -524,7 +537,7 @@ public class SafetyHubModuleViewBinderTest {
         assertEquals(expectedManagedSummary, mSafeBrowsingPreference.getSummary().toString());
         assertEquals(SAFE_ICON, shadowOf(mSafeBrowsingPreference.getIcon()).getCreatedFromResId());
         assertNull(mSafeBrowsingPreference.getPrimaryButtonText());
-        assertNull(mSafeBrowsingPreference.getSecondaryButtonText());
+        assertEquals(expectedSecondaryButtonText, mSafeBrowsingPreference.getSecondaryButtonText());
         assertFalse(mSafeBrowsingPreference.isExpanded());
     }
 
@@ -548,6 +561,9 @@ public class SafetyHubModuleViewBinderTest {
         assertTrue(mSafeBrowsingPreference.isExpanded());
 
         // Verify the managed state.
+        String expectedSecondaryButtonText =
+                mActivity.getString(R.string.safety_hub_go_to_security_settings_button);
+
         mSafeBrowsingPropertyModel.set(SafetyHubModuleProperties.IS_CONTROLLED_BY_POLICY, true);
         String expectedManagedSummary =
                 mActivity.getString(R.string.safety_hub_safe_browsing_off_summary_managed);
@@ -556,7 +572,7 @@ public class SafetyHubModuleViewBinderTest {
         assertEquals(
                 MANAGED_ICON, shadowOf(mSafeBrowsingPreference.getIcon()).getCreatedFromResId());
         assertNull(mSafeBrowsingPreference.getPrimaryButtonText());
-        assertNull(mSafeBrowsingPreference.getSecondaryButtonText());
+        assertEquals(expectedSecondaryButtonText, mSafeBrowsingPreference.getSecondaryButtonText());
         assertFalse(mSafeBrowsingPreference.isExpanded());
     }
 
@@ -661,14 +677,14 @@ public class SafetyHubModuleViewBinderTest {
     }
 
     @Test
-    public void testModuleOrder_NoWarningState() {
+    public void testModuleOrder_AllSafeStates() {
         @SafeBrowsingState int safeBrowsingState = SafeBrowsingState.STANDARD_PROTECTION;
         UpdateStatusProvider.UpdateStatus updateStatus = new UpdateStatusProvider.UpdateStatus();
         updateStatus.updateState = UpdateStatusProvider.UpdateState.NONE;
         updateStatus.latestVersion = "1.1.1.1";
-        int totalPasswordsCount = 0;
+        int totalPasswordsCount = 1;
         int compromisedPasswordsCount = 0;
-        int sitesWithUnusedPermissionsCount = 3;
+        int sitesWithUnusedPermissionsCount = 0;
         int notificationPermissionsForReviewCount = 0;
 
         mSafeBrowsingPropertyModel.set(
@@ -708,32 +724,36 @@ public class SafetyHubModuleViewBinderTest {
     }
 
     @Test
-    public void testModuleOrder_OneWarningState() {
+    public void testModuleOrder_MixedStates() {
         @SafeBrowsingState int safeBrowsingState = SafeBrowsingState.NO_SAFE_BROWSING;
-        UpdateStatusProvider.UpdateStatus updateStatus = new UpdateStatusProvider.UpdateStatus();
-        updateStatus.updateState = UpdateStatusProvider.UpdateState.NONE;
-        updateStatus.latestVersion = "1.1.1.1";
         int totalPasswordsCount = 10;
-        int compromisedPasswordsCount = 5;
-        int sitesWithUnusedPermissionsCount = 3;
+        int compromisedPasswordsCount = 6;
+        int sitesWithUnusedPermissionsCount = 0;
         int notificationPermissionsForReviewCount = 5;
+
+        // Unmanaged warning state should rank first.
+        mPasswordCheckPropertyModel.set(
+                SafetyHubModuleProperties.COMPROMISED_PASSWORDS_COUNT, compromisedPasswordsCount);
+        mPasswordCheckPropertyModel.set(
+                SafetyHubModuleProperties.TOTAL_PASSWORDS_COUNT, totalPasswordsCount);
+
+        // Unavailable state should rank after warning states.
+        mUpdateCheckPropertyModel.set(SafetyHubModuleProperties.UPDATE_STATUS, null);
 
         // Managed warning state should follow the same order as info state.
         mSafeBrowsingPropertyModel.set(
                 SafetyHubModuleProperties.SAFE_BROWSING_STATE, safeBrowsingState);
         mSafeBrowsingPropertyModel.set(SafetyHubModuleProperties.IS_CONTROLLED_BY_POLICY, true);
 
-        mUpdateCheckPropertyModel.set(SafetyHubModuleProperties.UPDATE_STATUS, updateStatus);
-        mPasswordCheckPropertyModel.set(
-                SafetyHubModuleProperties.COMPROMISED_PASSWORDS_COUNT, compromisedPasswordsCount);
-        mPasswordCheckPropertyModel.set(
-                SafetyHubModuleProperties.TOTAL_PASSWORDS_COUNT, totalPasswordsCount);
-        mPermissionsPropertyModel.set(
-                SafetyHubModuleProperties.SITES_WITH_UNUSED_PERMISSIONS_COUNT,
-                sitesWithUnusedPermissionsCount);
+        // Info state should rank above safe.
         mNotificationsReviewPropertyModel.set(
                 SafetyHubModuleProperties.NOTIFICATION_PERMISSIONS_FOR_REVIEW_COUNT,
                 notificationPermissionsForReviewCount);
+
+        // Safe state should rank last.
+        mPermissionsPropertyModel.set(
+                SafetyHubModuleProperties.SITES_WITH_UNUSED_PERMISSIONS_COUNT,
+                sitesWithUnusedPermissionsCount);
 
         List<Integer> actualOrder =
                 Arrays.asList(
@@ -753,53 +773,7 @@ public class SafetyHubModuleViewBinderTest {
                         mPasswordCheckPreference.getOrder(),
                         mUpdateCheckPreference.getOrder(),
                         mSafeBrowsingPreference.getOrder(),
-                        mPermissionsPreference.getOrder(),
-                        mNotificationsReviewPreference.getOrder()));
-    }
-
-    @Test
-    public void testModuleOrder_MultipleWarningState() {
-        @SafeBrowsingState int safeBrowsingState = SafeBrowsingState.NO_SAFE_BROWSING;
-        UpdateStatusProvider.UpdateStatus updateStatus = new UpdateStatusProvider.UpdateStatus();
-        updateStatus.updateState = UpdateStatusProvider.UpdateState.UPDATE_AVAILABLE;
-        int totalPasswordsCount = 10;
-        int compromisedPasswordsCount = 5;
-        int sitesWithUnusedPermissionsCount = 3;
-        int notificationPermissionsForReviewCount = 5;
-
-        mSafeBrowsingPropertyModel.set(
-                SafetyHubModuleProperties.SAFE_BROWSING_STATE, safeBrowsingState);
-        mUpdateCheckPropertyModel.set(SafetyHubModuleProperties.UPDATE_STATUS, updateStatus);
-        mPasswordCheckPropertyModel.set(
-                SafetyHubModuleProperties.COMPROMISED_PASSWORDS_COUNT, compromisedPasswordsCount);
-        mPasswordCheckPropertyModel.set(
-                SafetyHubModuleProperties.TOTAL_PASSWORDS_COUNT, totalPasswordsCount);
-        mPermissionsPropertyModel.set(
-                SafetyHubModuleProperties.SITES_WITH_UNUSED_PERMISSIONS_COUNT,
-                sitesWithUnusedPermissionsCount);
-        mNotificationsReviewPropertyModel.set(
-                SafetyHubModuleProperties.NOTIFICATION_PERMISSIONS_FOR_REVIEW_COUNT,
-                notificationPermissionsForReviewCount);
-
-        List<Integer> actualOrder =
-                Arrays.asList(
-                        mUpdateCheckPreference.getOrder(),
-                        mPasswordCheckPreference.getOrder(),
-                        mSafeBrowsingPreference.getOrder(),
-                        mPermissionsPreference.getOrder(),
-                        mNotificationsReviewPreference.getOrder());
-        Collections.sort(actualOrder);
-
-        // Verify that there are no duplicate orders.
-        assertEquals(actualOrder.size(), new HashSet<>(actualOrder).size());
-        // Verify the actual order of modules reflects the expected order.
-        assertThat(
-                actualOrder,
-                contains(
-                        mUpdateCheckPreference.getOrder(),
-                        mPasswordCheckPreference.getOrder(),
-                        mSafeBrowsingPreference.getOrder(),
-                        mPermissionsPreference.getOrder(),
-                        mNotificationsReviewPreference.getOrder()));
+                        mNotificationsReviewPreference.getOrder(),
+                        mPermissionsPreference.getOrder()));
     }
 }

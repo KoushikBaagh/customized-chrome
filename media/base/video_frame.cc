@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "media/base/video_frame.h"
 
 #include <GLES2/gl2.h>
@@ -1045,9 +1050,9 @@ scoped_refptr<VideoFrame> VideoFrame::WrapVideoFrame(
   //
   // We must still keep |frame| alive though since it may have destruction
   // observers which signal that the underlying resource is okay to reuse. E.g.,
-  // VideoFramePool.
+  // VideoFramePool. That's why we put it into |intermediate_wrapped_frame_|.
   if (frame->wrapped_frame_) {
-    wrapping_frame->AddDestructionObserver(base::DoNothingWithBoundArgs(frame));
+    wrapping_frame->intermediate_wrapped_frame_ = frame;
     frame = frame->wrapped_frame_;
   }
 
@@ -1441,18 +1446,18 @@ gfx::ColorSpace VideoFrame::CompatRGBColorSpace() const {
 }
 
 bool VideoFrame::RequiresExternalSampler() const {
-  const bool is_multiplanar_pixel_format = format() == PIXEL_FORMAT_NV12 ||
-                                           format() == PIXEL_FORMAT_YV12 ||
-                                           format() == PIXEL_FORMAT_P010LE;
+  const bool is_multiplanar_pixel_format =
+      format() == PIXEL_FORMAT_NV12 || format() == PIXEL_FORMAT_NV12A ||
+      format() == PIXEL_FORMAT_YV12 || format() == PIXEL_FORMAT_P010LE;
 
   // With SharedImageFormats NumTextures() is always 1. Use
   // SharedImageFormatType to check for NumTextures for legacy formats and
   // kSharedImageFormatExternalSampler for SharedImageFormats. Note that
   // kSharedImageFormatExternalSampler is set only for multiplanar formats.
   const bool requires_external_sampler =
-      shared_image_format_type() ==
-          SharedImageFormatType::kSharedImageFormatExternalSampler ||
-      (is_multiplanar_pixel_format &&
+      is_multiplanar_pixel_format &&
+      ((shared_image_format_type() ==
+        SharedImageFormatType::kSharedImageFormatExternalSampler) ||
        (NumTextures() == 1 &&
         shared_image_format_type() == SharedImageFormatType::kLegacy));
 
@@ -1480,7 +1485,7 @@ template <typename T>
 T VideoFrame::GetVisibleDataInternal(T data, size_t plane) const {
   DCHECK(IsValidPlane(format(), plane));
   DCHECK(IsMappable());
-  if (UNLIKELY(!data)) {
+  if (!data) [[unlikely]] {
     return nullptr;
   }
 
@@ -1679,6 +1684,17 @@ VideoFrame::~VideoFrame() {
   }
   for (auto& callback : done_callbacks) {
     std::move(callback).Run();
+  }
+
+  // This flattens the call graph avoiding recursion while walking
+  // `intermediate_wrapped_frame_` pointer chain, otherwise we might get
+  // a stack overflow while deleting the whole chain of nested frames.
+  auto frame_to_release = std::move(intermediate_wrapped_frame_);
+  // Delete all the frames for which `intermediate_wrapped_frame_` is
+  // the only reference.
+  while (frame_to_release && frame_to_release->HasOneRef()) {
+    auto next_frame = std::move(frame_to_release->intermediate_wrapped_frame_);
+    frame_to_release = next_frame;
   }
 }
 

@@ -34,9 +34,10 @@
 #include "components/supervised_user/core/common/buildflags.h"
 #include "components/webapps/common/constants.h"
 #include "extensions/buildflags/buildflags.h"
+#include "third_party/re2/src/re2/re2.h"
 
 #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
-#include "components/supervised_user/core/browser/supervised_user_preferences.h"
+#include "components/supervised_user/core/browser/supervised_user_capabilities.h"
 #include "components/supervised_user/core/browser/supervised_user_service.h"
 #endif
 
@@ -102,15 +103,36 @@ std::u16string GenerateShortTitle(const std::u16string& title) {
   if (title.empty()) {
     return std::u16string();
   }
-  std::vector<std::u16string> short_title_list = SplitString(
-      title, u"-:|;", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
-  // Make sure it doesn't crash when the title only contains spaces.
-  if (short_title_list.empty()) {
-    return std::u16string();
+
+  // Match "anything- anything" where "-" is one of the delimiters shown in the
+  // following examples of intended matches: "Front - Back", "Front | Back",
+  // "Front: Back", "Front; Back"
+  const std::string regex = "(.*?)[-|:;]+\\s(.*)";
+
+  std::string utf8_short_title_front;
+  std::string utf8_short_title_back;
+  std::string utf8_title = base::UTF16ToUTF8(title);
+
+  std::u16string short_title_front;
+  std::u16string short_title_back;
+  std::u16string short_title;
+
+  if (!re2::RE2::FullMatch(utf8_title, regex, &utf8_short_title_front,
+                           &utf8_short_title_back)) {
+    // If FullMatch() returns false, we don't have a split title, so return full
+    // title. Tests expect trimmed title.
+    return std::u16string(
+        base::TrimWhitespace(title, base::TrimPositions::TRIM_ALL));
   }
-  std::u16string short_title_front = short_title_list.front();
-  std::u16string short_title_back = short_title_list.back();
-  std::u16string short_title = short_title_front;
+
+  if (!utf8_short_title_front.empty()) {
+    short_title_front = base::UTF8ToUTF16(utf8_short_title_front);
+    short_title = short_title_front;
+  }
+  if (!utf8_short_title_back.empty()) {
+    short_title_back = base::UTF8ToUTF16(utf8_short_title_back);
+  }
+
   if (short_title_front != short_title_back) {
     int words_in_front =
         SplitString(short_title_front, base::kWhitespaceASCIIAs16,
@@ -124,6 +146,8 @@ std::u16string GenerateShortTitle(const std::u16string& title) {
       short_title = short_title_back;
     }
   }
+  base::TrimWhitespace(short_title, base::TrimPositions::TRIM_ALL,
+                       &short_title);
   return short_title;
 }
 
@@ -131,6 +155,7 @@ std::u16string GenerateShortTitle(const std::u16string& title) {
 
 MostVisitedSites::MostVisitedSites(
     PrefService* prefs,
+    signin::IdentityManager* identity_manager,
     supervised_user::SupervisedUserService* supervised_user_service,
     scoped_refptr<history::TopSites> top_sites,
     std::unique_ptr<PopularSites> popular_sites,
@@ -138,6 +163,7 @@ MostVisitedSites::MostVisitedSites(
     std::unique_ptr<IconCacher> icon_cacher,
     bool is_default_chrome_app_migrated)
     : prefs_(prefs),
+      identity_manager_(identity_manager),
       supervised_user_service_(supervised_user_service),
       top_sites_(top_sites),
       popular_sites_(std::move(popular_sites)),
@@ -532,7 +558,9 @@ MostVisitedSites::CreatePopularSitesSections(
       std::make_pair(SectionType::PERSONALIZED, NTPTilesVector())};
 #if BUILDFLAG(ENABLE_SUPERVISED_USERS)
   // For child accounts popular sites tiles will not be added.
-  if (supervised_user::IsSubjectToParentalControls(*prefs_)) {
+  if (identity_manager_ &&
+      supervised_user::IsPrimaryAccountSubjectToParentalControls(
+          identity_manager_) == signin::Tribool::kTrue) {
     return sections;
   }
 #endif

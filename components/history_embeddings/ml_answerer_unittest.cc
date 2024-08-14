@@ -6,12 +6,14 @@
 
 #include "base/memory/raw_ptr.h"
 #include "base/test/task_environment.h"
+#include "base/test/test_future.h"
 #include "components/optimization_guide/proto/features/history_answer.pb.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace history_embeddings {
 
+using base::test::TestFuture;
 using optimization_guide::OptimizationGuideModelExecutionError;
 using optimization_guide::OptimizationGuideModelStreamingExecutionResult;
 using optimization_guide::proto::HistoryAnswerResponse;
@@ -154,7 +156,7 @@ TEST_F(MlAnswererTest, ComputeAnswerNoSession) {
     return nullptr;
   });
 
-  Answerer::Context context;
+  Answerer::Context context("1");
   context.url_passages_map.insert({"url_1", {"passage_11", "passage_12"}});
   ComputeAnswerCallback callback =
       base::BindOnce([](AnswererResult answer_result) {
@@ -192,7 +194,7 @@ TEST_F(MlAnswererTest, ComputeAnswerExecutionFailure) {
                         /*provided_by_on_device=*/true, nullptr)));
           })));
 
-  Answerer::Context context;
+  Answerer::Context context("1");
   context.url_passages_map.insert({"url_1", {"passage_11", "passage_12"}});
   ComputeAnswerCallback callback =
       base::BindOnce([](AnswererResult answer_result) {
@@ -225,11 +227,12 @@ TEST_F(MlAnswererTest, ComputeAnswerSingleUrl) {
                                    /*provided_by_on_device=*/true, nullptr)));
           })));
 
-  Answerer::Context context;
+  Answerer::Context context("1");
   context.url_passages_map.insert({"url_1", {"passage_11", "passage_12"}});
   ComputeAnswerCallback callback =
       base::BindOnce([](AnswererResult answer_result) {
         EXPECT_EQ("Answer_1", answer_result.answer.text());
+        EXPECT_EQ("url_1", answer_result.url);
       });
 
   ml_answerer_->ComputeAnswer("query", context, std::move(callback));
@@ -272,15 +275,36 @@ TEST_F(MlAnswererTest, ComputeAnswerMultipleUrls) {
                                    /*provided_by_on_device=*/true, nullptr)));
           })));
 
-  Answerer::Context context;
+  Answerer::Context context("1");
   context.url_passages_map.insert({"url_1", {"passage_11", "passage_12"}});
   context.url_passages_map.insert({"url_2", {"passage_21", "passage_22"}});
   ComputeAnswerCallback callback =
       base::BindOnce([](AnswererResult answer_result) {
         EXPECT_EQ("Answer_2", answer_result.answer.text());
+        EXPECT_EQ("url_2", answer_result.url);
       });
 
   ml_answerer_->ComputeAnswer("query", context, std::move(callback));
+}
+
+TEST_F(MlAnswererTest, ComputeAnswerUnanswerable) {
+  ON_CALL(model_executor_, StartSession(_, _)).WillByDefault([&] {
+    return std::make_unique<MockSessionWrapper>(&session_1_);
+  });
+
+  // Below the default 0.5 threshold.
+  ON_CALL(session_1_, Score(_, _))
+      .WillByDefault(testing::WithArg<1>(testing::Invoke(
+          [&](optimization_guide::OptimizationGuideModelScoreCallback
+                  callback) { std::move(callback).Run(0.3); })));
+
+  Answerer::Context context("1");
+  context.url_passages_map.insert({"url_1", {"passage_11", "passage_12"}});
+
+  TestFuture<AnswererResult> future;
+  ml_answerer_->ComputeAnswer("query", context, future.GetCallback());
+  const auto answer_result = future.Get();
+  EXPECT_EQ(ComputeAnswerStatus::UNANSWERABLE, answer_result.status);
 }
 
 }  // namespace history_embeddings

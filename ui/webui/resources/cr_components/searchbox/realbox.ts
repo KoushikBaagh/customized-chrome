@@ -516,17 +516,11 @@ export class RealboxElement extends RealboxElementBase {
       return;
     }
 
-    if (!this.dropdownIsVisible) {
-      // Query for zero-prefix matches if user is clicking into an empty input
-      // and matches are not visible.
-      if (!this.$.input.value) {
-        this.queryAutocomplete_('');
-      } else if (this.showThumbnail) {
-        // Query current input if clicking into input while thumbnail is
-        // showing and matches are not visible.
-        this.queryAutocomplete_(this.$.input.value);
-      }
+    // Query autocomplete if dropdown is not visible
+    if (this.dropdownIsVisible) {
+      return;
     }
+    this.queryAutocomplete_(this.$.input.value);
   }
 
   private onInputPaste_() {
@@ -594,7 +588,7 @@ export class RealboxElement extends RealboxElementBase {
           // thumbnail isn't part of the text input.
           this.queryAutocomplete_(inputValue);
           e.preventDefault();
-        } else if (e.key === 'Tab') {
+        } else if (e.key === 'Tab' && !e.shiftKey) {
           this.$.input.focus();
           e.preventDefault();
         } else if (

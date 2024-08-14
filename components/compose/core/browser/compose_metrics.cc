@@ -7,6 +7,7 @@
 #include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
+#include "base/metrics/user_metrics.h"
 #include "base/strings/strcat.h"
 #include "base/time/time.h"
 #include "services/metrics/public/cpp/metrics_utils.h"
@@ -53,6 +54,9 @@ const char kComposeProactiveNudgeShowStatus[] =
 const char kOpenComposeDialogResult[] =
     "Compose.ContextMenu.OpenComposeDialogResult";
 const char kComposeSelectAll[] = "Compose.ContextMenu.SelectedAll";
+const char kComposeStartSessionEntryPoint[] = "Compose.EntryPoint.SessionStart";
+const char kComposeResumeSessionEntryPoint[] =
+    "Compose.EntryPoint.SessionResume";
 
 namespace {
 
@@ -188,6 +192,22 @@ void LogComposeProactiveNudgeShowStatus(ComposeShowStatus status) {
 
 void LogOpenComposeDialogResult(OpenComposeDialogResult result) {
   base::UmaHistogramEnumeration(kOpenComposeDialogResult, result);
+}
+
+void LogStartSessionEntryPoint(ComposeEntryPoint entry_point) {
+  base::UmaHistogramEnumeration(kComposeStartSessionEntryPoint, entry_point);
+
+  if (entry_point == ComposeEntryPoint::kProactiveNudge) {
+    base::RecordAction(
+        base::UserMetricsAction("Compose.StartedSession.ProactiveNudge"));
+  } else if (entry_point == ComposeEntryPoint::kContextMenu) {
+    base::RecordAction(
+        base::UserMetricsAction("Compose.StartedSession.ContextMenu"));
+  }
+}
+
+void LogResumeSessionEntryPoint(ComposeEntryPoint entry_point) {
+  base::UmaHistogramEnumeration(kComposeResumeSessionEntryPoint, entry_point);
 }
 
 void LogComposeRequestReason(ComposeRequestReason reason) {

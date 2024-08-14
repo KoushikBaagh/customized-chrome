@@ -1642,8 +1642,9 @@ bool View::OnMouseWheel(const ui::MouseWheelEvent& event) {
 }
 
 void View::OnKeyEvent(ui::KeyEvent* event) {
-  bool consumed = (event->type() == ui::ET_KEY_PRESSED) ? OnKeyPressed(*event)
-                                                        : OnKeyReleased(*event);
+  bool consumed = (event->type() == ui::EventType::kKeyPressed)
+                      ? OnKeyPressed(*event)
+                      : OnKeyReleased(*event);
   if (consumed) {
     event->StopPropagation();
   }
@@ -1651,13 +1652,13 @@ void View::OnKeyEvent(ui::KeyEvent* event) {
 
 void View::OnMouseEvent(ui::MouseEvent* event) {
   switch (event->type()) {
-    case ui::ET_MOUSE_PRESSED:
+    case ui::EventType::kMousePressed:
       if (ProcessMousePressed(*event)) {
         event->SetHandled();
       }
       return;
 
-    case ui::ET_MOUSE_MOVED:
+    case ui::EventType::kMouseMoved:
       if ((event->flags() &
            (ui::EF_LEFT_MOUSE_BUTTON | ui::EF_RIGHT_MOUSE_BUTTON |
             ui::EF_MIDDLE_MOUSE_BUTTON)) == 0) {
@@ -1665,28 +1666,28 @@ void View::OnMouseEvent(ui::MouseEvent* event) {
         return;
       }
       [[fallthrough]];
-    case ui::ET_MOUSE_DRAGGED:
+    case ui::EventType::kMouseDragged:
       ProcessMouseDragged(event);
       return;
 
-    case ui::ET_MOUSE_RELEASED:
+    case ui::EventType::kMouseReleased:
       ProcessMouseReleased(*event);
       return;
 
-    case ui::ET_MOUSEWHEEL:
+    case ui::EventType::kMousewheel:
       if (OnMouseWheel(*event->AsMouseWheelEvent())) {
         event->SetHandled();
       }
       break;
 
-    case ui::ET_MOUSE_ENTERED:
+    case ui::EventType::kMouseEntered:
       if (event->flags() & ui::EF_TOUCH_ACCESSIBILITY) {
         NotifyAccessibilityEvent(ax::mojom::Event::kHover, true);
       }
       OnMouseEntered(*event);
       break;
 
-    case ui::ET_MOUSE_EXITED:
+    case ui::EventType::kMouseExited:
       OnMouseExited(*event);
       break;
 
@@ -2155,11 +2156,11 @@ bool View::HandleAccessibleAction(const ui::AXActionData& action_data) {
       break;
     case ax::mojom::Action::kDoDefault: {
       const gfx::Point center = GetLocalBounds().CenterPoint();
-      ui::MouseEvent press(ui::ET_MOUSE_PRESSED, center, center,
+      ui::MouseEvent press(ui::EventType::kMousePressed, center, center,
                            ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
                            ui::EF_LEFT_MOUSE_BUTTON);
       OnEvent(&press);
-      ui::MouseEvent release(ui::ET_MOUSE_RELEASED, center, center,
+      ui::MouseEvent release(ui::EventType::kMouseReleased, center, center,
                              ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
                              ui::EF_LEFT_MOUSE_BUTTON);
       OnEvent(&release);
@@ -2933,7 +2934,7 @@ void View::PaintDebugRects(const PaintInfo& parent_paint_info) {
   ui::PaintRecorder recorder(context, paint_info.paint_recording_size(),
                              paint_info.paint_recording_scale_x(),
                              paint_info.paint_recording_scale_y(),
-                             &paint_cache_);
+                             /*cache*/ nullptr);
   gfx::Canvas* canvas = recorder.canvas();
   const float scale = canvas->UndoDeviceScaleFactor();
   gfx::RectF outline_rect(ScaleToEnclosedRect(GetLocalBounds(), scale));
@@ -2997,9 +2998,23 @@ void View::AddChildViewAtImpl(View* view, size_t index) {
   // inherit the visibility of the owner View.
   view->UpdateLayerVisibility();
 
+  // TODO(https://crbug.com/325137417): We should only complete the
+  // initialization of the accessible cache when we know an accessibility API
+  // client fetches information from the browser. Add a condition for the
+  // kNativeAPIs mode after doing some testing.
+  view->GetViewAccessibility().CompleteCacheInitialization();
+
   // Make sure that the accessible focusable state of the descendants of the
-  // `view` is correct.
-  view->GetViewAccessibility().UpdateFocusableStateRecursive();
+  // `view` is correct, and make sure they are ready to send event
+  // notifications.
+  //
+  // TODO(https://crbug.com/325137417): This function and
+  // `CompleteCacheInitialization` called above both walk the views hierarchy.
+  // Their responsibilities are also similar. Investigate whether we can prevent
+  // events from being fired until accessibility is fully initialized, and if we
+  // need to update the accessible focusable state before the cache is fully
+  // initialized. If so, let's merge these two functions.
+  view->GetViewAccessibility().UpdateStatesForViewAndDescendants();
 
   if (widget) {
     // There are scenarios where we might be reparenting a view from a widget

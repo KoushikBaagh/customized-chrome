@@ -10,6 +10,7 @@
 #include "base/check_deref.h"
 #include "base/containers/flat_map.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/notreached.h"
 #include "base/scoped_multi_source_observation.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/types/cxx23_to_underlying.h"
@@ -19,6 +20,7 @@
 #include "components/autofill/core/browser/autofill_plus_address_delegate.h"
 #include "components/autofill/core/browser/data_model/borrowed_transliterator.h"
 #include "components/autofill/core/browser/form_structure.h"
+#include "components/autofill/core/browser/ui/suggestion_type.h"
 #include "components/autofill/core/common/unique_ids.h"
 #include "components/commerce/core/heuristics/commerce_heuristics_provider.h"
 #include "components/signin/public/base/consent_level.h"
@@ -63,6 +65,10 @@ bool IsCartOrCheckoutUrl(const GURL& url) {
          commerce_heuristics::IsVisitCart(url);
 }
 
+bool IsPlusAddressCreationSuggestion(SuggestionType suggestion_type) {
+  return suggestion_type == SuggestionType::kCreateNewPlusAddress;
+}
+
 }  // namespace
 
 PlusAddressSubmissionLogger::Record::Record(
@@ -93,7 +99,7 @@ void PlusAddressSubmissionLogger::OnPlusAddressSuggestionShown(
     FormGlobalId form,
     FieldGlobalId field,
     autofill::AutofillPlusAddressDelegate::SuggestionContext suggestion_context,
-    autofill::AutofillClient::PasswordFormType form_type,
+    autofill::AutofillClient::PasswordFormClassification::Type form_type,
     SuggestionType suggestion_type,
     size_t plus_address_count) {
   const CoreAccountInfo core_account_info =
@@ -141,23 +147,33 @@ void PlusAddressSubmissionLogger::OnPlusAddressSuggestionShown(
       .SetFieldCountRendererForm(ukm::GetExponentialBucketMinForCounts1000(
           field_count_in_renderer_form))
       .SetManagedProfile(account_info.IsManaged())
-      .SetNewlyCreatedPlusAddress(suggestion_type ==
-                                  SuggestionType::kCreateNewPlusAddress)
+      // NewlyCreatedPlusAddress may be reset during submission if no plus
+      // address was submitted.
+      .SetNewlyCreatedPlusAddress(
+          IsPlusAddressCreationSuggestion(suggestion_type))
       .SetPasswordFormType(base::to_underlying(form_type))
       .SetPlusAddressCount(
           base::to_underlying(ToPlusAddressCountBucket(plus_address_count)))
-      .SetSuggestionContext(base::to_underlying(suggestion_context));
+      .SetSuggestionContext(base::to_underlying(suggestion_context))
+      .SetWasShownCreateSuggestion(
+          IsPlusAddressCreationSuggestion(suggestion_type));
   records_[&manager].insert_or_assign(field, std::move(record));
 }
 
-void PlusAddressSubmissionLogger::OnAutofillManagerDestroyed(
-    autofill::AutofillManager& manager) {
-  RemoveManagerObservation(manager);
-}
-
-void PlusAddressSubmissionLogger::OnAutofillManagerReset(
-    autofill::AutofillManager& manager) {
-  RemoveManagerObservation(manager);
+void PlusAddressSubmissionLogger::OnAutofillManagerStateChanged(
+    autofill::AutofillManager& manager,
+    autofill::AutofillManager::LifecycleState old_state,
+    autofill::AutofillManager::LifecycleState new_state) {
+  using enum autofill::AutofillManager::LifecycleState;
+  switch (new_state) {
+    case kInactive:
+    case kActive:
+      break;
+    case kPendingReset:
+    case kPendingDeletion:
+      RemoveManagerObservation(manager);
+      break;
+  }
 }
 
 void PlusAddressSubmissionLogger::OnFormSubmitted(

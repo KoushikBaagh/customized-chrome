@@ -13,12 +13,11 @@
 #include "base/timer/timer.h"
 #include "chrome/browser/ui/browser_list_observer.h"
 #include "chrome/browser/ui/browser_user_data.h"
-#include "chrome/browser/ui/side_panel/side_panel_entry_observer.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
+#include "chrome/browser/ui/views/side_panel/side_panel_entry_observer.h"
 #include "content/public/browser/web_contents_observer.h"
 
 class Browser;
-class SidePanelRegistry;
 namespace views {
 class View;
 }  // namespace views
@@ -42,10 +41,8 @@ class ReadAnythingCoordinator : public BrowserUserData<ReadAnythingCoordinator>,
    public:
     virtual void Activate(bool active) {}
     virtual void OnActivePageDistillable(bool distillable) {}
-    virtual void OnCoordinatorDestroyed() = 0;
   };
 
-  void CreateAndRegisterEntry(SidePanelRegistry* global_registry);
   explicit ReadAnythingCoordinator(Browser* browser);
   ~ReadAnythingCoordinator() override;
 
@@ -62,10 +59,6 @@ class ReadAnythingCoordinator : public BrowserUserData<ReadAnythingCoordinator>,
   friend class BrowserUserData<ReadAnythingCoordinator>;
   friend class ReadAnythingCoordinatorTest;
   friend class ReadAnythingCoordinatorScreen2xDataCollectionModeTest;
-
-  void CreateAndRegisterEntriesForExistingWebContents(
-      TabStripModel* tab_strip_model);
-  void CreateAndRegisterEntryForWebContents(content::WebContents* web_contents);
 
   // Starts the delay for showing the IPH after the tab has changed.
   void StartPageChangeDelay();

@@ -215,18 +215,19 @@ class MediaNotificationViewImplTest : public views::ViewsTestBase {
     EXPECT_TRUE(button->GetVisible());
 
     views::test::ButtonTestApi(button).NotifyClick(
-        ui::MouseEvent(ui::ET_MOUSE_PRESSED, gfx::Point(), gfx::Point(),
+        ui::MouseEvent(ui::EventType::kMousePressed, gfx::Point(), gfx::Point(),
                        ui::EventTimeForNow(), 0, 0));
   }
 
   void SimulateHeaderClick() {
     views::test::ButtonTestApi(header_row())
-        .NotifyClick(ui::MouseEvent(ui::ET_MOUSE_PRESSED, gfx::Point(),
+        .NotifyClick(ui::MouseEvent(ui::EventType::kMousePressed, gfx::Point(),
                                     gfx::Point(), ui::EventTimeForNow(), 0, 0));
   }
 
   void SimulateTab() {
-    ui::KeyEvent pressed_tab(ui::ET_KEY_PRESSED, ui::VKEY_TAB, ui::EF_NONE);
+    ui::KeyEvent pressed_tab(ui::EventType::kKeyPressed, ui::VKEY_TAB,
+                             ui::EF_NONE);
     view()->GetFocusManager()->OnKeyEvent(pressed_tab);
   }
 
@@ -865,13 +866,16 @@ TEST_F(MediaNotificationViewImplTest, NotifysContainerOfExpandedState) {
   EXPECT_FALSE(expanded);
 }
 
-TEST_F(MediaNotificationViewImplTest, AccessibleNodeData) {
+TEST_F(MediaNotificationViewImplTest, AccessibleProperties) {
   ui::AXNodeData data;
-  view()->GetAccessibleNodeData(&data);
+  view()->GetViewAccessibility().GetAccessibleNodeData(&data);
 
   EXPECT_TRUE(
       data.HasStringAttribute(ax::mojom::StringAttribute::kRoleDescription));
   EXPECT_EQ(u"title - artist", accessible_name());
+
+  EXPECT_EQ(view()->GetViewAccessibility().GetCachedRole(),
+            ax::mojom::Role::kListItem);
 }
 
 TEST_F(MediaNotificationViewImplTest, ForcedExpandedState) {

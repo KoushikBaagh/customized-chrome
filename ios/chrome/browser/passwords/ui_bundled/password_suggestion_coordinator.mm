@@ -5,9 +5,12 @@
 #import "ios/chrome/browser/passwords/ui_bundled/password_suggestion_coordinator.h"
 
 #import "base/check.h"
+#import "base/metrics/histogram_functions.h"
 #import "base/notreached.h"
 #import "base/strings/sys_string_conversions.h"
+#import "components/autofill/core/common/password_generation_util.h"
 #import "components/password_manager/core/browser/features/password_features.h"
+#import "components/password_manager/ios/constants.h"
 #import "components/password_manager/ios/password_manager_java_script_feature.h"
 #import "components/prefs/pref_service.h"
 #import "ios/chrome/browser/autofill/model/bottom_sheet/autofill_bottom_sheet_tab_helper.h"
@@ -85,11 +88,10 @@ constexpr CGFloat preferredCornerRadius = 20;
   self.viewController.modalPresentationStyle = UIModalPresentationPageSheet;
   UISheetPresentationController* presentationController =
       self.viewController.sheetPresentationController;
-  presentationController.prefersEdgeAttachedInCompactHeight = YES;
-  presentationController.detents = @[
-    UISheetPresentationControllerDetent.mediumDetent,
-    UISheetPresentationControllerDetent.largeDetent
-  ];
+  presentationController.detents = [self detents];
+  presentationController.prefersEdgeAttachedInCompactHeight =
+      [self isEdgeAttachedInCompactHeight];
+
   presentationController.preferredCornerRadius = preferredCornerRadius;
 
   // Immediately dismiss the keyboard (only on tablet) because the
@@ -226,14 +228,18 @@ constexpr CGFloat preferredCornerRadius = 20;
   }
   PrefService* prefService = browserState->GetPrefs();
   if (prefService) {
-    const int currentDismissCount = prefService->GetInteger(
-        prefs::kIosPasswordGenerationBottomSheetDismissCount);
-    if (currentDismissCount <
-        AutofillBottomSheetTabHelper::
-            kPasswordGenerationBottomSheetMaxDismissCount) {
-      prefService->SetInteger(
-          prefs::kIosPasswordGenerationBottomSheetDismissCount,
-          currentDismissCount + 1);
+    const int newDismissCount =
+        prefService->GetInteger(
+            prefs::kIosPasswordGenerationBottomSheetDismissCount) +
+        1;
+    prefService->SetInteger(
+        prefs::kIosPasswordGenerationBottomSheetDismissCount, newDismissCount);
+    if (newDismissCount == AutofillBottomSheetTabHelper::
+                               kPasswordGenerationBottomSheetMaxDismissCount) {
+      base::UmaHistogramEnumeration(
+          "PasswordGeneration.BottomSheetStateTransitionPasswordGeneration.iOS."
+          "ProactiveBottomSheetStateTransition",
+          PasswordGenerationBottomSheetStateTransitionType::kSilenced);
     }
   }
 }
@@ -279,9 +285,79 @@ constexpr CGFloat preferredCornerRadius = 20;
   }
   PrefService* prefService = browserState->GetPrefs();
   if (prefService) {
+    const int currentDismissCount = prefService->GetInteger(
+        prefs::kIosPasswordGenerationBottomSheetDismissCount);
+    if (currentDismissCount ==
+        AutofillBottomSheetTabHelper::
+            kPasswordGenerationBottomSheetMaxDismissCount) {
+      base::UmaHistogramEnumeration(
+          "PasswordGeneration.iOS.ProactiveBottomSheetStateTransition",
+          PasswordGenerationBottomSheetStateTransitionType::kUnsilenced);
+    }
     prefService->SetInteger(
         prefs::kIosPasswordGenerationBottomSheetDismissCount, 0);
   }
+}
+
+// Returns the minimum detent height such that the entire content can be
+// shown, constrained between the medium and large detent heights. If
+// the content does not fit entirely in the largest height, the content
+// is scrollable.
+- (UISheetPresentationControllerDetent*)preferredHeightDetent {
+  auto resolver = ^CGFloat(
+      id<UISheetPresentationControllerDetentResolutionContext> context) {
+    CGFloat height = [self.viewController preferredHeightForContent];
+    CGFloat largeDetentHeight = [UISheetPresentationControllerDetent.largeDetent
+        resolvedValueInContext:context];
+    height = MIN(height, largeDetentHeight);
+    CGFloat mediumDetentHeight =
+        [UISheetPresentationControllerDetent.mediumDetent
+            resolvedValueInContext:context];
+    return MAX(height, mediumDetentHeight);
+  };
+  return [UISheetPresentationControllerDetent
+      customDetentWithIdentifier:@"preferred_height"
+                        resolver:resolver];
+}
+
+- (NSArray<UISheetPresentationControllerDetent*>*)detents {
+  // Custom sized detents for modals are available from iOS 16.
+  if (@available(iOS 18, *)) {
+    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+      // As of iOS 18, the modal on iPad no longer appears near the bottom
+      // edge and should not be expandable (i.e. large detent should not
+      // be an option).
+      return @[ [self preferredHeightDetent] ];
+    }
+    // Having the large detent as an option makes the modal expandable to
+    // the maximum size.
+    return @[
+      [self preferredHeightDetent],
+      UISheetPresentationControllerDetent.largeDetent
+    ];
+  } else if (@available(iOS 16, *)) {
+    // Having the large detent as an option makes the modal expandable to
+    // the maximum size.
+    return @[
+      [self preferredHeightDetent],
+      UISheetPresentationControllerDetent.largeDetent
+    ];
+  }
+  return @[
+    UISheetPresentationControllerDetent.mediumDetent,
+    UISheetPresentationControllerDetent.largeDetent
+  ];
+}
+
+- (BOOL)isEdgeAttachedInCompactHeight {
+  if (@available(iOS 18, *)) {
+    // This specifically affects the iPad mini format, so the bottom
+    // sheet does not attach to the bottom edge like it does on iPhone.
+    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+      return NO;
+    }
+  }
+  return YES;
 }
 
 @end

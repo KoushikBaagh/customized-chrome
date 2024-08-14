@@ -14,6 +14,7 @@
 
 #include "base/containers/flat_map.h"
 #include "base/time/time.h"
+#include "base/types/optional_ref.h"
 #include "base/types/pass_key.h"
 #include "third_party/blink/public/common/common_export.h"
 #include "third_party/blink/public/common/interest_group/ad_display_size.h"
@@ -31,11 +32,6 @@ namespace blink {
 
 constexpr char kKAnonKeyForAdComponentBidPrefix[] = "ComponentBid\n";
 constexpr char kKAnonKeyForAdBidPrefix[] = "AdBid\n";
-constexpr char kKAnonKeyForAdNameReportingBuyerAndSellerIdPrefix[] =
-    "BuyerAndSellerReportId\n";
-constexpr char kKAnonKeyForAdNameReportingBuyerReportIdPrefix[] =
-    "BuyerReportId\n";
-constexpr char kKAnonKeyForAdNameReportingNamePrefix[] = "NameReport\n";
 
 // Interest group used by FLEDGE auctions. Typemapped to
 // blink::mojom::InterestGroup, primarily so the typemap can include validity
@@ -66,6 +62,8 @@ struct BLINK_COMMON_EXPORT InterestGroup {
        std::optional<std::string> size_group = std::nullopt,
        std::optional<std::string> buyer_reporting_id = std::nullopt,
        std::optional<std::string> buyer_and_seller_reporting_id = std::nullopt,
+       std::optional<std::vector<std::string>>
+           selectable_buyer_and_seller_reporting_ids = std::nullopt,
        std::optional<std::string> ad_render_id = std::nullopt,
        std::optional<std::vector<url::Origin>> allowed_reporting_origins =
            std::nullopt);
@@ -87,6 +85,8 @@ struct BLINK_COMMON_EXPORT InterestGroup {
     // checks. These are only set on ads, not on component ads.
     std::optional<std::string> buyer_reporting_id;
     std::optional<std::string> buyer_and_seller_reporting_id;
+    std::optional<std::vector<std::string>>
+        selectable_buyer_and_seller_reporting_ids;
 
     // Optional alias to use for B&A auctions
     std::optional<std::string> ad_render_id;
@@ -165,6 +165,7 @@ struct BLINK_COMMON_EXPORT InterestGroup {
   TrustedBiddingSignalsSlotSizeMode trusted_bidding_signals_slot_size_mode =
       TrustedBiddingSignalsSlotSizeMode::kNone;
   int32_t max_trusted_bidding_signals_url_length = 0;
+  std::optional<url::Origin> trusted_bidding_signals_coordinator;
   std::optional<std::string> user_bidding_signals;
   std::optional<std::vector<InterestGroup::Ad>> ads, ad_components;
   std::optional<base::flat_map<std::string, blink::AdSize>> ad_sizes;
@@ -176,7 +177,7 @@ struct BLINK_COMMON_EXPORT InterestGroup {
   std::optional<AdditionalBidKey> additional_bid_key;
   std::optional<url::Origin> aggregation_coordinator_origin;
 
-  static_assert(__LINE__ == 179, R"(
+  static_assert(__LINE__ == 180, R"(
 If modifying InterestGroup fields, make sure to also modify:
 
 * IsValid(), EstimateSize(), and IsEqualForTesting() in this class
@@ -284,12 +285,16 @@ HashedKAnonKeyForAdComponentBid(const GURL& ad_url);
 // do not provide the interest group name to reportWin.
 // DEPRECATED_KAnonKeyForAdNameReporting should only be used for upgrades of
 // the InterestGroups database. Use HashedKAnonKeyForAdNameReporting instead.
-std::string BLINK_COMMON_EXPORT
-DEPRECATED_KAnonKeyForAdNameReporting(const InterestGroup& group,
-                                      const InterestGroup::Ad& ad);
+std::string BLINK_COMMON_EXPORT DEPRECATED_KAnonKeyForAdNameReporting(
+    const InterestGroup& group,
+    const InterestGroup::Ad& ad,
+    base::optional_ref<const std::string>
+        selected_buyer_and_seller_reporting_id);
 std::string BLINK_COMMON_EXPORT
 HashedKAnonKeyForAdNameReporting(const InterestGroup& group,
-                                 const InterestGroup::Ad& ad);
+                                 const InterestGroup::Ad& ad,
+                                 base::optional_ref<const std::string>
+                                     selected_buyer_and_seller_reporting_id);
 
 }  // namespace blink
 

@@ -41,12 +41,14 @@
 #include "chrome/browser/signin/signin_util.h"
 #include "chrome/browser/sync/sync_service_factory.h"
 #include "chrome/browser/sync/sync_ui_util.h"
+#include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/bookmarks/bookmark_utils.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/global_error/global_error.h"
 #include "chrome/browser/ui/global_error/global_error_service.h"
 #include "chrome/browser/ui/global_error/global_error_service_factory.h"
@@ -137,6 +139,7 @@
 #endif
 
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+#include "chrome/browser/ui/lens/lens_overlay_entry_point_controller.h"
 #include "components/lens/lens_features.h"
 #endif
 
@@ -264,42 +267,76 @@ std::u16string GetInstallPWALabel(const Browser* browser) {
     return std::u16string();
   }
 
+  std::u16string install_page_as_app_label =
+      l10n_util::GetStringUTF16(IDS_INSTALL_DIY_TO_OS_LAUNCH_SURFACE);
   webapps::AppBannerManager* banner =
       webapps::AppBannerManager::FromWebContents(web_contents);
   if (!banner) {
+    // Showing `Install Page as App` allows the user to refetch the manifest and
+    // go through the install flow without relying on the AppBannerManager to
+    // finish working.
+    if (base::FeatureList::IsEnabled(features::kWebAppUniversalInstall)) {
+      return install_page_as_app_label;
+    }
     return std::u16string();
   }
 
   std::optional<webapps::InstallBannerConfig> install_config =
       banner->GetCurrentBannerConfig();
   if (!install_config) {
+    // In some edge cases where the `AppBannerManager` pipeline hasn't run yet,
+    // the information populated to be used for determining installability and
+    // other parameters is not available. In this case, allow users to try
+    // installability by refetching the manifest.
+    if (base::FeatureList::IsEnabled(features::kWebAppUniversalInstall)) {
+      return install_page_as_app_label;
+    }
     return std::u16string();
   }
   CHECK_EQ(install_config->mode, webapps::AppBannerMode::kWebApp);
   webapps::InstallableWebAppCheckResult installable =
       banner->GetInstallableWebAppCheckResult();
-  std::u16string app_name;
+
   switch (installable) {
     case webapps::InstallableWebAppCheckResult::kUnknown:
+      // Loading of the menu model is synchronous, so there could be a condition
+      // where the `AppBannerManager` has not yet finished the pipeline while
+      // the menu item has been triggered. In such a case,
+      // `banner->GetInstallableWebAppCheckResult()` returns the default value
+      // of `kUnknown`.
+      // Show `Install Page as App` for that use-case, since that allows the
+      // user to trigger the install flow to verify all the data required for
+      // installability. The correct dialog will be shown to the user depending
+      // on whether the app turns out to be installable or not.
+      if (base::FeatureList::IsEnabled(features::kWebAppUniversalInstall)) {
+        return install_page_as_app_label;
+      }
+      return std::u16string();
     case webapps::InstallableWebAppCheckResult::kNo_AlreadyInstalled:
+      // Returning an empty string here allows the `launch page as app` field to
+      // get populated in place of the `install` strings.
       return std::u16string();
     case webapps::InstallableWebAppCheckResult::kNo:
-      // Returning an empty string prevents menu item creation.
       if (base::FeatureList::IsEnabled(features::kWebAppUniversalInstall)) {
-        return l10n_util::GetStringUTF16(IDS_INSTALL_DIY_TO_OS_LAUNCH_SURFACE);
+        return install_page_as_app_label;
       }
       return std::u16string();
     case webapps::InstallableWebAppCheckResult::kYes_ByUserRequest:
     case webapps::InstallableWebAppCheckResult::kYes_Promotable:
-      app_name = install_config->GetWebOrNativeAppName();
-      break;
+      std::u16string app_name = install_config->GetWebOrNativeAppName();
+      if (app_name.empty()) {
+        // Prefer showing `Install Page as App` here, as users can set the name
+        // of the installed app on the DIY app dialog anyway.
+        if (base::FeatureList::IsEnabled(features::kWebAppUniversalInstall)) {
+          return install_page_as_app_label;
+        } else {
+          return std::u16string();
+        }
+      }
+      return l10n_util::GetStringFUTF16(
+          IDS_INSTALL_TO_OS_LAUNCH_SURFACE,
+          ui::EscapeMenuLabelAmpersands(app_name));
   }
-  if (app_name.empty()) {
-    return std::u16string();
-  }
-
-  return l10n_util::GetStringFUTF16(IDS_INSTALL_TO_OS_LAUNCH_SURFACE,
-                                    ui::EscapeMenuLabelAmpersands(app_name));
 }
 
 // TODO(b/328077967): Implement async updates of menu for app icon.
@@ -328,8 +365,10 @@ ui::ImageModel GetInstallPWAIcon(Browser* browser) {
 
   // For sites that are not installable (DIY apps), do not return any icons,
   // instead use the default chrome refresh icon for installing.
-  if (banner->GetInstallableWebAppCheckResult() ==
-      webapps::InstallableWebAppCheckResult::kNo) {
+  auto installable_check_result = banner->GetInstallableWebAppCheckResult();
+  if (installable_check_result == webapps::InstallableWebAppCheckResult::kNo ||
+      installable_check_result ==
+          webapps::InstallableWebAppCheckResult::kUnknown) {
     return app_icon_to_use;
   }
 
@@ -459,6 +498,7 @@ ProfileSubMenuModel::ProfileSubMenuModel(
     if (BuildSyncSection()) {
       AddSeparator(ui::NORMAL_SEPARATOR);
     }
+
     ProfileAttributesEntry* profile_attributes =
         GetProfileAttributesFromProfile(profile);
     // If the profile is being deleted, profile_attributes may be null.
@@ -468,8 +508,10 @@ ProfileSubMenuModel::ProfileSubMenuModel(
           account_info.IsEmpty()
               ? profile_attributes->GetAvatarIcon(
                     avatar_icon_size, /*use_high_res_file=*/true,
-                    /*icon_params=*/
-                    {.has_padding = false, .has_background = false})
+                    GetPlaceholderAvatarIconParamsDependingOnTheme(
+                        ThemeServiceFactory::GetForProfile(profile),
+                        /*background_color_id=*/ui::kColorMenuBackground,
+                        *color_provider))
               : account_info.account_image;
       // The avatar image can be empty if the account image hasn't been
       // fetched yet, if there is no image, or in tests.
@@ -698,9 +740,7 @@ SaveAndShareSubMenuModel::SaveAndShareSubMenuModel(
     ui::SimpleMenuModel::Delegate* delegate,
     Browser* browser)
     : SimpleMenuModel(delegate) {
-  if (media_router::MediaRouterEnabled(browser->profile()) &&
-      base::FeatureList::IsEnabled(features::kCastAppMenuExperiment) &&
-      features::kCastListedFirst.Get()) {
+  if (media_router::MediaRouterEnabled(browser->profile())) {
     AddTitle(l10n_util::GetStringUTF16(IDS_SAVE_AND_SHARE_MENU_CAST));
     SetElementIdentifierAt(GetItemCount() - 1, AppMenuModel::kCastTitleItem);
     AddItemWithStringIdAndVectorIcon(this, IDC_ROUTE_MEDIA,
@@ -740,14 +780,6 @@ SaveAndShareSubMenuModel::SaveAndShareSubMenuModel(
       AddItemWithStringIdAndVectorIcon(this, IDC_QRCODE_GENERATOR,
                                        IDS_APP_MENU_CREATE_QR_CODE,
                                        kQrCodeChromeRefreshIcon);
-    }
-
-    if (media_router::MediaRouterEnabled(browser->profile()) &&
-        (!base::FeatureList::IsEnabled(features::kCastAppMenuExperiment) ||
-         !features::kCastListedFirst.Get())) {
-      AddItemWithStringIdAndVectorIcon(this, IDC_ROUTE_MEDIA,
-                                       IDS_MEDIA_ROUTER_MENU_ITEM_TITLE,
-                                       kCastChromeRefreshIcon);
     }
   }
   if (sharing_hub::DesktopScreenshotsFeatureEnabled(browser->profile())) {
@@ -1835,7 +1867,10 @@ void AppMenuModel::Build() {
   AddItemWithStringIdAndVectorIcon(this, IDC_PRINT, IDS_PRINT, kPrintMenuIcon);
 
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  if (LensOverlayController::IsEnabled(browser())) {
+  if (browser()
+          ->GetFeatures()
+          .lens_overlay_entry_point_controller()
+          ->IsEnabled()) {
     AddItemWithStringIdAndVectorIcon(
         this, IDC_CONTENT_CONTEXT_LENS_OVERLAY, IDS_SHOW_LENS_OVERLAY,
         vector_icons::kGoogleLensMonochromeLogoIcon);
@@ -1874,12 +1909,9 @@ void AppMenuModel::Build() {
 
   sub_menus_.push_back(
       std::make_unique<SaveAndShareSubMenuModel>(this, browser_));
-  int string_id =
-      media_router::MediaRouterEnabled(browser()->profile()) &&
-              base::FeatureList::IsEnabled(features::kCastAppMenuExperiment)
-          ? (features::kCastListedFirst.Get() ? IDS_CAST_SAVE_AND_SHARE_MENU
-                                              : IDS_SAVE_SHARE_AND_CAST_MENU)
-          : IDS_SAVE_AND_SHARE_MENU;
+  int string_id = media_router::MediaRouterEnabled(browser()->profile())
+                      ? IDS_CAST_SAVE_AND_SHARE_MENU
+                      : IDS_SAVE_AND_SHARE_MENU;
   AddSubMenuWithStringIdAndVectorIcon(this, IDC_SAVE_AND_SHARE_MENU, string_id,
                                       sub_menus_.back().get(),
                                       kFileSaveChromeRefreshIcon);

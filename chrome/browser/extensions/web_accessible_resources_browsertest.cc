@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "base/files/file_path.h"
+#include "base/strings/stringprintf.h"
 #include "base/test/scoped_feature_list.h"
 #include "chrome/browser/extensions/extension_browsertest.h"
 #include "chrome/browser/ui/browser.h"
@@ -13,6 +14,7 @@
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/test_navigation_observer.h"
 #include "extensions/common/extension_features.h"
+#include "extensions/test/extension_test_message_listener.h"
 #include "extensions/test/test_extension_dir.h"
 #include "net/dns/mock_host_resolver.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -36,12 +38,41 @@ static constexpr char kManifestStub[] = R"({
   ]
 })";
 
-// Test manifest.json's use_dynamic_url restriction requiring only dynamic urls.
+static constexpr char kFetchResourceScriptTemplate[] = R"(
+  // Verify that the web accessible resource can be fetched.
+  async function test(title, filename, useDynamicUrl, isAllowed) {
+    return new Promise(async resolve => {
+      const dynamicUrl = `chrome-extension://%s/${filename}`;
+      const staticUrl = `chrome-extension://%s/${filename}`;
+      const url = useDynamicUrl ? dynamicUrl : staticUrl;
+
+      // Fetch and verify the contents of fetched web accessible resources.
+      const verifyFetch = (actual) => {
+        if (isAllowed == (filename == actual)) {
+          resolve();
+        } else {
+          reject(`${title}. Expected: ${filename}. Actual: ${actual}`);
+        }
+      };
+      fetch(url)
+        .then(result => result.text())
+        .catch(error => verifyFetch(error))
+        .then(text => verifyFetch(text));
+    });
+  }
+
+  // Run tests with list example: [[title, filename, useDynamicUrl, isAllowed]].
+  const testCases = [%s];
+  const tests = testCases.map(testCase => test(...testCase));
+  Promise.all(tests).then(response => true);
+)";
+
+// Exercise web accessible resources with experimental extension features.
 class WebAccessibleResourcesBrowserTest : public ExtensionBrowserTest {
  public:
-  WebAccessibleResourcesBrowserTest() {
-    feature_list_.InitAndEnableFeature(
-        extensions_features::kExtensionDynamicURLRedirection);
+  explicit WebAccessibleResourcesBrowserTest(bool enable_feature = true) {
+    feature_list_.InitWithFeatureState(
+        extensions_features::kExtensionDynamicURLRedirection, enable_feature);
   }
 
   void SetUpOnMainThread() override {
@@ -53,6 +84,14 @@ class WebAccessibleResourcesBrowserTest : public ExtensionBrowserTest {
  private:
   base::test::ScopedFeatureList feature_list_;
   ScopedCurrentChannel current_channel_{version_info::Channel::CANARY};
+};
+
+// Exercise web accessible resources without experimental extension features.
+class WebAccessibleResourcesNonGuidBrowserTest
+    : public WebAccessibleResourcesBrowserTest {
+ public:
+  WebAccessibleResourcesNonGuidBrowserTest()
+      : WebAccessibleResourcesBrowserTest(false) {}
 };
 
 // If `use_dynamic_url` is set to true in manifest.json, then the associated web
@@ -73,43 +112,14 @@ IN_PROC_BROWSER_TEST_F(WebAccessibleResourcesBrowserTest,
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), gurl));
   auto* web_contents = browser()->tab_strip_model()->GetActiveWebContents();
 
-  static constexpr char kScriptTemplate[] = R"(
-    // Verify that the web accessible resource can be fetched.
-    async function test(title, isAllowed, filename, useDynamicUrl) {
-      return new Promise(async resolve => {
-        const dynamicUrl = `chrome-extension://%s/${filename}`;
-        const staticUrl = `chrome-extension://%s/${filename}`;
-        const url = useDynamicUrl ? dynamicUrl : staticUrl;
-
-        // Fetch and verify the contents of fetched web accessible resources.
-        const verifyFetch = (actual) => {
-          if (isAllowed == (filename == actual)) {
-            resolve();
-          } else {
-            reject(`${title}. Expected: ${filename}. Actual: ${actual}`);
-          }
-        };
-        fetch(url)
-          .then(result => result.text())
-          .catch(error => verifyFetch(error))
-          .then(text => verifyFetch(text));
-      });
-    }
-
-    // Run tests.
-    const testCases = [
-      // Arguments: [title, isAllowed, filename, useDynamicUrl].
-      ["Dynamic is ok when useDynamicUrl is true", true, 'dynamic.html', true],
-      ["Static is ok when useDynamicUrl is true", true, 'static.html', true],
-      ["Static is ok when useDynamcUrl is false", true, 'static.html', false],
-      ["Dynamic not ok when useDynamicUrl false", false, 'dynamic.html', false],
-    ];
-    const tests = testCases.map(testCase => test(...testCase));
-    Promise.all(tests).then(response => true);
-  )";
-
-  std::string script = base::StringPrintf(
-      kScriptTemplate, extension->guid().c_str(), extension->id().c_str());
+  std::string script =
+      base::StringPrintf(kFetchResourceScriptTemplate,
+                         extension->guid().c_str(), extension->id().c_str(), R"(
+      ["Load a static resource with a dynamic url", 'static.html', true, true],
+      ["Load a static resource with a static url", 'static.html', false, true],
+      ["Load dynamic resource with a dynamic url", 'dynamic.html', true, true],
+      ["Load dynamic resource with a static url", 'dynamic.html', false, false],
+      )");
   ASSERT_TRUE(content::EvalJs(web_contents, script).ExtractBool());
 }
 
@@ -176,18 +186,149 @@ IN_PROC_BROWSER_TEST_F(WebAccessibleResourcesBrowserTest,
   }
 }
 
-// TODO(crbug.com/352455685): Write a test for DNR and WAR.
+// A test suite that will run both with and without the dynamic URL feature
+// enabled.
+class ParameterizedWebAccessibleResourcesBrowserTest
+    : public WebAccessibleResourcesBrowserTest,
+      public testing::WithParamInterface<bool> {
+ public:
+  ParameterizedWebAccessibleResourcesBrowserTest()
+      : WebAccessibleResourcesBrowserTest(GetParam()) {}
+};
 
-// TODO(crbug.com/352267920): Write a test to ensure that server redirects work
-// fine from this point. It already exists at
-// CrossExtensionEmbeddingOfWebAccessibleResources, but localize it here to
-// detect early exit from IsResourceWebAccessible, such as:
-// if (!upstream_url.is_empty() && !upstream_url.SchemeIs(kExtensionScheme)) {
-//   // return false;
-// }
+INSTANTIATE_TEST_SUITE_P(All,
+                         ParameterizedWebAccessibleResourcesBrowserTest,
+                         testing::Bool());
 
-// TODO(crbug.com/352267920): Create a test for guid based on
-// accessible_link_resource.html;drc=9a60d160b6dfb2351ae0dad28341c3ca80f1ca59.
+// DNR, WAR, and use_dynamic_url with the extension feature. DNR does not
+// currently succeed when redirecting to a resource using use_dynamic_url with
+// query parameters.
+IN_PROC_BROWSER_TEST_P(ParameterizedWebAccessibleResourcesBrowserTest,
+                       DeclarativeNetRequest) {
+  ExtensionTestMessageListener listener("ready");
+  auto file_path = test_data_dir_.AppendASCII("web_accessible_resources/dnr");
+  const Extension* extension = LoadExtension(file_path);
+  ASSERT_TRUE(extension);
+  ASSERT_TRUE(listener.WaitUntilSatisfied());
+
+  // Navigate to a non-extension web page before beginning the test. This might
+  // not be needed, but it will at the very least put the tab on a known url.
+  {
+    content::WebContents* web_contents =
+        browser()->tab_strip_model()->GetActiveWebContents();
+    GURL gurl = embedded_test_server()->GetURL("example.com", "/simple.html");
+    content::TestNavigationObserver navigation_observer(web_contents);
+    ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), gurl));
+    ASSERT_TRUE(navigation_observer.last_navigation_succeeded());
+    EXPECT_EQ(gurl, web_contents->GetLastCommittedURL());
+  }
+
+  // Redirect from a webpage to a web accessible resource that has
+  // `use_dynamic_url` set to true. The route is from a web page through DNR,
+  // WAR, and on to a webpage using `use_dynamic_url`.
+  {
+    // Initialize redirection from example.com to example.org through DNR + WAR.
+    GURL end(embedded_test_server()->GetURL("example.org", "/empty.html"));
+    GURL start(
+        base::StringPrintf("https://example.com/url?q=%s", end.spec().c_str()));
+
+    // Navigate from within the page instead of from the Omnibox. That's because
+    // in manual testing, this would succeed when the url is pasted into the
+    // Omnibox but not when the same url is clicked from a link withing the
+    // page.
+    content::WebContents* web_contents =
+        browser()->tab_strip_model()->GetActiveWebContents();
+    content::TestNavigationObserver navigation_observer(web_contents);
+    ASSERT_TRUE(ExecJs(web_contents->GetPrimaryMainFrame(),
+                       base::StringPrintf("window.location.href = '%s';",
+                                          start.spec().c_str())));
+    navigation_observer.Wait();
+
+    // Verify that the expected end url has been reached. Execution of the
+    // script on the `start` should redirect to `end`.
+    EXPECT_EQ(end, navigation_observer.last_navigation_url());
+    EXPECT_EQ(end, web_contents->GetLastCommittedURL());
+    EXPECT_EQ(net::Error::OK, navigation_observer.last_net_error_code());
+    EXPECT_TRUE(navigation_observer.last_navigation_succeeded());
+  }
+}
+
+// If `use_dynamic_url` is set to true in manifest.json, then the associated web
+// accessible resource(s) can only be loaded using the dynamic url if using the
+// extension feature. If not using the extension feature, dynamic URLs can be
+// loaded using static urls.
+IN_PROC_BROWSER_TEST_F(WebAccessibleResourcesNonGuidBrowserTest,
+                       UseDynamicUrlInFetch) {
+  // Load extension.
+  TestExtensionDir extension_dir;
+  extension_dir.WriteManifest(kManifestStub);
+  extension_dir.WriteFile(FILE_PATH_LITERAL("dynamic.html"), "dynamic.html");
+  extension_dir.WriteFile(FILE_PATH_LITERAL("static.html"), "static.html");
+  const Extension* extension = LoadExtension(extension_dir.UnpackedPath());
+
+  // Navigate to a test page and get the web contents.
+  base::FilePath test_page;
+  GURL gurl = embedded_test_server()->GetURL("example.com", "/simple.html");
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), gurl));
+  auto* web_contents = browser()->tab_strip_model()->GetActiveWebContents();
+
+  std::string script =
+      base::StringPrintf(kFetchResourceScriptTemplate,
+                         extension->guid().c_str(), extension->id().c_str(), R"(
+      ["Load a static resource with a dynamic url", 'static.html', true, false],
+      ["Load a static resource with a static url", 'static.html', false, true],
+      ["Load dynamic resource with a dynamic url", 'dynamic.html', true, false],
+      ["Load dynamic resource with a static url", 'dynamic.html', false, true],
+      )");
+  ASSERT_TRUE(content::EvalJs(web_contents, script).ExtractBool());
+}
+
+// Verify setting script.src from a content script that relies on web request to
+// redirect to a web accessible resource. It's important to set `script.src`
+// using a script so that `CanRequestResource` has `upstream_url` set to
+// something other than a chrome extension.
+IN_PROC_BROWSER_TEST_P(ParameterizedWebAccessibleResourcesBrowserTest,
+                       WebRequestRedirectFromScript) {
+  ExtensionTestMessageListener listener("ready");
+  auto file_path = test_data_dir_.AppendASCII(
+      "web_accessible_resources/web_request/redirect_from_script");
+  const Extension* extension = LoadExtension(file_path);
+  ASSERT_TRUE(extension);
+  ASSERT_TRUE(listener.WaitUntilSatisfied());
+
+  // Navigate to a non extension page.
+  content::WebContents* web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  GURL gurl = embedded_test_server()->GetURL("example.com", "/empty.html");
+  content::TestNavigationObserver navigation_observer(web_contents);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), gurl));
+  ASSERT_TRUE(navigation_observer.last_navigation_succeeded());
+  EXPECT_EQ(gurl, web_contents->GetLastCommittedURL());
+  EXPECT_EQ(net::Error::OK, navigation_observer.last_net_error_code());
+}
+
+// Tests an extension using webRequest to redirect a resource included in a
+// page's static html.
+IN_PROC_BROWSER_TEST_P(ParameterizedWebAccessibleResourcesBrowserTest,
+                       WebRequestRedirectFromPage) {
+  ExtensionTestMessageListener listener("ready");
+  auto file_path = test_data_dir_.AppendASCII(
+      "web_accessible_resources/web_request/redirect_from_page");
+  const Extension* extension = LoadExtension(file_path);
+  ASSERT_TRUE(extension);
+  ASSERT_TRUE(listener.WaitUntilSatisfied());
+
+  // Navigate to a non extension page.
+  content::WebContents* web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  GURL gurl = embedded_test_server()->GetURL(
+      "example.com", "/extensions/api_test/webrequest/script/index.html");
+  content::TestNavigationObserver navigation_observer(web_contents);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), gurl));
+  ASSERT_TRUE(navigation_observer.last_navigation_succeeded());
+  EXPECT_EQ(gurl, web_contents->GetLastCommittedURL());
+  EXPECT_EQ(net::Error::OK, navigation_observer.last_net_error_code());
+}
 
 }  // namespace
 }  // namespace extensions

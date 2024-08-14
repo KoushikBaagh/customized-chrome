@@ -14,16 +14,17 @@
 #import "components/saved_tab_groups/tab_group_sync_service.h"
 #import "components/saved_tab_groups/tab_group_sync_service_impl.h"
 #import "components/sync/base/report_unrecoverable_error.h"
-#import "components/sync/model/client_tag_based_model_type_processor.h"
-#import "components/sync/model/model_type_store_service.h"
+#import "components/sync/model/client_tag_based_data_type_processor.h"
+#import "components/sync/model/data_type_store_service.h"
 #import "components/sync_device_info/device_info_sync_service.h"
 #import "ios/chrome/browser/saved_tab_groups/model/ios_tab_group_sync_delegate.h"
 #import "ios/chrome/browser/saved_tab_groups/model/tab_group_local_update_observer.h"
+#import "ios/chrome/browser/sessions/model/session_restoration_service_factory.h"
 #import "ios/chrome/browser/shared/model/browser/browser_list_factory.h"
 #import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/sync/model/data_type_store_service_factory.h"
 #import "ios/chrome/browser/sync/model/device_info_sync_service_factory.h"
-#import "ios/chrome/browser/sync/model/model_type_store_service_factory.h"
 #import "ios/chrome/common/channel_info.h"
 #import "ios/web/public/browser_state.h"
 
@@ -34,11 +35,11 @@ namespace {
 std::unique_ptr<SyncDataTypeConfiguration>
 CreateSavedTabGroupDataTypeConfiguration(ChromeBrowserState* browser_state) {
   return std::make_unique<SyncDataTypeConfiguration>(
-      std::make_unique<syncer::ClientTagBasedModelTypeProcessor>(
+      std::make_unique<syncer::ClientTagBasedDataTypeProcessor>(
           syncer::SAVED_TAB_GROUP,
           base::BindRepeating(&syncer::ReportUnrecoverableError,
                               ::GetChannel())),
-      ModelTypeStoreServiceFactory::GetForBrowserState(browser_state)
+      DataTypeStoreServiceFactory::GetForBrowserState(browser_state)
           ->GetStoreFactory());
 }
 }  // namespace
@@ -60,7 +61,10 @@ TabGroupSyncServiceFactory::TabGroupSyncServiceFactory()
     : BrowserStateKeyedServiceFactory(
           "TabGroupSyncServiceFactory",
           BrowserStateDependencyManager::GetInstance()) {
-  DependsOn(ModelTypeStoreServiceFactory::GetInstance());
+  DependsOn(BrowserListFactory::GetInstance());
+  DependsOn(DataTypeStoreServiceFactory::GetInstance());
+  DependsOn(DeviceInfoSyncServiceFactory::GetInstance());
+  DependsOn(SessionRestorationServiceFactory::GetInstance());
 }
 
 TabGroupSyncServiceFactory::~TabGroupSyncServiceFactory() = default;

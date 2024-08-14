@@ -99,13 +99,15 @@ class AccountSelectionBubbleViewTest : public ChromeViewsTestBase,
         kIdpETLDPlusOne, metadata,
         CreateTestClientMetadata(/*terms_of_service_url=*/""), account_list,
         /*request_permission=*/true, /*has_login_status_mismatch=*/false);
-    dialog_->ShowMultiAccountPicker(idp_data, /*show_back_button=*/false);
+    dialog_->ShowMultiAccountPicker(idp_data, /*show_back_button=*/false,
+                                    /*is_choose_an_account=*/false);
   }
 
   void CreateAndShowMultiIdpAccountPicker(
       const std::vector<IdentityProviderDisplayData>& idp_data_list) {
     CreateAccountSelectionBubble(/*exclude_title=*/true);
-    dialog_->ShowMultiAccountPicker(idp_data_list, /*show_back_button=*/false);
+    dialog_->ShowMultiAccountPicker(idp_data_list, /*show_back_button=*/false,
+                                    /*is_choose_an_account=*/false);
   }
 
   void PerformHeaderChecks(
@@ -194,6 +196,7 @@ class AccountSelectionBubbleViewTest : public ChromeViewsTestBase,
     EXPECT_TRUE(IsViewClass<views::Separator>(children[1]));
 
     views::ScrollView* scroller = static_cast<views::ScrollView*>(children[2]);
+    EXPECT_FALSE(scroller->GetDrawOverflowIndicator());
     views::View* contents = scroller->contents();
     ASSERT_TRUE(contents);
 
@@ -456,6 +459,7 @@ TEST_F(AccountSelectionBubbleViewTest, UseDifferentAccount) {
   ASSERT_EQ(children.size(), 3u);
 
   views::ScrollView* scroll_view = static_cast<views::ScrollView*>(children[2]);
+  EXPECT_FALSE(scroll_view->GetDrawOverflowIndicator());
   ASSERT_EQ(scroll_view->contents()->children().size(), 3u);
 
   size_t index = 1;
@@ -725,6 +729,7 @@ TEST_F(MultipleIdpAccountSelectionBubbleViewTest,
   EXPECT_TRUE(IsViewClass<views::Separator>(children[1]));
 
   views::ScrollView* scroller = static_cast<views::ScrollView*>(children[2]);
+  EXPECT_FALSE(scroller->GetDrawOverflowIndicator());
   views::View* contents = scroller->contents();
   ASSERT_TRUE(contents);
 
@@ -793,6 +798,7 @@ TEST_F(MultipleIdpAccountSelectionBubbleViewTest, OneIdpWithMismatch) {
 
   views::ScrollView* accounts_scroller =
       static_cast<views::ScrollView*>(children[0]);
+  EXPECT_FALSE(accounts_scroller->GetDrawOverflowIndicator());
   views::View* accounts_contents = accounts_scroller->contents();
   ASSERT_TRUE(accounts_contents);
 
@@ -809,6 +815,7 @@ TEST_F(MultipleIdpAccountSelectionBubbleViewTest, OneIdpWithMismatch) {
 
   views::ScrollView* mismatch_scroller =
       static_cast<views::ScrollView*>(children[2]);
+  EXPECT_FALSE(mismatch_scroller->GetDrawOverflowIndicator());
   views::View* mismatch_contents = mismatch_scroller->contents();
   ASSERT_TRUE(mismatch_contents);
 
@@ -851,6 +858,7 @@ TEST_F(MultipleIdpAccountSelectionBubbleViewTest, MultiIdpUseOtherAccount) {
   EXPECT_TRUE(IsViewClass<views::Separator>(children[1]));
 
   views::ScrollView* scroller = static_cast<views::ScrollView*>(children[2]);
+  EXPECT_FALSE(scroller->GetDrawOverflowIndicator());
   views::View* contents = scroller->contents();
   ASSERT_TRUE(contents);
 
@@ -933,6 +941,20 @@ TEST_F(MultipleIdpAccountSelectionBubbleViewTest,
   EXPECT_TRUE(IsViewClass<views::Separator>(contents[1]));
   CheckChooseAnAccount(contents, accounts_index,
                        u"idp3.com, idp4.com, idp-example.com");
+
+  // Simulate clicking on the choose an account button.
+  dialog_->ShowMultiAccountPicker(idp_data, /*show_back_button=*/true,
+                                  /*is_choose_an_account=*/true);
+
+  children = dialog()->children();
+  ASSERT_EQ(children.size(), 3u);
+
+  // Check title text.
+  views::Label* title_view =
+      static_cast<views::Label*>(GetViewWithClassName(children[0], "Label"));
+  ASSERT_TRUE(title_view);
+  EXPECT_EQ(title_view->GetText(),
+            u"Choose an account to sign in to rp-example.com");
 }
 
 TEST_F(MultipleIdpAccountSelectionBubbleViewTest, MultiIdpWithAllIdpsMismatch) {
@@ -974,6 +996,7 @@ TEST_F(MultipleIdpAccountSelectionBubbleViewTest, MultiIdpWithAllIdpsMismatch) {
 
   views::ScrollView* mismatch_scroller =
       static_cast<views::ScrollView*>(children[0]);
+  EXPECT_FALSE(mismatch_scroller->GetDrawOverflowIndicator());
   views::View* mismatch_contents = mismatch_scroller->contents();
   ASSERT_TRUE(mismatch_contents);
 
@@ -1016,6 +1039,7 @@ TEST_F(MultipleIdpAccountSelectionBubbleViewTest, MultipleReturningAccounts) {
   EXPECT_TRUE(IsViewClass<views::Separator>(children[1]));
 
   views::ScrollView* scroller = static_cast<views::ScrollView*>(children[2]);
+  EXPECT_FALSE(scroller->GetDrawOverflowIndicator());
   views::View* contents = scroller->contents();
   ASSERT_TRUE(contents);
 
@@ -1072,6 +1096,7 @@ TEST_F(MultipleIdpAccountSelectionBubbleViewTest,
   EXPECT_TRUE(IsViewClass<views::Separator>(children[1]));
 
   views::ScrollView* scroller = static_cast<views::ScrollView*>(children[2]);
+  EXPECT_FALSE(scroller->GetDrawOverflowIndicator());
   views::View* contents = scroller->contents();
   ASSERT_TRUE(contents);
 
@@ -1121,6 +1146,7 @@ TEST_F(MultipleIdpAccountSelectionBubbleViewTest, HoverChangesIdpCircle) {
       dialog()->children();
   ASSERT_EQ(children.size(), 3u);
   views::ScrollView* scroller = static_cast<views::ScrollView*>(children[2]);
+  EXPECT_FALSE(scroller->GetDrawOverflowIndicator());
   views::View* contents = scroller->contents();
   ASSERT_TRUE(contents);
 

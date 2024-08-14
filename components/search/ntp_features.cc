@@ -13,14 +13,6 @@
 #include "base/time/time.h"
 #include "build/build_config.h"
 
-namespace {
-
-bool IsEnUSInUS(std::string application_locale, std::string country_code) {
-  return application_locale == "en-US" && country_code == "us";
-}
-
-}  // namespace
-
 namespace ntp_features {
 
 // If enabled, shows a confirm dialog before removing search suggestions from
@@ -301,11 +293,6 @@ BASE_FEATURE(kNtpHistoryClustersModule,
              "NtpHistoryClustersModule",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Dummy feature to set kNtpHistoryClustersModuleBeginTimeDurationHoursParam.
-BASE_FEATURE(kNtpHistoryClustersModuleBeginTimeDuration,
-             "NtpHistoryClustersModuleBeginTimeDuration",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Dummy feature to set kNtpHistoryClustersModuleMinimumVisitsRequiredParam.
 BASE_FEATURE(kNtpHistoryClustersModuleMinimumVisitsRequired,
              "NtpHistoryClustersModuleMinimumVisitsRequired",
@@ -423,6 +410,12 @@ BASE_FEATURE(kNtpWallpaperSearchButtonAnimation,
              "NtpWallpaperSearchButtonAnimation",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Dummy feature to set param "NtpWallpaperSearchButtonAnimationShownThreshold".
+// This is used for an emergency Finch param. Keep indefinitely.
+BASE_FEATURE(kNtpWallpaperSearchButtonAnimationShownThreshold,
+             "NtpWallpaperSearchButtonAnimationShownThreshold",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 const char kNtpModuleIgnoredCriteriaThreshold[] =
     "NtpModuleIgnoredCriteriaThreshold";
 const char kNtpModuleIgnoredHaTSDelayTimeParam[] =
@@ -453,10 +446,6 @@ const char kNtpDriveModuleCacheMaxAgeSParam[] =
     "NtpDriveModuleCacheMaxAgeSParam";
 const char kNtpDriveModuleExperimentGroupParam[] =
     "NtpDriveModuleExperimentGroupParam";
-const char kNtpHistoryClustersModuleDataParam[] =
-    "NtpHistoryClustersModuleDataParam";
-const char kNtpChromeCartInHistoryClustersModuleDataParam[] =
-    "NtpChromeCartInHistoryClustersModuleDataParam";
 const char kNtpMiddleSlotPromoDismissalParam[] =
     "NtpMiddleSlotPromoDismissalParam";
 const char kNtpPhotosModuleDataParam[] = "NtpPhotosModuleDataParam";
@@ -501,6 +490,8 @@ const char kNtpTabResumptionModuleTimeLimitParam[] =
     "NtpTabResumptionModuleTimeLimitParam";
 const char kNtpTabResumptionModuleVisibilityThresholdDataParam[] =
     "NtpTabResumptionModuleVisibilityThresholdDataParam";
+const char kNtpWallpaperSearchButtonAnimationShownThresholdParam[] =
+    "NtpWallpaperSearchButtonAnimationShownThresholdParam";
 const char kWallpaperSearchHatsDelayParam[] = "WallpaperSearchHatsDelayParam";
 
 const base::FeatureParam<std::string> kNtpCalendarModuleExperimentParam(
@@ -560,14 +551,9 @@ std::vector<std::string> GetModulesOrder() {
                            base::SplitResult::SPLIT_WANT_NONEMPTY);
 }
 
-bool IsNtpModulesRedesignedEnabled(std::string application_locale,
-                                   std::string country_code) {
-  if (base::FeatureList::GetInstance()->IsFeatureOverridden(
-          kNtpModulesRedesigned.name)) {
-    return base::FeatureList::IsEnabled(ntp_features::kNtpModulesRedesigned);
-  }
-
-  return IsEnUSInUS(application_locale, country_code);
+int GetWallpaperSearchButtonAnimationShownThreshold() {
+  return base::GetFieldTrialParamByFeatureAsInt(
+      kNtpWallpaperSearchButtonAnimationShownThreshold,
+      kNtpWallpaperSearchButtonAnimationShownThresholdParam, 15);
 }
-
 }  // namespace ntp_features

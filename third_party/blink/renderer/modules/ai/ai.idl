@@ -11,7 +11,7 @@ enum AIModelAvailability {
 };
 
 [
-  Exposed=Window,
+  Exposed=(Window,Worker),
   RuntimeEnabled=BuiltInAIAPI
 ]
 interface AI {
@@ -36,5 +36,10 @@ interface AI {
     CallWith=ScriptState,
     RaisesException
   ]
-  Promise<AITextSessionOptions> defaultTextSessionOptions();
+  Promise<AITextModelInfo> textModelInfo();
+  [
+    Measure,
+    RuntimeEnabled=AISummarizationAPI
+  ]
+  readonly attribute AISummarizerFactory summarizer;
 };

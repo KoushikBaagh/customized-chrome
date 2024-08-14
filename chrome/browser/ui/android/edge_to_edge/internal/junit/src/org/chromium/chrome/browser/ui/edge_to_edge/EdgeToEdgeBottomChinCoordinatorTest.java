@@ -6,6 +6,8 @@ package org.chromium.chrome.browser.ui.edge_to_edge;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 
+import android.view.View;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -20,9 +22,11 @@ import org.chromium.chrome.browser.layouts.LayoutManager;
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
 public class EdgeToEdgeBottomChinCoordinatorTest {
+    @Mock private View mView;
     @Mock private LayoutManager mLayoutManager;
     @Mock private EdgeToEdgeController mEdgeToEdgeController;
     @Mock private BottomControlsStacker mBottomControlsStacker;
+    @Mock private NavigationBarColorProvider mNavigationBarColorProvider;
     @Mock private EdgeToEdgeBottomChinSceneLayer mEdgeToEdgeBottomChinSceneLayer;
 
     @Before
@@ -34,8 +38,10 @@ public class EdgeToEdgeBottomChinCoordinatorTest {
     public void testEdgeToEdgeBottomChinCoordinator() {
         EdgeToEdgeBottomChinCoordinator coordinator =
                 new EdgeToEdgeBottomChinCoordinator(
+                        mView,
                         mLayoutManager,
                         mEdgeToEdgeController,
+                        mNavigationBarColorProvider,
                         mBottomControlsStacker,
                         mEdgeToEdgeBottomChinSceneLayer);
         verify(mLayoutManager).addSceneOverlay(any());

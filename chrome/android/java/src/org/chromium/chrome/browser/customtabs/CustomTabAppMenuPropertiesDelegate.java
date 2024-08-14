@@ -59,8 +59,9 @@ public class CustomTabAppMenuPropertiesDelegate extends AppMenuPropertiesDelegat
     private final boolean mShowStar;
     private final boolean mShowDownload;
     private final boolean mIsOpenedByChrome;
-    private final boolean mIsIncognito;
-    private final boolean mIsAuthView;
+    private final boolean mIsIncognitoBranded;
+    private final boolean mIsOffTheRecord;
+    private final boolean mIsAuthTab;
     private final boolean mIsStartIconMenu;
 
     private final List<String> mMenuEntries;
@@ -85,8 +86,9 @@ public class CustomTabAppMenuPropertiesDelegate extends AppMenuPropertiesDelegat
             boolean showShare,
             boolean showStar,
             boolean showDownload,
-            boolean isIncognito,
-            boolean isAuthView,
+            boolean isIncognitoBranded,
+            boolean isOffTheRecord,
+            boolean isAuthTab,
             boolean isStartIconMenu,
             Supplier<ReadAloudController> readAloudControllerSupplier,
             boolean hasClientPackage) {
@@ -105,11 +107,12 @@ public class CustomTabAppMenuPropertiesDelegate extends AppMenuPropertiesDelegat
         mUiType = uiType;
         mMenuEntries = menuEntries;
         mIsOpenedByChrome = isOpenedByChrome;
-        mShowShare = showShare && !isAuthView;
+        mShowShare = showShare && !isAuthTab;
         mShowStar = showStar;
         mShowDownload = showDownload;
-        mIsIncognito = isIncognito;
-        mIsAuthView = isAuthView;
+        mIsIncognitoBranded = isIncognitoBranded;
+        mIsOffTheRecord = isOffTheRecord;
+        mIsAuthTab = isAuthTab;
         mIsStartIconMenu = isStartIconMenu;
         mHasClientPackage = hasClientPackage;
     }
@@ -144,19 +147,22 @@ public class CustomTabAppMenuPropertiesDelegate extends AppMenuPropertiesDelegat
             loadingStateChanged(currentTab.isLoading());
 
             MenuItem shareItem = menu.findItem(R.id.share_row_menu_id);
-            shareItem.setVisible(mShowShare);
-            shareItem.setEnabled(mShowShare);
-            if (mShowShare) {
+            // TODO(crbug.com/337363657): Show Share for pdf native pages once supported.
+            boolean isPdfPage = currentTab.isNativePage() && currentTab.getNativePage().isPdf();
+            boolean showShareExceptForPdf = mShowShare && !isPdfPage;
+            shareItem.setVisible(showShareExceptForPdf);
+            shareItem.setEnabled(showShareExceptForPdf);
+            if (showShareExceptForPdf) {
                 updateDirectShareMenuItem(menu.findItem(R.id.direct_share_menu_id));
             }
 
-            boolean openInChromeItemVisible = !mIsAuthView;
-            boolean bookmarkItemVisible = mShowStar && !mIsAuthView;
-            boolean downloadItemVisible = mShowDownload && !mIsAuthView;
-            boolean addToHomeScreenVisible = !mIsAuthView;
+            boolean openInChromeItemVisible = !mIsAuthTab;
+            boolean bookmarkItemVisible = mShowStar && !mIsAuthTab;
+            boolean downloadItemVisible = mShowDownload && !mIsAuthTab;
+            boolean addToHomeScreenVisible = !mIsAuthTab;
             boolean requestDesktopSiteVisible = true;
             boolean tryAddingReadAloud = ReadAloudFeatures.isEnabledForOverflowMenuInCCT();
-            boolean historyItemVisible = !mIsAuthView;
+            boolean historyItemVisible = !mIsAuthTab;
             if (!HistoryManager.isAppSpecificHistoryEnabled() || !mHasClientPackage) {
                 historyItemVisible = false;
             }
@@ -209,7 +215,7 @@ public class CustomTabAppMenuPropertiesDelegate extends AppMenuPropertiesDelegat
                 addToHomeScreenVisible = false;
             }
 
-            if (mIsIncognito) {
+            if (mIsIncognitoBranded) {
                 addToHomeScreenVisible = false;
                 downloadItemVisible = false;
                 openInChromeItemVisible = false;
@@ -261,7 +267,7 @@ public class CustomTabAppMenuPropertiesDelegate extends AppMenuPropertiesDelegat
             MenuItem openInChromeItem = menu.findItem(R.id.open_in_browser_id);
             if (openInChromeItemVisible) {
                 String title =
-                        mIsIncognito
+                        mIsOffTheRecord
                                 ? ContextUtils.getApplicationContext()
                                         .getString(R.string.menu_open_in_incognito_chrome)
                                 : DefaultBrowserInfo.getTitleOpenInDefaultBrowser(

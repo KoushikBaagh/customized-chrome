@@ -5,11 +5,11 @@
 
 load("//lib/branches.star", "branches")
 load("//lib/builder_config.star", "builder_config")
-load("//lib/builder_url.star", "linkify_builder")
 load("//lib/builders.star", "os", "siso")
 load("//lib/try.star", "try_")
 load("//lib/consoles.star", "consoles")
 load("//lib/gn_args.star", "gn_args")
+load("//lib/html.star", "linkify_builder")
 load("//project.star", "settings")
 
 try_.defaults.set(
@@ -224,7 +224,7 @@ try_.builder(
         # crbug/940930
         "chromium.enable_cleandead": 100,
         # b/346598710
-        "chromium.luci_analysis_v2": 50,
+        "chromium.luci_analysis_v2": 100,
     },
     main_list_view = "try",
     tryjob = try_.job(),
@@ -393,7 +393,7 @@ try_.builder(
         # crbug/940930
         "chromium.enable_cleandead": 100,
         # b/346598710
-        "chromium.luci_analysis_v2": 50,
+        "chromium.luci_analysis_v2": 100,
     },
     main_list_view = "try",
     tryjob = try_.job(),
@@ -512,7 +512,7 @@ try_.orchestrator_builder(
         # crbug/940930
         "chromium.enable_cleandead": 100,
         # b/346598710
-        "chromium.luci_analysis_v2": 50,
+        "chromium.luci_analysis_v2": 100,
     },
     main_list_view = "try",
     # TODO(crbug.com/40241638): Use orchestrator pool once overloaded test pools
@@ -563,7 +563,7 @@ try_.orchestrator_builder(
         # crbug/940930
         "chromium.enable_cleandead": 50,
         # b/346598710
-        "chromium.luci_analysis_v2": 50,
+        "chromium.luci_analysis_v2": 100,
     },
     main_list_view = "try",
     # TODO(crbug.com/40241638): Use orchestrator pool once overloaded test pools

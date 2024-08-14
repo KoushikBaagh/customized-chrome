@@ -40,6 +40,7 @@
 #import "ios/chrome/browser/home_customization/utils/home_customization_constants.h"
 #import "ios/chrome/browser/ntp/model/new_tab_page_state.h"
 #import "ios/chrome/browser/ntp/model/new_tab_page_tab_helper.h"
+#import "ios/chrome/browser/overscroll_actions/ui_bundled/overscroll_actions_controller.h"
 #import "ios/chrome/browser/search_engines/model/template_url_service_factory.h"
 #import "ios/chrome/browser/shared/coordinator/layout_guide/layout_guide_util.h"
 #import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
@@ -52,6 +53,7 @@
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/browser_coordinator_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/help_commands.h"
 #import "ios/chrome/browser/shared/public/commands/lens_commands.h"
 #import "ios/chrome/browser/shared/public/commands/omnibox_commands.h"
 #import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
@@ -107,7 +109,6 @@
 #import "ios/chrome/browser/ui/ntp/new_tab_page_mediator.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_metrics_delegate.h"
 #import "ios/chrome/browser/ui/ntp/new_tab_page_view_controller.h"
-#import "ios/chrome/browser/ui/overscroll_actions/overscroll_actions_controller.h"
 #import "ios/chrome/browser/ui/sharing/sharing_coordinator.h"
 #import "ios/chrome/browser/ui/sharing/sharing_params.h"
 #import "ios/chrome/browser/ui/toolbar/public/fakebox_focuser.h"
@@ -508,13 +509,16 @@
   [self.NTPViewController omniboxDidResignFirstResponder];
 }
 
-- (void)constrainFeedHeaderManagementButtonNamedGuide {
+- (void)constrainNamedGuideForFeedIPH {
   if (self.browser->GetBrowserState()->IsOffTheRecord()) {
     return;
   }
-  [LayoutGuideCenterForBrowser(self.browser)
-      referenceView:self.feedHeaderViewController.managementButton
-          underName:kFeedHeaderManagementButtonGuide];
+  UIView* viewToConstrain =
+      IsHomeCustomizationEnabled()
+          ? [self.headerViewController customizationMenuButton]
+          : self.feedHeaderViewController.managementButton;
+  [LayoutGuideCenterForBrowser(self.browser) referenceView:viewToConstrain
+                                                 underName:kFeedIPHNamedGuide];
 }
 
 - (void)updateFollowingFeedHasUnseenContent:(BOOL)hasUnseenContent {
@@ -789,7 +793,8 @@
 
   [self configureMainViewControllerUsing:self.NTPViewController];
   self.NTPViewController.feedMetricsRecorder = self.feedMetricsRecorder;
-  self.NTPViewController.bubblePresenter = self.bubblePresenter;
+  self.NTPViewController.helpHandler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(), HelpCommands);
   self.NTPViewController.mutator = self.NTPMediator;
 }
 
@@ -875,15 +880,7 @@
 }
 
 - (void)customizationMenuWasTapped:(UIView*)customizationMenu {
-  if (!_customizationCoordinator) {
-    _customizationCoordinator = [[HomeCustomizationCoordinator alloc]
-        initWithBaseViewController:self.NTPViewController
-                           browser:self.browser];
-    _customizationCoordinator.delegate = self;
-    [_customizationCoordinator start];
-  }
-  [_customizationCoordinator
-      presentCustomizationMenuAtPage:CustomizationMenuPage::kMain];
+  [self openCustomizationMenuAtPage:CustomizationMenuPage::kMain animated:YES];
 }
 
 #pragma mark - FeedMenuCoordinatorDelegate
@@ -969,7 +966,7 @@
     self.discoverFeedService->SetFollowingFeedContentSeen();
   }
 
-  [self updateNTPForFeed];
+  [self handleChangeInModules];
 
   // Scroll position resets when changing the feed, so we set it back to what it
   // was.
@@ -993,7 +990,7 @@
   self.discoverFeedService->SetFollowingFeedSortType(sortType);
   self.feedHeaderViewController.followingFeedSortType = sortType;
 
-  [self updateNTPForFeed];
+  [self handleChangeInModules];
 
   // Scroll position resets when changing the feed, so we set it back to what it
   // was.
@@ -1020,7 +1017,7 @@
   if (!self.NTPViewController.viewLoaded) {
     return;
   }
-  [self updateNTPForFeed];
+  [self handleChangeInModules];
   [self.NTPViewController setContentOffsetToTop];
 }
 
@@ -1053,6 +1050,11 @@
                           params:params
                       originView:view];
   [_sharingCoordinator start];
+}
+
+- (void)openMagicStackCustomizationMenu {
+  [self openCustomizationMenuAtPage:CustomizationMenuPage::kMagicStack
+                           animated:NO];
 }
 
 #pragma mark - FeedSignInPromoDelegate
@@ -1171,6 +1173,13 @@
   // inserted.
   [self.feedHeaderViewController updateForSelectedFeed];
   self.feedMetricsRecorder.followDelegate = self;
+}
+
+- (void)updateModuleVisibility {
+  [self handleChangeInModules];
+  [self cancelOmniboxEdit];
+  [self setContentOffsetToTop];
+  [self.feedHeaderViewController updateForFeedVisibilityChanged];
 }
 
 #pragma mark - NewTabPageDelegate
@@ -1391,14 +1400,15 @@
 #pragma mark - BooleanObserver
 
 - (void)booleanDidChange:(id<ObservableBoolean>)observableBoolean {
-  [self handleFeedVisibilityDidChange];
+  // Observes changes in feed visibility pref.
+  [self updateModuleVisibility];
 }
 
 #pragma mark - DiscoverFeedObserverBridge
 
 - (void)discoverFeedModelWasCreated {
   if (self.NTPViewController.viewDidAppear) {
-    [self updateNTPForFeed];
+    [self handleChangeInModules];
 
     if (IsWebChannelsEnabled()) {
       [self.feedHeaderViewController updateForFollowingFeedVisibilityChanged];
@@ -1444,7 +1454,7 @@
       // If sign-in becomes disabled, the sign-in promo must be disabled too.
       // TODO(crbug.com/40280872): The sign-in promo should just be hidden
       // instead of resetting the hierarchy.
-      [self updateNTPForFeed];
+      [self handleChangeInModules];
       [self setContentOffsetToTop];
   }
 }
@@ -1518,9 +1528,8 @@
   }
 }
 
-// Updates the NTP to take into account a new feed, or a change in feed
-// visibility.
-- (void)updateNTPForFeed {
+// Updates the NTP to take into account a change in module visibility
+- (void)handleChangeInModules {
   DCHECK(self.NTPViewController);
 
   [self.NTPViewController resetViewHierarchy];
@@ -1620,7 +1629,7 @@
 - (void)setFeedVisibleFromHeader:(BOOL)visible {
   [self.feedExpandedPref setValue:visible];
   [self.feedMetricsRecorder recordDiscoverFeedVisibilityChanged:visible];
-  [self handleFeedVisibilityDidChange];
+  [self updateModuleVisibility];
 }
 
 // Configures and returns the feed top section coordinator.
@@ -1647,15 +1656,6 @@
   self.feedManagementCoordinator.navigationDelegate = self.NTPMediator;
   self.feedManagementCoordinator.feedMetricsRecorder = self.feedMetricsRecorder;
   [self.feedManagementCoordinator start];
-}
-
-// Handles how the NTP should react when the feed visbility preference is
-// changed.
-- (void)handleFeedVisibilityDidChange {
-  [self updateNTPForFeed];
-  [self cancelOmniboxEdit];
-  [self setContentOffsetToTop];
-  [self.feedHeaderViewController updateForFeedVisibilityChanged];
 }
 
 // Private setter for the `webState` property.
@@ -1743,6 +1743,20 @@
 // necessary.
 - (void)restoreNTPState {
   [self.NTPMediator restoreNTPStateForWebState:self.webState];
+}
+
+// Opens the Home customization menu at a specific `page`.
+- (void)openCustomizationMenuAtPage:(CustomizationMenuPage)page
+                           animated:(BOOL)animated {
+  if (!_customizationCoordinator) {
+    _customizationCoordinator = [[HomeCustomizationCoordinator alloc]
+        initWithBaseViewController:self.NTPViewController
+                           browser:self.browser];
+    _customizationCoordinator.delegate = self;
+    [_customizationCoordinator start];
+  }
+  [_customizationCoordinator presentCustomizationMenuAtPage:page
+                                                   animated:animated];
 }
 
 #pragma mark - AccountMenuCoordinatorDelegate

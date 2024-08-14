@@ -38,7 +38,6 @@
 <translation id="1492280395845991349">Chrome යාවත්කාලීන කිරීම අවසන් කිරීමට යළි දියත් කරන්න</translation>
 <translation id="1497802159252041924">ස්ථාපනය කිරීමේ දෝෂයක්: <ph name="INSTALL_ERROR" /></translation>
 <translation id="1507198376417198979">ඔබගේ නව Chrome පැතිකඩ අභිරුචිකරණය කරන්න</translation>
-<translation id="1516530951338665275">යුගල කිරීම දිගටම කර ගෙන යාමට Google Chrome හට බ්ලූටූත් ප්‍රවේශය අවශ්‍යයි. <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
 <translation id="1547295885616600893">අතිරේක <ph name="BEGIN_LINK_CROS_OSS" />විවෘත මූලාශ්‍ර මෘදුකාංග<ph name="END_LINK_CROS_OSS" /> මගින් ChromeOS සඳහා හැකියාව ලබා දී ඇත.</translation>
 <translation id="1553358976309200471">Chrome යාවත් කරන්න</translation>
 <translation id="1583073672411044740"><ph name="EXISTING_USER" /> දැනටමත් මෙම Chrome පැතිකඩට පුරා ඇත. මෙය <ph name="USER_EMAIL_ADDRESS" /> සඳහා නව Chrome පැතිකඩක් තනනු ඇත</translation>
@@ -54,6 +53,7 @@
 <translation id="1682634494516646069">Google Chrome හට එහි දත්ත නාමාවලිය කියවීම හෝ ලිවීම කළ නොහැක:
 
 <ph name="USER_DATA_DIRECTORY" /></translation>
+<translation id="1689338313606606627">ඔබේ බ්‍රවුස් කිරීමේ අත්දැකීම වැඩි දියුණු කිරීමට සහ දේවල් වේගවත් කර ගැනීමට Chrome හට මෙම පටිත්ත අක්‍රිය කළ හැක.</translation>
 <translation id="1698376642261615901">Google Chrome යනු ආලෝකයේ වේගය, ස්ථාවරත්වය, සහ භාවිතයට පහසුව සහිත වෙබ් පිටු හා යෙදුම් ධාවනය වන වෙබ් බ්‍රව්සරයකි. Google Chrome තුළට සවි කරන ලද මැල්වෙයා සහ ෆිෂිං සහිත වෙබ් වඩා ආරක්ෂිත බ්‍රව්ස් කරන්න.</translation>
 <translation id="1713301662689114961">{0,plural, =1{Chrome පැයකින් යළි දියත් වෙයි}one{Chrome පැය # කින් යළි දියත් වෙයි}other{Chrome පැය # කින් යළි දියත් වෙයි}}</translation>
 <translation id="1722488837206509557">මෙය ඔබට පවතින උපාංගවලින් තේරීමට සහ ඒවායේ අන්තර්ගතය පෙන්වීමට ඉඩ දෙනු ඇත.</translation>
@@ -63,6 +63,7 @@
 <translation id="178701303897325119">මෙම දිගුව තවදුරටත් සහාය නොදක්වයි. ඒ වෙනුවට එය ඉවත් කරන ලෙස Chrome නිර්දේශ කරයි.</translation>
 <translation id="1812689907177901597">මෙය අක්‍රිය කිරීමෙන්, ඔබට Chrome වෙත පුරනය නොවී Gmail වැනි Google වෙබ් අඩවිවලට පුරනය විය හැක.</translation>
 <translation id="1860536484129686729">Chrome හට මෙම අඩවිය සදහා ඔබේ කැමරාවට ප්‍රවේශ වීමට අවසර අවශ්‍යයි</translation>
+<translation id="1861924772887221906">අනාරක්ෂිත සම්බන්ධතාවයක් භාවිතයෙන් පොදු වෙබ් අඩවි පූරණය කිරීමට පෙර Chrome ඔබෙන් අසනු ඇත, නමුත් පෞද්ගලික ජාල සඳහා HTTP සම්බන්ධතා වලට ඉඩ දෙනු ඇත</translation>
 <translation id="1873233029667955273">Google Chrome ඔබේ පෙරනිමි බ්‍රව්සරය නොවේ</translation>
 <translation id="1874309113135274312">Google Chrome බීටා (mDNS-In)</translation>
 <translation id="1877026089748256423">Chrome යල් පැන ගොස් ඇත</translation>
@@ -74,6 +75,7 @@
 <translation id="2008942457798486387">{NUM_EXTENSIONS,plural, =1{මෙම දිගුව තවදුරටත් සහාය නොදක්වයි. ඔබ එය ඉවත් කරන ලෙස Chrome නිර්දේශ කරයි.}one{මෙම දිගු තවදුරටත් සහාය නොදක්වයි. ඔබ ඒවා ඉවත් කරන ලෙස Chrome නිර්දේශ කරයි.}other{මෙම දිගු තවදුරටත් සහාය නොදක්වයි. ඔබ ඒවා ඉවත් කරන ලෙස Chrome නිර්දේශ කරයි.}}</translation>
 <translation id="2018528049276128029">එක් එක් පැතිකඩ පිටුසන්, ඉතිහාසය, මුරපද සහ තවත් දේවල් වැනි එහිම Chrome තොරතුරු දරයි</translation>
 <translation id="2018879682492276940">ස්ථාපනය අසාර්ථක විය. කරුණාකර නැවත උත්සාහ කරන්න.</translation>
+<translation id="2022471217832964798">අපි ගිණුම් ප්‍රවේශය පිහිටුවන අතරතුර, ඔබට තවමත් Chrome භාවිත කළ හැක. පිහිටුවීම සම්පූර්ණ වන තෙක් ඔබට ඇතැම් සම්පත් වෙත ප්‍රවේශ වීමට නොහැකි විය හැක.</translation>
 <translation id="207902854391093810">අත්හදා බැලීම් ක්‍රියාත්මක විට, වෙළඳ දැන්වීම් මිනුම ඔබ පිවිසෙන අඩවිවලට Chrome වෙතින් තොරතුරු ඉල්ලීමට ඉඩදෙන අතර එය අඩවියට ඔවුන්ගේ වෙළඳ දැන්වීම්වල කාර්ය සාධනය මැනීමට උපකාරී වේ. වෙළඳ දැන්වීම් මිනුම අඩවි අතර හැකි තරම් අඩුවෙන් තතු මාරු කිරීමෙන් හරස්-අඩවි ලුහුබැඳීම සීමා කරයි.</translation>
 <translation id="2091012649849228750">අනාගත Google Chrome යාවත්කාලීන ලබා ගැනීමට, ඔබට Windows 10 හෝ ඊට පසු අනුවාද අවශ්‍ය වෙයි. මෙම පරිගණකය Windows 8 භාවිත කරයි.</translation>
 <translation id="2094648590148273905">ChromeOS Flex නියම</translation>
@@ -114,6 +116,7 @@
 <translation id="2559253115192232574">පසුව, ඔබ පිවිසෙන අඩවියක් ඔබ දකින වෙළඳ දැන්වීම් පුද්ගලිකකරණය කිරීම සඳහා ඔබගේ ලැදිකම් බැලීමට Chrome වෙතින් ඉල්ලිය හැකිය. Chrome හට ලැදිකම් 3ක් දක්වා බෙදා ගත හැකිය.</translation>
 <translation id="2563121210305478421">Chrome යළි දියත් කරන්නද?</translation>
 <translation id="2569974318947988067">Chrome සංචාලන HTTPS වෙත උත්ශ්‍රේණි කිරීමට උත්සාහ කරනු ඇත</translation>
+<translation id="2571392474191184472">ඔබේ සංවිධානය Chrome කළමනාකරණය කරයි</translation>
 <translation id="2574930892358684005"><ph name="EXISTING_USER" /> දැනටමත් මෙම Chrome පැතිකඩට පුරා ඇත. ඔබගේ බ්‍රවුස් කිරීම වෙනම තබා ගැනීමට, Chrome හට ඔබ සඳහා ඔබගේම පැතිකඩක් තැනිය හැකිය.</translation>
 <translation id="2580411288591421699">දැන් ඇති Google Chrome සංස්කරණයම ස්ථාපනය කළ නොහැක. Google Chrome වසා නැවත උත්සාහ කරන්න.</translation>
 <translation id="2586406160782125153">මෙය ඔබගේ බ්‍රවුස් කිරීමේ දත්ත මෙම උපාංගයෙන් මකනු ඇත. ඔබගේ දත්ත පසුව ලබා ගැනීමට, <ph name="USER_EMAIL" /> ලෙස Chrome වෙත පුරන්න.</translation>
@@ -198,6 +201,7 @@
 <translation id="3596080736082218006">{COUNT,plural, =0{යාවත්කාලීනයක් යෙදීමට ඔබ Chrome නැවත ආරම්භ කිරීම පරිපාලකයාට අවශ්‍ය වේ}=1{යාවත්කාලීනයක් යෙදීමට ඔබ Chrome නැවත ආරම්භ කිරීම පරිපාලකයාට අවශ්‍ය වේ. ඔබේ අප්‍රසිද්ධ කවුළුව යළි විවෘත නොවෙයි.}one{යාවත්කාලීනයක් යෙදීමට ඔබ Chrome නැවත ආරම්භ කිරීම පරිපාලකයාට අවශ්‍ය වේ. ඔබේ අප්‍රසිද්ධ කවුළු # යළි විවෘත නොවෙයි.}other{යාවත්කාලීනයක් යෙදීමට ඔබ Chrome නැවත ආරම්භ කිරීම පරිපාලකයාට අවශ්‍ය වේ. ඔබේ අප්‍රසිද්ධ කවුළු # යළි විවෘත නොවෙයි.}}</translation>
 <translation id="3597003331831379823">උසස් වරප්‍රසාද සහිත පිහිටුවීම් ධාවනය කිරීමට අසමත් විය. <ph name="METAINSTALLER_ERROR" /></translation>
 <translation id="3609788354808247807">ඔබ මෑත පැමිණ නැත. Chrome <ph name="PERMISSION_1" />, <ph name="PERMISSION_2" />, <ph name="PERMISSION_3" /> ඉවත් කළා</translation>
+<translation id="3614820178395775413">අනාරක්ෂිත සම්බන්ධතාවයක් භාවිතයෙන් ඕනෑම අඩවියක් පූරණය කිරීමට පෙර Chrome ඔබෙන් අසනු ඇත</translation>
 <translation id="3622797965165704966">දැන් Chrome ඔබගේ Google ගිණුම සහ බෙදාගත් පරිගණක මත භාවිතා කිරීමට වඩාත් පහසුයි.</translation>
 <translation id="3635073343384702370">ඔබ ඒවා සුරකින විට Chrome හට ඔබේ මුරපද පරීක්ෂා කළ හැක</translation>
 <translation id="3667616615096815454">ස්ථාපනය කළ නොහැකි වේ, යෙදුම සේවාදායකයට නොදනී.</translation>
@@ -207,12 +211,14 @@
 <translation id="3703994572283698466">ChromeOS අතිරේක <ph name="BEGIN_LINK_CROS_OSS" />විවෘත මූලාශ්‍ර මෘදුකාංගය<ph name="END_LINK_CROS_OSS" /> මගින්, <ph name="BEGIN_LINK_LINUX_OSS" />Linux සංවර්ධන පරිසරය<ph name="END_LINK_LINUX_OSS" /> ලෙස හැකියාව ලබා දී ඇත.</translation>
 <translation id="3716540481907974026">ChromeOS Flex අනුවාදය</translation>
 <translation id="3718181793972440140">මෙය අයිතම 1ක් මෙම උපාංගයෙන් මකනු ඇත. ඔබගේ දත්ත පසුව ලබා ගැනීමට, <ph name="USER_EMAIL" /> ලෙස Chrome වෙත පුරන්න.</translation>
+<translation id="3723744677043446310">{NUM_EXTENSIONS,plural, =1{ඔබ එය ඉවත් කරන ලෙස Chrome නිර්දේශ කරයි. <ph name="BEGIN_LINK" />සහාය දක්වන දිගු ගැන තව දැන ගන්න<ph name="END_LINK" />}one{ඔබ ඒවා ඉවත් කරන ලෙස Chrome නිර්දේශ කරයි. <ph name="BEGIN_LINK" />සහාය දක්වන දිගු ගැන තව දැන ගන්න<ph name="END_LINK" />}other{ඔබ ඒවා ඉවත් කරන ලෙස Chrome නිර්දේශ කරයි. <ph name="BEGIN_LINK" />සහාය දක්වන දිගු ගැන තව දැන ගන්න<ph name="END_LINK" />}}</translation>
 <translation id="3744202345691150878">ChromeOS සමගින් උදවු ලබා ගන්න</translation>
 <translation id="3780814664026482060">Chrome - <ph name="PAGE_TITLE" /></translation>
 <translation id="3785324443014631273">ChromeOS Flex හට පිරීමේ දෝෂයක් හේතුවෙන් ඔබගේ දත්ත සමමුහුර්ත කළ නොහැකි විය.</translation>
 <translation id="3795971588916395511">Google ChromeOS</translation>
 <translation id="3809772425479558446">Google Chrome හට Windows 10 හෝ ඊට ඉහළ අනුවාදයක් අවශ්‍යයි.</translation>
 <translation id="3835168907083856002">මෙය <ph name="USER_EMAIL_ADDRESS" /> සඳහා නව Chrome පැතිකඩක් තනනු ඇත</translation>
+<translation id="383928141529488001">බ්ලූටූත් උපාංග ගවේෂණය කිරීමට Google Chrome හට බ්ලූටූත් ප්‍රවේශය අවශ්‍ය වේ. <ph name="IDS_SERIAL_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
 <translation id="386202838227397562">Google Chrome කවුළුව වසා නැවත උත්සාහ කරන්න.</translation>
 <translation id="3865754807470779944">Chrome අනුවාදය <ph name="PRODUCT_VERSION" /> ස්ථාපන කෙරේ</translation>
 <translation id="3873044882194371212">සබැඳිය Chrome අ&amp;ප්‍රසිද්ධ කවුළුව තුළ විවෘත කරන්න</translation>
@@ -302,6 +308,7 @@
 <translation id="5126049312684316860">Chrome ඔබ පැමිණීමට ඉඩ ඇති පිටුවලටත් වඩා පිටු පූර්ව පූරණය කරයි, එවිට ඔබ ඒවාට පිවිසෙන විට ඒවා ඉක්මනින් පූරණය වේ</translation>
 <translation id="5132929315877954718">Google Chrome සඳහා විශිෂ්ට යෙදුම්, ක්‍රීඩා, දිගු සහ තේමා සොයා ගන්න.</translation>
 <translation id="5139423532931106058">ඔබගේ Chrome පැතිකඩ අභිරුචිකරණය කරන්න</translation>
+<translation id="5161361450770099246">ඔබේ බ්‍රවුස් කිරීමේ අත්දැකීම වැඩි දියුණු කිරීමට සහ සම්පත් නිදහස් කිරීමට Chrome හට මෙම පටිත්ත අක්‍රිය කළ හැක.</translation>
 <translation id="5163087008893166964">Chrome වෙත සාදරයෙන් පිළිගනිමු; නව බ්‍රවුසර කවුළුවක් විවෘත කරන ලදි</translation>
 <translation id="5170938038195470297">ඔබේ පැතිකඩ Google Chrome නව සංස්කරණයකින් එන බැවින් භාවිත කළ නොහැක.
 
@@ -314,7 +321,6 @@
 <translation id="5334309298019785904">ඔබගේ වසම සඳහා සමමුහුර්තකරණය ලබා ගත නොහැකි නිසා ChromeOS හට ඔබගේ දත්ත සමමුහුර්ත කළ නොහැකි විය.</translation>
 <translation id="5334487786912937552">Chrome හට ගොනු බාගැනීමට ගබඩා අවසරය අවශ්‍යයි</translation>
 <translation id="5337648990166757586">විකල්පමය: දෝෂ නිර්ණ සහ භාවිත දත්ත ස්වයංක්‍රියව Google වෙත යැවීමෙන් ChromeOS විශේෂාංග සහ කාර්ය සාධනය වැඩිදියුණු කිරීමට උදවු වන්න.</translation>
-<translation id="5345497718959596593">ඔබ පුරනය වී සිටින අතරතුර, ඔබට Chrome තුළ ඔබේ Google ගිණුමෙන් ඔබේ මුරපද සහ තවත් ඒවා භාවිත කළ හැක</translation>
 <translation id="5357889879764279201">ChromeOS Flex සම්බන්ධව උදවු ලබා ගන්න</translation>
 <translation id="5368118228313795342">අමතර කේතය: <ph name="EXTRA_CODE" />.</translation>
 <translation id="5386244825306882791">තවද එය ඔබ Chrome විවෘත කරන විට හෝ Omnibox වෙතින් සොයන විට පෙන්වන වෙබ් පිටුව නිර්ණය කරයි.</translation>
@@ -327,6 +333,7 @@ Google Chrome හට ඔබගේ සැකසුම් ප්‍රතිසා
 <translation id="5524761631371622910">අත්හදා බැලීම් ක්‍රියාත්මක විට සහ Chrome ඔබව අහඹු ලෙස සක්‍රිය අත්හදා බැලීමක තබා ඇත්නම්, ඔබගේ බ්‍රවුස් කිරීමේ ඉතිහාසය ඔබ දකින වෙළඳ දැන්වීම් සහ ලැදිකම්වලට පහත තක්සේරු කර ඇති පරිදි බලපායි. ඔබගේ පෞද්ගලිකත්වය ආරක්ෂා කිරීමට, Chrome සෑම මසකම පෙරළෙන පදනම මත ඔබගේ ලැදිකම් මකයි.</translation>
 <translation id="5530733413481476019">Chrome වේගවත් කරන්න</translation>
 <translation id="5566025111015594046">Google Chrome (mDNS-In)</translation>
+<translation id="5602351063754773347">ඔබ එය ඉවත් කරන ලෙස Chrome නිර්දේශ කරයි. <ph name="BEGIN_LINK" />සහාය දක්වන දිගු ගැන තව දැන ගන්න<ph name="END_LINK" /></translation>
 <translation id="5648328599815354043">ඔබව සබැඳිව ආරක්‍ෂිතව තැබීමට Chrome වැඩියෙන් ඉටු කරයි</translation>
 <translation id="565744775970812598"><ph name="FILE_NAME" /> අනතුරුදායක විය හැකිය, එම නිසා Chrome එය අවහිර කර ඇත.</translation>
 <translation id="5678190148303298925">{COUNT,plural, =0{මෙම යාවත්කාලීනය යෙදීමට Chrome නැවත ආරම්භ කරන ලෙසට පරිපාලකයා ඔබට පවසයි}=1{මෙම යාවත්කාලීනය යෙදීමට Chrome නැවත ආරම්භ කරන ලෙසට පරිපාලකයා ඔබට පවසයි. ඔබේ අප්‍රසිද්ධ කවුළුව යළි විවෘත නොවෙයි.}one{මෙම යාවත්කාලීනය යෙදීමට Chrome නැවත ආරම්භ කරන ලෙසට පරිපාලකයා ඔබට පවසයි. ඔබේ අප්‍රසිද්ධ කවුළු # යළි විවෘත නොවෙයි.}other{මෙම යාවත්කාලීනය යෙදීමට Chrome නැවත ආරම්භ කරන ලෙසට පරිපාලකයා ඔබට පවසයි. ඔබේ අප්‍රසිද්ධ කවුළු # යළි විවෘත නොවෙයි.}}</translation>
@@ -342,6 +349,7 @@ Google Chrome හට ඔබගේ සැකසුම් ප්‍රතිසා
 <translation id="5804318322022881572">Chrome දියත් කළ නොහැකි විය. නැවත උත්සාහ කරන්න.</translation>
 <translation id="5809516625706423866">අන්තර්ජාලය වෙත සම්බන්ධ වීමට නොහැකි වේ. HTTP 401 අනවසරයි. ඔබේ ප්‍රොක්සි වින්‍යාසය පරීක්ෂා කරන්න.</translation>
 <translation id="5825922397106002626">Chrome වෙතින් <ph name="EXTENSION_NAME" /> ඉවත් කරන්න</translation>
+<translation id="58431560289969279">ඔබ පුරනය වී සිටින අතරතුර, ඔබට Chrome තුළ ඔබේ Google ගිණුමෙන් ඔබේ මුරපද සහ තවත් ඒවා භාවිත කළ හැක. ඔබට සැකසීම් තුළින් ඕනෑම වේලාවක මෙය වෙනස් කළ හැක.</translation>
 <translation id="5858486459377137936">ඔබ Chrome වෙත පුරනය වී ඇති නම් ඔබේ Google ගිණුම හැර, ඔබ සියලු Chrome කවුළු වසා දැමූ විට ඔබ බොහෝ අඩවිවලින් වරනු ලැබේ. අඩවිවලට ඔබව මතක තබා ගැනීමට ඉඩ දීමට, <ph name="SETTINGS_LINK" />.</translation>
 <translation id="586971344380992563"><ph name="BEGIN_LINK" />Chrome ඔබට අනාරක්ෂිත අඩවි සහ බාගැනීම් ගැන අනතුරු අඟවයි<ph name="END_LINK" /></translation>
 <translation id="5895138241574237353">යළි අරඹන්න</translation>
@@ -367,6 +375,7 @@ Google Chrome හට ඔබගේ සැකසුම් ප්‍රතිසා
 <translation id="6157638032135951407">ඔබේ සංවිධානය Chrome දත්ත <ph name="TIMEOUT_DURATION" /> සඳහා භාවිතා නොකරන විට මකයි. මෙයට ඉතිහාසය, ස්වයං පිරවීම, සහ බාගැනීම් ඇතුළත් විය හැක.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE" /> - Google Chrome</translation>
 <translation id="6173637689840186878"><ph name="PAGE_TITLE" /> - Google Chrome බීටා</translation>
+<translation id="6180522807229584611">මෙම පටිත්ත අමතර සම්පත් භාවිත කරයි. ඔබේ කාර්ය සාධනය වැඩි දියුණු කිරීමට, Chrome හට එය අක්‍රිය කිරීමට ඉඩ දෙන්න.</translation>
 <translation id="6182736845697986886">යාවත්කාලීන සේවාදායක අභ්‍යන්තර දෝෂයක් නිසා ස්ථාපනය අසමත් විය.</translation>
 <translation id="6200139057479872438">ඔබ මෑත පැමිණ නැත. Chrome <ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> ඉවත් කළා</translation>
 <translation id="621585339844629864">ඔබේ තිරය බෙදා ගැනීමට, පද්ධති මනාප තුළ Chrome සඳහා තිර පටිගත කිරීමට ඉඩ දෙන්න.</translation>
@@ -415,10 +424,12 @@ Google Chrome හට ඔබගේ සැකසුම් ප්‍රතිසා
 <translation id="6851981911629679515">Chrome හි ජාවාස්ක්‍රිප්ට සහ WebAssembly එන්ජිම තුළ අමතර ආරක්‍ෂාව සක්‍රීය කරන්න</translation>
 <translation id="6881299373831449287">Chrome යාවත්කාලීන කරමින්</translation>
 <translation id="6885412569789873916">Chrome බීටා යෙදුම්</translation>
+<translation id="6893363893008038481">Chrome වෙතින් ගිණුම ඉවත් කරන්න</translation>
 <translation id="6933858244219479645">ChromeOS පද්ධතිය</translation>
 <translation id="6938166777909186039">අනාගත Google Chrome යාවත්කාලීන ලබා ගැනීමට, ඔබට Windows 10 හෝ ඊට පසු අවශ්‍ය වේ. මෙම පරිගණකය Windows 8.1 භාවිතා කරයි.</translation>
 <translation id="6943584222992551122">මෙම පුද්ගලයාගේ බ්‍රවුස් කිරීමේ දත්ත මෙම උපාංගයෙන් මකනු ලැබේ. දත්ත ප්‍රතිසාධන කිරීමට, <ph name="USER_EMAIL" /> ලෙස Chrome වෙත පුරන්න.</translation>
 <translation id="6967962315388095737">mDNS තදබදයට ඉඩ දීමට Google Chrome බීටා සඳහා බන්ධිත රීතිය.</translation>
+<translation id="6979589607440534284">Chrome නව පටිත්තක විවෘත වන සමහර ගොනු අවහිර කරන්නේ මන්දැයි ඉගෙන ගන්න</translation>
 <translation id="7011190694940573312">මෙහෙයුම් පද්ධතියෙහි මෙම අනුවාදය සඳහා සහාය නොදක්වන නිසා ස්ථාපනය අසමත් විය.</translation>
 <translation id="7024536598735240744">ඇසුරුම් හැරීමේ දෝෂය: <ph name="UNPACK_ERROR" />.</translation>
 <translation id="7025789849649390912">ස්ථාපනය නැවතිණි.</translation>
@@ -441,11 +452,12 @@ Google Chrome හට ඔබගේ සැකසුම් ප්‍රතිසා
 <translation id="7177959540995930968">ඔබට Chrome සැකසීම් තුළ මෙම විශේෂාංග ගැන තව දැන ගත හැකිය.</translation>
 <translation id="7193885263065350793">ඔබේ සංවිධානය Chrome <ph name="TIMEOUT_DURATION" /> සඳහා භාවිතා නොකරන විට එය වසා දමයි.</translation>
 <translation id="7242029209006116544">මොබ පාලිත ගිනුමකින් පිවිසෙන අතර ඔබ ඔබේ Google Chrome පැතිකඩෙහි පාලනය පරිපාලක වෙත ලබාදේ. ඔබේ යෙදුම්, පොත්සලකුණු, ඉතිහාසය, මුරපද, හා වෙනත් Chrome සැකසුම් ස්ථිරව  <ph name="USER_NAME" /> හැ බැඳී පවතී. ඔබට Google ගිනුම් පාලකපුවරුව හරහා දත්ත මකාදැමිය හැකි නමුත්, ඔබට වෙනත් ගිනුමක දත්ත හවුල්කරගත නොහැක.මීට අමතරව ඔබේ වත්මන් Chrome දත්ත වෙන්ව තබාගැනීම සඳහා නව පැතිකඩක් නිර්මාණය කළ හැක. <ph name="LEARN_MORE" /></translation>
-<translation id="7292266096633803196">ඔබ එය ඉවත් කරන ලෙස Chrome නිර්දේශ කරයි. සහාය දක්වන දිගු ගැන තව දැන ගන්න</translation>
+<translation id="7285616922384953075"><ph name="MANAGER" /> Chrome කළමනාකරණය කරයි</translation>
 <translation id="7295052994004373688">මෙම භාෂාව Google Chrome UI දැක්වීමට භාවිතයි</translation>
 <translation id="7296210096911315575">වැදගත් භාවිතය සහ ආරක්‍ෂක තොරතුරු</translation>
 <translation id="7302361266603927550">ඔබේ Chrome දත්ත සමහරක් තවම ඔබේ Google ගිණුම තුළ සුරැකී නැත. වරන්නට පෙර විනාඩි කිහිපයක් රැඳී සිටීමට උත්සාහ කරන්න. ඔබ දැන් වරන්නේ නම් මෙම දත්ත මකනු ලැබේ.</translation>
 <translation id="7308322188646931570">Chrome හට ගොනු බාගැනීමට ආචයන ප්‍රවේශය අවශ්‍යයි</translation>
+<translation id="7324120788743384890">ක්‍රියාත්මක වූ විට, HTTPS සඳහා සහය නොදක්වන වෙබ් අඩවි පූරණය කිරීමට පෙර Chrome ඔබෙන් අසනු ඇත</translation>
 <translation id="7339898014177206373">නව කවුළුව</translation>
 <translation id="7352881504289275361">දියුණු කළ ආරක්‍ෂිත බ්‍රවුස් කිරීම ඔබ බ්‍රවුස් කරන විට ඔබව ආරක්‍ෂිතව තැබීමට Chrome හි ප්‍රබලතම සබැඳි ආරක්‍ෂාව පිරිනමයි</translation>
 <translation id="7394745511930161845">ඔබේ බ්‍රවුසරයට අද්විතීය පෙනුමක් දීමට AI සමග ඔබේම තේමාව සාදන්න</translation>
@@ -458,6 +470,7 @@ Google Chrome හට ඔබගේ සැකසුම් ප්‍රතිසා
 <translation id="7452987490177144319">{COUNT,plural, =1{1 මිනිත්තුවකට Chrome භාවිත නොකරන විට ඔබේ සංවිධානය බ්‍රවුස් කිරීමේ දත්ත ස්වයංක්‍රීයව මකයි. මෙයට ඉතිහාසය, ස්වයං පිරවුම, සහ බාගැනීම් ඇතුළත් විය හැක. ඔබේ පටිති විවෘතව පවතියි.}one{මිනිත්තු #කට Chrome භාවිත නොකරන විට ඔබේ සංවිධානය බ්‍රවුස් කිරීමේ දත්ත ස්වයංක්‍රීයව මකයි. මෙයට ඉතිහාසය, ස්වයං පිරවුම, සහ බාගැනීම් ඇතුළත් විය හැක. ඔබේ පටිති විවෘතව පවතියි.}other{මිනිත්තු #කට Chrome භාවිත නොකරන විට ඔබේ සංවිධානය බ්‍රවුස් කිරීමේ දත්ත ස්වයංක්‍රීයව මකයි. මෙයට ඉතිහාසය, ස්වයං පිරවුම, සහ බාගැනීම් ඇතුළත් විය හැක. ඔබේ පටිති විවෘතව පවතියි.}}</translation>
 <translation id="7477130805345743099">අනාරක්ෂිත සම්බන්ධතාවයක් භාවිතයෙන් ඕනෑම අඩවියක් පූරණය කිරීමට පෙර Chrome ඔබට අනතුරු අඟවනු ඇත</translation>
 <translation id="7481213027396403996">Chrome හි ප්‍රබලම ආරක්ෂාව ලබා ගන්න</translation>
+<translation id="749228101751499733">ඔබ පුරනය වී සිටින අතරතුර, ඔබට Chrome තුළ ඔබේ Google ගිණුමෙන් ඔබේ මුරපද සහ තවත් ඒවා භාවිත කළ හැක. <ph name="SHORTCUT" /> හට ඔබේ Google සේවා සැකසීම් වෙනස් කළ හැක.</translation>
 <translation id="7535429826459677826">Google Chrome Dev</translation>
 <translation id="7572537927358445944">අක්‍රිය • Chrome හට මෙම දිගුව එන තැන සත්‍යාපන කළ නොහැක</translation>
 <translation id="7583399374488819119"><ph name="COMPANY_NAME" /> ස්ථාපකය</translation>
@@ -574,6 +587,7 @@ Google Chrome හට ඔබගේ සැකසුම් ප්‍රතිසා
 <translation id="8989968390305463310">ඔබගේ බ්‍රවුස් කිරීමේ ඉතිහාසය ඔබ දකින වෙළඳ දැන්වීම්වලට සහ ලැදිකම්වලට පහත තක්සේරු කර ඇති පරිදි බලපායි. ඔබගේ පෞද්ගලිකත්වය ආරක්ෂා කිරීමට, Chrome සෑම මසකම පෙරළෙන පදනම මත ඔබගේ ලැදිකම් ස්වයංක්‍රීයව මකයි. ඔබ ඒවා ඉවත් නොකළහොත් ලැදිකම් නැවුම් විය හැකිය.</translation>
 <translation id="8999117580775242387">HTTPS නොමැති විට, Chrome ඔබට අනතුරු ඇඟවීමකින් තොරව අනාරක්ෂිත සම්බන්ධතාවයක් භාවිතා කරනු ඇත</translation>
 <translation id="8999208279178790196">{0,plural, =0{Chrome යාවත්කාලීනයක් තිබේ}=1{Chrome යාවත්කාලීනයක් තිබේ}one{දින # කට Chrome යාවත්කාලීනයක් ලැබී ඇත}other{දින # කට Chrome යාවත්කාලීනයක් ලැබී ඇත}}</translation>
+<translation id="9014771989710951291">බහුවිධ සංවිධාන Chrome කළමනාකරණය කරයි</translation>
 <translation id="9024318700713112071">Chrome ඔබේ පෙරනිමිය ලෙස සකසන්න</translation>
 <translation id="9053892488859122171">ChromeOS Flex පද්ධතිය</translation>
 <translation id="9090566250983691233">Chrome සමහර ගොනු අවහිර කරන හේතුව දැන ගන්න</translation>

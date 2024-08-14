@@ -7,33 +7,12 @@
 #ifndef COMPONENTS_PRIVACY_SANDBOX_PRIVACY_SANDBOX_NOTICE_CONSTANTS_H_
 #define COMPONENTS_PRIVACY_SANDBOX_PRIVACY_SANDBOX_NOTICE_CONSTANTS_H_
 
+#include <string_view>
+
+#include "base/containers/fixed_flat_set.h"
 namespace privacy_sandbox {
 
 inline constexpr int kPrivacySandboxNoticeSchemaVersion = 1;
-
-// Full 3PCD notice names.
-inline constexpr char kFull3PCDIPH[] = "Full3PCDDesktopIPH";
-inline constexpr char kFull3PCDClankBrApp[] = "Full3PCDClankBrApp";
-inline constexpr char kFull3PCDClankCCT[] = "Full3PCDClankCCT";
-
-// Full 3PCD silent notice names.
-inline constexpr char kFull3PCDSilentIPH[] = "Full3PCDSilentDesktopIPH";
-inline constexpr char kFull3PCDSilentClankBrApp[] = "Full3PCDSilentClankBrApp";
-inline constexpr char kFull3PCDSilentClankCCT[] = "Full3PCDSilentClankCCT";
-
-// Full 3PCD with IPP notice names.
-inline constexpr char kFull3PCDWithIPPIPH[] = "Full3PCDWithIPPDesktopIPH";
-inline constexpr char kFull3PCDWithIPPClankBrApp[] =
-    "Full3PCDWithIPPClankBrApp";
-inline constexpr char kFull3PCDWithIPPClankCCT[] = "Full3PCDWithIPPClankCCT";
-
-// Full 3PCD with IPP silent notice names.
-inline constexpr char kFull3PCDSilentWithIPPIPH[] =
-    "Full3PCDSilentWithIPPDesktopIPH";
-inline constexpr char kFull3PCDSilentWithIPPClankBrApp[] =
-    "Full3PCDSilentWithIPPClankBrApp";
-inline constexpr char kFull3PCDSilentWithIPPClankCCT[] =
-    "Full3PCDSilentWithIPPClankCCT";
 
 // Topics Consent modal names.
 inline constexpr char kTopicsConsentModal[] = "TopicsConsentDesktopModal";
@@ -41,6 +20,11 @@ inline constexpr char kTopicsConsentModalClankBrApp[] =
     "TopicsConsentModalClankBrApp";
 inline constexpr char kTopicsConsentModalClankCCT[] =
     "TopicsConsentModalClankCCT";
+
+inline constexpr auto kPrivacySandboxNoticeNames =
+    base::MakeFixedFlatSet<std::string_view>({kTopicsConsentModal,
+                                              kTopicsConsentModalClankBrApp,
+                                              kTopicsConsentModalClankCCT});
 
 }  // namespace privacy_sandbox
 

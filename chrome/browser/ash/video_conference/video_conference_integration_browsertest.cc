@@ -7,6 +7,7 @@
 #include "ash/constants/ash_pref_names.h"
 #include "ash/constants/ash_switches.h"
 #include "ash/public/cpp/capture_mode/capture_mode_test_api.h"
+#include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/system/audio/audio_effects_controller.h"
@@ -125,7 +126,7 @@ ash::VideoConferenceTray* GetVcTray() {
 
 // Simulates left click on the `button`.
 void ClickButton(views::Button* button) {
-  ui::MouseEvent event(ui::ET_MOUSE_PRESSED, gfx::Point(), gfx::Point(),
+  ui::MouseEvent event(ui::EventType::kMousePressed, gfx::Point(), gfx::Point(),
                        ui::EventTimeForNow(), 0, 0);
   views::test::ButtonTestApi(button).NotifyClick(event);
 }

@@ -312,7 +312,10 @@ ci.builder(
         ),
         chromium_config = builder_config.chromium_config(
             config = "chromium",
-            apply_configs = ["mb"],
+            apply_configs = [
+                "mb",
+                "shared_build_dir",
+            ],
             build_config = builder_config.build_config.RELEASE,
             target_arch = builder_config.target_arch.INTEL,
             target_bits = 64,
@@ -379,6 +382,7 @@ ci.thin_tester(
     main_console_view = "main",
     cq_mirrors_console_view = "mirrors",
     contact_team_email = "chromeos-sw-engprod@google.com",
+    notifies = ["chrome-fake-vaapi-test"],
     siso_remote_jobs = siso.remote_jobs.HIGH_JOBS_FOR_CI,
 )
 
@@ -684,6 +688,7 @@ ci.builder(
             config = "chromium",
             apply_configs = [
                 "mb",
+                "shared_build_dir",
             ],
             build_config = builder_config.build_config.RELEASE,
             target_arch = builder_config.target_arch.INTEL,

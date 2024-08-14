@@ -7,7 +7,6 @@ package org.chromium.chrome.browser.tasks.tab_management;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.BLOCK_TOUCH_INPUT;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.FOCUS_TAB_INDEX_FOR_ACCESSIBILITY;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.INITIAL_SCROLL_INDEX;
-import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.IS_INCOGNITO;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.MODE;
 
 import android.view.View;
@@ -189,6 +188,7 @@ public class TabSwitcherPaneMediator
 
     /** Destroys the mediator unregistering all its observers. */
     public void destroy() {
+        hideDialogs();
         mTabModelFilterSupplier.removeObserver(mOnTabModelFilterChanged);
         removeTabModelObserver(mTabModelFilterSupplier.get());
 
@@ -418,7 +418,6 @@ public class TabSwitcherPaneMediator
         removeTabModelObserver(oldFilter);
 
         if (newFilter != null) {
-            mContainerViewModel.set(IS_INCOGNITO, newFilter.isIncognito());
             newFilter.addObserver(mTabModelObserver);
             // The tab model may already be restored and `restoreCompleted` will be skipped, but
             // this pane is visible. To avoid an empty state, try to show tabs now.
@@ -435,14 +434,19 @@ public class TabSwitcherPaneMediator
     private void onAnimatingChanged(boolean animating) {
         updateBlockTouchInput();
         DialogController controller = getTabGridDialogController();
-        if (controller != null) {
+        if (controller != null && animating) {
             controller.hideDialog(true);
         }
         notifyBackPressStateChangedInternal();
     }
 
     private void onVisibilityChanged(boolean visible) {
-        if (visible) mOnTabSwitcherShown.run();
+        if (visible) {
+            mOnTabSwitcherShown.run();
+        } else {
+            hideDialogs();
+        }
+
         notifyBackPressStateChangedInternal();
     }
 

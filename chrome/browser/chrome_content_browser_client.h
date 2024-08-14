@@ -352,9 +352,10 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       const url::Origin& destination_origin,
       content::PrivacySandboxInvokingAPI invoking_api,
       bool post_impression_reporting) override;
-  void OnAuctionComplete(content::RenderFrameHost* render_frame_host,
-                         content::InterestGroupManager::InterestGroupDataKey
-                             winner_data_key) override;
+  void OnAuctionComplete(
+      content::RenderFrameHost* render_frame_host,
+      std::optional<content::InterestGroupManager::InterestGroupDataKey>
+          winner_data_key) override;
   bool IsAttributionReportingOperationAllowed(
       content::BrowserContext* browser_context,
       AttributionReportingOperation operation,
@@ -995,9 +996,6 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   bool IsTransientActivationRequiredForShowFileOrDirectoryPicker(
       content::WebContents* web_contents) override;
 
-  bool IsTransientActivationRequiredForHtmlFullscreen(
-      content::RenderFrameHost* render_frame_host) override;
-
   bool ShouldUseFirstPartyStorageKey(const url::Origin& origin) override;
 
   std::unique_ptr<content::ResponsivenessCalculatorDelegate>
@@ -1071,6 +1069,9 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       base::OnceCallback<void(std::optional<blink::mojom::RelatedApplication>)>
           callback) override;
 #endif  // !BUILDFLAG(IS_ANDROID)
+
+  bool IsSaveableNavigation(
+      content::NavigationHandle* navigation_handle) override;
 
   void SetSamplingProfiler(
       std::unique_ptr<MainThreadStackSamplingProfiler> sampling_profiler);
@@ -1195,7 +1196,8 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       content::BrowserContext* browser_context,
       net::handles::NetworkHandle bound_network,
       network::URLLoaderFactoryBuilder& factory_builder,
-      network::mojom::URLLoaderFactoryOverridePtr* factory_override);
+      network::mojom::URLLoaderFactoryOverridePtr* factory_override,
+      const net::IsolationInfo& isolation_info);
 
   mojo::Remote<network::mojom::NetworkContext>&
   get_network_bound_network_context_for_testing() {

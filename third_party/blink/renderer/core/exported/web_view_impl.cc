@@ -477,6 +477,17 @@ void ForEachFrameWidgetControlledByView(
   }
 }
 
+void MaybePreloadSystemFonts(Page* page) {
+  static bool is_first_run = true;
+  if (!is_first_run) {
+    return;
+  }
+  is_first_run = false;
+
+  page->GetAgentGroupScheduler().DefaultTaskRunner()->PostTask(
+      FROM_HERE, WTF::BindOnce([]() { FontCache::MaybePreloadSystemFonts(); }));
+}
+
 }  // namespace
 
 // WebView ----------------------------------------------------------------
@@ -664,11 +675,6 @@ WebViewImpl::WebViewImpl(
 
 WebViewImpl::~WebViewImpl() {
   DCHECK(!page_);
-}
-
-WebDevToolsAgentImpl* WebViewImpl::MainFrameDevToolsAgentImpl() {
-  WebLocalFrameImpl* main_frame = MainFrameImpl();
-  return main_frame ? main_frame->DevToolsAgentImpl() : nullptr;
 }
 
 void WebViewImpl::SetTabKeyCyclesThroughElements(bool value) {
@@ -1773,6 +1779,8 @@ void WebView::ApplyWebPreferences(const web_pref::WebPreferences& prefs,
       prefs.scroll_top_left_interop_enabled);
   RuntimeEnabledFeatures::SetAcceleratedSmallCanvasesEnabled(
       !prefs.disable_accelerated_small_canvases);
+  RuntimeEnabledFeatures::SetLongPressLinkSelectTextEnabled(
+      prefs.long_press_link_select_text);
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_FUCHSIA)
@@ -1787,8 +1795,6 @@ void WebView::ApplyWebPreferences(const web_pref::WebPreferences& prefs,
       prefs.require_transient_activation_for_get_display_media);
   settings->SetRequireTransientActivationForShowFileOrDirectoryPicker(
       prefs.require_transient_activation_for_show_file_or_directory_picker);
-  settings->SetRequireTransientActivationForHtmlFullscreen(
-      prefs.require_transient_activation_for_html_fullscreen);
   settings->SetViewportEnabled(prefs.viewport_enabled);
   settings->SetViewportMetaEnabled(prefs.viewport_meta_enabled);
   settings->SetViewportStyle(prefs.viewport_style);
@@ -2307,31 +2313,11 @@ double WebViewImpl::ClampZoomLevel(double zoom_level) const {
                   std::min(maximum_zoom_level_, zoom_level));
 }
 
-double WebViewImpl::ZoomLevelToZoomFactor(double zoom_level,
-                                          bool for_main_frame) const {
-  double zoom_factor = blink::ZoomLevelToZoomFactor(zoom_level);
-  if (for_main_frame && zoom_factor_override_) {
-    zoom_factor = zoom_factor_override_;
+double WebViewImpl::ZoomLevelToZoomFactor(double zoom_level) const {
+  if (zoom_factor_override_) {
+    return zoom_factor_override_;
   }
-  if (zoom_factor_for_device_scale_factor_) {
-    if (compositor_device_scale_factor_override_) {
-      zoom_factor *= compositor_device_scale_factor_override_;
-    } else {
-      zoom_factor *= zoom_factor_for_device_scale_factor_;
-    }
-  }
-  return zoom_factor;
-}
-
-double WebViewImpl::ZoomFactorToZoomLevel(double zoom_factor) const {
-  if (zoom_factor_for_device_scale_factor_) {
-    if (compositor_device_scale_factor_override_) {
-      zoom_factor /= compositor_device_scale_factor_override_;
-    } else {
-      zoom_factor /= zoom_factor_for_device_scale_factor_;
-    }
-  }
-  return blink::ZoomFactorToZoomLevel(zoom_factor);
+  return blink::ZoomLevelToZoomFactor(zoom_level);
 }
 
 void WebViewImpl::UpdateWidgetZoomFactors() {
@@ -2341,14 +2327,12 @@ void WebViewImpl::UpdateWidgetZoomFactors() {
 }
 
 void WebViewImpl::UpdateInspectorDeviceScaleFactorOverride() {
-  if (zoom_factor_for_device_scale_factor_) {
-    if (compositor_device_scale_factor_override_) {
-      page_->SetInspectorDeviceScaleFactorOverride(
-          zoom_factor_for_device_scale_factor_ /
-          compositor_device_scale_factor_override_);
-    } else {
-      page_->SetInspectorDeviceScaleFactorOverride(1.0f);
-    }
+  if (compositor_device_scale_factor_override_) {
+    page_->SetInspectorDeviceScaleFactorOverride(
+        zoom_factor_for_device_scale_factor_ /
+        compositor_device_scale_factor_override_);
+  } else {
+    page_->SetInspectorDeviceScaleFactorOverride(1.0f);
   }
 }
 
@@ -3082,7 +3066,10 @@ void WebViewImpl::Show(const LocalFrameToken& opener_frame_token,
       std::move(window_features), opened_by_user_gesture,
       WTF::BindOnce(&WebViewImpl::DidShowCreatedWindow, WTF::Unretained(this)));
 
-  MainFrameDevToolsAgentImpl()->DidShowNewWindow();
+  if (auto* dev_tools_agent =
+          MainFrameImpl()->DevToolsAgentImpl(/*create_if_necessary=*/false)) {
+    dev_tools_agent->DidShowNewWindow();
+  }
 }
 
 void WebViewImpl::DidShowCreatedWindow() {
@@ -3252,10 +3239,8 @@ void WebViewImpl::SetCompositorDeviceScaleFactorOverride(
     float device_scale_factor) {
   if (compositor_device_scale_factor_override_ != device_scale_factor) {
     compositor_device_scale_factor_override_ = device_scale_factor;
-    if (zoom_factor_for_device_scale_factor_) {
-      UpdateWidgetZoomFactors();
-      UpdateInspectorDeviceScaleFactorOverride();
-    }
+    UpdateWidgetZoomFactors();
+    UpdateInspectorDeviceScaleFactorOverride();
   }
 }
 
@@ -3553,6 +3538,8 @@ void WebViewImpl::UpdateRendererPreferences(
         renderer_preferences_.prefixed_fullscreen_video_api_availability
             .value());
   }
+
+  MaybePreloadSystemFonts(GetPage());
 }
 
 void WebViewImpl::SetHistoryOffsetAndLength(int32_t history_offset,
@@ -4073,6 +4060,10 @@ bool WebViewImpl::SupportsDraggableRegions() {
 }
 
 void WebViewImpl::DraggableRegionsChanged() {
+  if (!MainFrameImpl()) {
+    return;
+  }
+
   WebVector<WebDraggableRegion> web_regions =
       MainFrameImpl()->GetDocument().DraggableRegions();
 

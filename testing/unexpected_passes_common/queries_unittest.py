@@ -3,15 +3,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import collections
-import copy
-import json
-import subprocess
-import sys
-from typing import (Iterable, List, Optional, Tuple)
+from typing import Iterable, Optional
 import unittest
-
-import unittest.mock as mock
+from unittest import mock
 
 from unexpected_passes_common import builders
 from unexpected_passes_common import constants
@@ -43,10 +37,10 @@ class BigQueryQuerierInitUnittest(unittest.TestCase):
     with self.assertRaises(AssertionError):
       uu.CreateGenericQuerier(num_samples=-1)
 
-  def testInvalidNumSamples(self):
-    """Tests that the number of samples is validated."""
-    with self.assertRaises(AssertionError):
-      uu.CreateGenericQuerier(num_samples=-1)
+  def testDefaultSamples(self):
+    """Tests that the number of samples is set to a default if not provided."""
+    querier = uu.CreateGenericQuerier(num_samples=0)
+    self.assertGreater(querier._num_samples, 0)
 
 
 class GetBuilderGroupedQueryResultsUnittest(unittest.TestCase):
@@ -216,8 +210,9 @@ class FillExpectationMapForBuildersUnittest(unittest.TestCase):
       self._querier.FillExpectationMapForBuilders(
           data_types.TestExpectationMap({}), builders_to_fill)
 
-  def testValidResults(self) -> None:
-    """Tests functionality when valid results are returned by the query."""
+  def _runValidResultsTest(self, keep_unmatched_results: bool) -> None:
+    self._querier = uu.CreateGenericQuerier(
+        keep_unmatched_results=keep_unmatched_results)
 
     public_results = [
         uu.FakeQueryResult(builder_name='matched_builder',
@@ -318,16 +313,27 @@ class FillExpectationMapForBuildersUnittest(unittest.TestCase):
         },
     }
     self.assertEqual(expectation_map, expected_expectation_map)
-    self.assertEqual(
-        unmatched_results, {
-            'chromium/ci:unmatched_builder': [
-                data_types.Result('bar', [], 'Pass', 'step_name', 'build_id'),
-            ],
-            'chrome/ci:unmatched_internal': [
-                data_types.Result('bar', [], 'Pass', 'step_name_internal',
-                                  'build_id'),
-            ],
-        })
+    if keep_unmatched_results:
+      self.assertEqual(
+          unmatched_results, {
+              'chromium/ci:unmatched_builder': [
+                  data_types.Result('bar', [], 'Pass', 'step_name', 'build_id'),
+              ],
+              'chrome/ci:unmatched_internal': [
+                  data_types.Result('bar', [], 'Pass', 'step_name_internal',
+                                    'build_id'),
+              ],
+          })
+    else:
+      self.assertEqual(unmatched_results, {})
+
+  def testValidResultsKeepUnmatched(self) -> None:
+    """Tests behavior w/ valid results and keeping unmatched results."""
+    self._runValidResultsTest(True)
+
+  def testValidResultsDoNotKeepUnmatched(self) -> None:
+    """Tests behavior w/ valid results and not keeping unmatched results."""
+    self._runValidResultsTest(False)
 
 
 class ProcessRowsForBuilderUnittest(unittest.TestCase):

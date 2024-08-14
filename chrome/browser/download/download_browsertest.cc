@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include <stdint.h>
 
 #include <algorithm>
@@ -2308,19 +2313,9 @@ IN_PROC_BROWSER_TEST_F(DownloadTest, NullInitiator) {
 
 class DownloadTestSplitCacheEnabled : public DownloadTest {
  public:
-  void SetUp() override {
-    DownloadTest::SetUp();
-    feature_list_.InitWithFeatures(GetEnabledFeatures(), GetDisabledFeatures());
-  }
-
-  virtual std::vector<base::test::FeatureRef> GetEnabledFeatures() const {
-    std::vector<base::test::FeatureRef> enabled;
-    enabled.push_back(net::features::kSplitCacheByNetworkIsolationKey);
-    return enabled;
-  }
-
-  virtual std::vector<base::test::FeatureRef> GetDisabledFeatures() const {
-    return {};
+  DownloadTestSplitCacheEnabled() {
+    feature_list_.InitAndEnableFeature(
+        net::features::kSplitCacheByNetworkIsolationKey);
   }
 
  private:
@@ -2339,24 +2334,6 @@ class PdfDownloadTestSplitCacheEnabled : public base::test::WithFeatureOverride,
   pdf::TestPdfViewerStreamManager* GetTestPdfViewerStreamManager() {
     return factory_.GetTestPdfViewerStreamManager(
         browser()->tab_strip_model()->GetActiveWebContents());
-  }
-
-  std::vector<base::test::FeatureRef> GetEnabledFeatures() const override {
-    std::vector<base::test::FeatureRef> enabled =
-        DownloadTestSplitCacheEnabled::GetEnabledFeatures();
-    if (UseOopif()) {
-      enabled.push_back(chrome_pdf::features::kPdfOopif);
-    }
-    return enabled;
-  }
-
-  std::vector<base::test::FeatureRef> GetDisabledFeatures() const override {
-    std::vector<base::test::FeatureRef> disabled =
-        DownloadTestSplitCacheEnabled::GetDisabledFeatures();
-    if (!UseOopif()) {
-      disabled.push_back(chrome_pdf::features::kPdfOopif);
-    }
-    return disabled;
   }
 
   void TestSaveMainFramePdfFromTargetFrameContextMenu(
@@ -4736,9 +4713,9 @@ IN_PROC_BROWSER_TEST_F(DownloadTest, ContextMenuSaveImageWithAcceptHeader) {
       ->GetWidget()
       ->ForwardMouseEvent(mouse_event);
   waiter->WaitForFinished();
-  std::string accept_header;
-  headers.GetHeader(net::HttpRequestHeaders::kAccept, &accept_header);
-  EXPECT_EQ(accept_header, blink::network_utils::ImageAcceptHeader());
+  EXPECT_EQ(headers.GetHeader(net::HttpRequestHeaders::kAccept)
+                .value_or(std::string()),
+            blink::network_utils::ImageAcceptHeader());
   EXPECT_EQ(1u, waiter->NumDownloadsSeenInState(DownloadItem::COMPLETE));
   CheckDownloadStates(1, DownloadItem::COMPLETE);
 }

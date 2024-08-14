@@ -48,6 +48,7 @@
 #include "components/policy/core/common/cloud/user_cloud_policy_manager.h"
 #include "components/policy/core/common/policy_logger.h"
 #include "components/prefs/pref_service.h"
+#include "components/signin/public/base/signin_pref_names.h"
 #include "components/signin/public/identity_manager/primary_account_mutator.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
@@ -60,13 +61,18 @@ using profile_management::features::kOidcAuthStubDmToken;
 using profile_management::features::kOidcAuthStubUserEmail;
 using profile_management::features::kOidcAuthStubUserName;
 
+using profile_management::features::kOidcAuthForceErrorUi;
+using profile_management::features::kOidcAuthForceTimeoutUi;
+
+using profile_management::features::kOidcEnrollRegistrationTimeout;
+
 using enterprise::ProfileIdServiceFactory;
 
 namespace {
 
 constexpr char kUniqueIdentifierTemplate[] = "iss:%s,sub:%s";
 
-bool IsValidOidcToken(const ProfileManagementOicdTokens& oidc_tokens) {
+bool IsValidOidcToken(const ProfileManagementOidcTokens& oidc_tokens) {
   return !oidc_tokens.auth_token.empty() && !oidc_tokens.id_token.empty();
 }
 
@@ -85,7 +91,7 @@ OidcAuthenticationSigninInterceptor::~OidcAuthenticationSigninInterceptor() =
 
 void OidcAuthenticationSigninInterceptor::MaybeInterceptOidcAuthentication(
     content::WebContents* intercepted_contents,
-    const ProfileManagementOicdTokens& oidc_tokens,
+    const ProfileManagementOidcTokens& oidc_tokens,
     const std::string& issuer_id,
     const std::string& subject_id,
     OidcInterceptionCallback oidc_callback) {
@@ -201,7 +207,7 @@ void OidcAuthenticationSigninInterceptor::Reset() {
   }
 
   web_contents_ = nullptr;
-  oidc_tokens_ = ProfileManagementOicdTokens();
+  oidc_tokens_ = ProfileManagementOidcTokens();
   dm_token_.clear();
   client_id_.clear();
   user_display_name_.clear();
@@ -310,15 +316,26 @@ void OidcAuthenticationSigninInterceptor::StartOidcRegistration() {
                      base::Unretained(this), std::move(client),
                      preset_profile_guid, registration_start_time);
 
+  base::TimeDelta timeout_duration =
+      (base::FeatureList::IsEnabled(
+          profile_management::features::kOidcEnrollmentTimeout))
+          ? kOidcEnrollRegistrationTimeout.Get()
+          : base::TimeDelta();
   registration_helper_for_temporary_client_->StartRegistrationWithOidcTokens(
       oidc_tokens_.auth_token, oidc_tokens_.id_token, std::string(),
-      oidc_tokens_.state, std::move(registration_callback));
+      oidc_tokens_.state, timeout_duration, std::move(registration_callback));
 }
 
 void OidcAuthenticationSigninInterceptor::OnClientRegistered(
     std::unique_ptr<CloudPolicyClient> client,
     std::string preset_profile_guid,
     base::TimeTicks registration_start_time) {
+  if (kOidcAuthForceErrorUi.Get()) {
+    LOG_POLICY(ERROR, OIDC_ENROLLMENT) << "OIDC client registration failure "
+                                          "enforced by feature flag parameter.";
+    return HandleError(OidcInterceptionResult::kFailedToRegisterProfile);
+  }
+
   if (client->last_dm_status() != policy::DM_STATUS_SUCCESS) {
     RecordOidcEnrollmentRegistrationLatency(
         std::nullopt, /*success=*/false,
@@ -359,6 +376,16 @@ void OidcAuthenticationSigninInterceptor::OnClientRegistered(
   // IsDasherlessManagement is replaced with an Enum.
   dasher_based_ = !kOidcAuthIsDasherBased.Get() ? kOidcAuthIsDasherBased.Get()
                                                 : !is_dasherless_client;
+
+  // TODO(b/355270189): The interaction between OIDC profiles and BrowserSignin
+  // policy should be finalized, this check only prevents Chrome from crashing.
+  if (dasher_based_ &&
+      !profile_->GetPrefs()->GetBoolean(prefs::kSigninAllowedOnNextStartup)) {
+    LOG_POLICY(ERROR, OIDC_ENROLLMENT)
+        << "Google-synced OIDC profile can't be created because browser sign "
+           "in is disabled.";
+    return HandleError(OidcInterceptionResult::kInvalidProfile);
+  }
 
   RecordOidcEnrollmentRegistrationLatency(
       dasher_based_, /*success=*/true,
@@ -522,7 +549,7 @@ void OidcAuthenticationSigninInterceptor::OnPolicyFetchCompleteInNewProfile(
     bool success) {
   if (user_choice_handling_done_callback_) {
     std::move(user_choice_handling_done_callback_)
-        .Run(success
+        .Run((success && !kOidcAuthForceTimeoutUi.Get())
                  ? signin::SigninChoiceOperationResult::SIGNIN_CONFIRM_SUCCESS
                  : signin::SigninChoiceOperationResult::SIGNIN_TIMEOUT);
   } else {

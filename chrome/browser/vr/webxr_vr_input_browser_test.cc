@@ -2,10 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include <atomic>
 
 #include "base/containers/contains.h"
 #include "base/no_destructor.h"
+#include "base/not_fatal_until.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "chrome/browser/vr/test/mock_xr_device_hook_base.h"
@@ -251,7 +257,7 @@ class WebXrControllerInputMock : public MockXRDeviceHookBase {
 
   device::ControllerFrameData GetCurrentControllerData(unsigned int index) {
     auto iter = controller_data_map_.find(index);
-    DCHECK(iter != controller_data_map_.end());
+    CHECK(iter != controller_data_map_.end(), base::NotFatalUntil::M130);
     return iter->second;
   }
 

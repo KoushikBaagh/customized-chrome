@@ -58,8 +58,10 @@ export enum SafeBrowsingSetting {
  */
 export enum HttpsFirstModeSetting {
   DISABLED = 0,
-  ENABLED_INCOGNITO = 1,
+  // DEPRECATED: A separate Incognito setting never shipped.
+  // ENABLED_INCOGNITO = 1,
   ENABLED_FULL = 2,
+  ENABLED_BALANCED = 3,
 }
 
 export interface SettingsSecurityPageElement {
@@ -149,6 +151,14 @@ export class SettingsSecurityPageElement extends
         value: HttpsFirstModeSetting,
       },
 
+      /**
+       * Setting for HTTPS-First Mode when the toggle is off.
+       */
+      httpsFirstModeUncheckedValues_: {
+        type: Array,
+        value: () => [HttpsFirstModeSetting.DISABLED],
+      },
+
       enableHttpsFirstModeNewSettings_: {
         type: Boolean,
         readOnly: true,
@@ -181,14 +191,6 @@ export class SettingsSecurityPageElement extends
       focusConfig: {
         type: Object,
         observer: 'focusConfigChanged_',
-      },
-
-      enableFriendlierSafeBrowsingSettings_: {
-        type: Boolean,
-        value() {
-          return loadTimeData.getBoolean(
-              'enableFriendlierSafeBrowsingSettings');
-        },
       },
 
       enableHashPrefixRealTimeLookups_: {
@@ -246,7 +248,6 @@ export class SettingsSecurityPageElement extends
   private enableSecurityKeysSubpage_: boolean;
   focusConfig: FocusConfig;
   private showDisableSafebrowsingDialog_: boolean;
-  private enableFriendlierSafeBrowsingSettings_: boolean;
   private enableHashPrefixRealTimeLookups_: boolean;
   private enableHttpsFirstModeNewSettings_: boolean;
   private lastFocusTime_: number|undefined;
@@ -311,11 +312,11 @@ export class SettingsSecurityPageElement extends
       this.safeBrowsingStateOnOpen_ = prefValue;
 
       // The HTTPS-First Mode generated pref should never be set to
-      // ENABLED_INCOGNITO if the feature flag is not enabled.
+      // ENABLED_BALANCED if the feature flag is not enabled.
       if (!loadTimeData.getBoolean('enableHttpsFirstModeNewSettings')) {
         assert(
             this.getPref('generated.https_first_mode_enabled').value !==
-            HttpsFirstModeSetting.ENABLED_INCOGNITO);
+            HttpsFirstModeSetting.ENABLED_BALANCED);
       }
     });
 
@@ -427,10 +428,6 @@ export class SettingsSecurityPageElement extends
       this.recordInteractionHistogramOnRadioChange_(selected);
       this.recordActionOnRadioChange_(selected);
       this.interactedWithPage_(selected);
-      this.setPrefValue(
-          'safebrowsing.esb_opt_in_with_friendlier_settings',
-          selected === SafeBrowsingSetting.ENHANCED &&
-              this.enableFriendlierSafeBrowsingSettings_);
     }
     if (selected === SafeBrowsingSetting.DISABLED) {
       this.showDisableSafebrowsingDialog_ = true;
@@ -450,48 +447,16 @@ export class SettingsSecurityPageElement extends
         SafeBrowsingSetting.STANDARD;
   }
 
-  private getSafeBrowsingDisabledSubLabel_(): string {
-    return this.i18n(
-        this.enableFriendlierSafeBrowsingSettings_ ?
-            'safeBrowsingNoneDescUpdated' :
-            'safeBrowsingNoneDesc');
-  }
-
-  private getSafeBrowsingEnhancedSubLabel_(): string {
-    return this.i18n(
-        this.enableFriendlierSafeBrowsingSettings_ ?
-            'safeBrowsingEnhancedDescUpdated' :
-            'safeBrowsingEnhancedDesc');
-  }
 
   private getSafeBrowsingStandardSubLabel_(): string {
     return this.i18n(
-        this.enableFriendlierSafeBrowsingSettings_ ?
-            this.enableHashPrefixRealTimeLookups_ ?
-            'safeBrowsingStandardDescUpdatedProxy' :
-            'safeBrowsingStandardDescUpdated' :
+        this.enableHashPrefixRealTimeLookups_ ?
+            'safeBrowsingStandardDescProxy' :
             'safeBrowsingStandardDesc');
   }
 
-  private getSafeBrowsingStandardBulTwo_(): string {
-    return this.i18n(
-        this.enableHashPrefixRealTimeLookups_ ?
-            'safeBrowsingStandardBulTwoProxy' :
-            'safeBrowsingStandardBulTwo');
-  }
-
-  private getPasswordsLeakToggleLabel_(): string {
-    return this.i18n(
-        this.enableFriendlierSafeBrowsingSettings_ ?
-            'passwordsLeakDetectionLabelUpdated' :
-            'passwordsLeakDetectionLabel');
-  }
-
   private getPasswordsLeakToggleSubLabel_(): string {
-    let subLabel = this.i18n(
-        this.enableFriendlierSafeBrowsingSettings_ ?
-            'passwordsLeakDetectionGeneralDescriptionUpdated' :
-            'passwordsLeakDetectionGeneralDescription');
+    let subLabel = this.i18n('passwordsLeakDetectionGeneralDescription');
     // If the backing password leak detection preference is enabled, but the
     // generated preference is off and user control is disabled, then additional
     // text explaining that the feature will be enabled if the user signs in is
@@ -525,6 +490,10 @@ export class SettingsSecurityPageElement extends
         generatedPref.userControlDisabled ?
             'httpsOnlyModeDescriptionAdvancedProtection' :
             'httpsOnlyModeDescription');
+  }
+
+  private isHttpsFirstModeEnabled_(value: number): boolean {
+    return value !== HttpsFirstModeSetting.DISABLED;
   }
 
   private onManageCertificatesClick_() {

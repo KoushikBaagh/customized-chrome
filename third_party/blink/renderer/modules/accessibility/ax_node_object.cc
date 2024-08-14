@@ -1924,12 +1924,19 @@ ax::mojom::blink::Role AXNodeObject::RoleFromLayoutObjectOrNode() const {
   }
 
   // Minimum role:
+  // TODO(accessibility) if (AXObjectCache().IsInternalUICheckerOn()) assert,
+  // because it is a bad code smell and usually points to other problems.
   if (GetElement() && !GetElement()->FastHasAttribute(html_names::kRoleAttr)) {
     if (IsPopup() != ax::mojom::blink::IsPopup::kNone ||
         GetElement()->FastHasAttribute(html_names::kAutofocusAttr) ||
         GetElement()->FastHasAttribute(html_names::kDraggableAttr)) {
-      // TODO(accessibility) Consider for tabindex="0".
       return ax::mojom::blink::Role::kGroup;
+    }
+    if (RuntimeEnabledFeatures::AccessibilityMinRoleTabbableEnabled()) {
+      if (GetElement()->IsKeyboardFocusable(
+              Element::UpdateBehavior::kNoneForAccessibility)) {
+        return ax::mojom::blink::Role::kGroup;
+      }
     }
   }
 
@@ -1989,8 +1996,10 @@ ax::mojom::blink::Role AXNodeObject::NativeRoleIgnoringAria() const {
   if (IsA<HTMLAnchorElement>(GetNode()) || IsA<SVGAElement>(GetNode())) {
     // Assume that an anchor element is a Role::kLink if it has an href or a
     // click event listener.
-    if (GetNode()->IsLink() || IsClickable())
+    if (GetNode()->IsLink() ||
+        GetNode()->HasAnyEventListeners(event_util::MouseButtonEventTypes())) {
       return ax::mojom::blink::Role::kLink;
+    }
 
     // According to the SVG-AAM, a non-link 'a' element should be exposed like
     // a 'g' if it does not descend from a 'text' element and like a 'tspan'
@@ -2468,7 +2477,7 @@ bool AXNodeObject::IsControl() const {
 
   auto* element = DynamicTo<Element>(node);
   return ((element && element->IsFormControlElement()) ||
-          AXObject::IsARIAControl(RawAriaRole()));
+          ui::IsControl(RawAriaRole()));
 }
 
 bool AXNodeObject::IsAutofillAvailable() const {
@@ -4611,11 +4620,13 @@ String AXNodeObject::TextAlternative(
   DCHECK(!name_sources || related_objects);
 
   bool found_text_alternative = false;
+  Node* node = GetNode();
 
-  if (!GetNode() && !GetLayoutObject())
+  if (!node && !GetLayoutObject()) {
     return String();
+  }
 
-  if (IsA<HTMLSlotElement>(GetNode()) && GetNode()->IsInUserAgentShadowRoot()) {
+  if (IsA<HTMLSlotElement>(node) && node->IsInUserAgentShadowRoot()) {
     // User agent slots do not have a name.
     return String();
   }
@@ -4716,31 +4727,29 @@ String AXNodeObject::TextAlternative(
   }
 
   // Step 2F / 2G from: http://www.w3.org/TR/accname-aam-1.1 -- from content.
-  if (aria_label_or_description_root || SupportsNameFromContents(recursive)) {
-    Node* node = GetNode();
-    if (!IsA<HTMLSelectElement>(node)) {  // Avoid option descendant text
-      name_from = ax::mojom::blink::NameFrom::kContents;
+  if (ShouldIncludeContentInTextAlternative(
+          recursive, aria_label_or_description_root, visited)) {
+    name_from = ax::mojom::blink::NameFrom::kContents;
+    if (name_sources) {
+      name_sources->push_back(NameSource(found_text_alternative));
+      name_sources->back().type = name_from;
+    }
+
+    if (auto* text_node = DynamicTo<Text>(node)) {
+      text_alternative = text_node->data();
+    } else if (IsA<HTMLBRElement>(node)) {
+      text_alternative = String("\n");
+    } else {
+      text_alternative =
+          TextFromDescendants(visited, aria_label_or_description_root, false);
+    }
+
+    if (!text_alternative.empty()) {
       if (name_sources) {
-        name_sources->push_back(NameSource(found_text_alternative));
-        name_sources->back().type = name_from;
-      }
-
-      if (auto* text_node = DynamicTo<Text>(node)) {
-        text_alternative = text_node->data();
-      } else if (IsA<HTMLBRElement>(node)) {
-        text_alternative = String("\n");
+        found_text_alternative = true;
+        name_sources->back().text = text_alternative;
       } else {
-        text_alternative =
-            TextFromDescendants(visited, aria_label_or_description_root, false);
-      }
-
-      if (!text_alternative.empty()) {
-        if (name_sources) {
-          found_text_alternative = true;
-          name_sources->back().text = text_alternative;
-        } else {
-          return MaybeAppendFileDescriptionToName(text_alternative);
-        }
+        return MaybeAppendFileDescriptionToName(text_alternative);
       }
     }
   }
@@ -4757,12 +4766,9 @@ String AXNodeObject::TextAlternative(
   // description, or Not mapped". There's nothing in HTML-AAM that explicitly
   // forbids this, and it seems reasonable for authors to use a tooltip on any
   // visible element without causing an accessibility error or user problem.
-  // Note: https://github.com/w3c/html-aam/issues/552 has been filed to
-  // change the spec to be more explicit about this.
   // Note: if this is part of another label or description, it needs to be
   // computed as a name, in order to contribute to that.
-  if (!RuntimeEnabledFeatures::AccessibilityProhibitedNamesEnabled() ||
-      aria_label_or_description_root || !IsNameProhibited()) {
+  if (aria_label_or_description_root || !IsNameProhibited()) {
     String resulting_text = TextAlternativeFromTooltip(
         name_from, name_sources, &found_text_alternative, &text_alternative,
         related_objects);
@@ -4838,6 +4844,7 @@ static bool ShouldInsertSpaceBetweenObjectsIfNeeded(
     case ax::mojom::blink::NameFrom::kNone:
     case ax::mojom::blink::NameFrom::kAttributeExplicitlyEmpty:
     case ax::mojom::blink::NameFrom::kContents:
+    case ax::mojom::blink::NameFrom::kProhibited:
       break;
     case ax::mojom::blink::NameFrom::kAttribute:
     case ax::mojom::blink::NameFrom::kCaption:
@@ -4852,6 +4859,7 @@ static bool ShouldInsertSpaceBetweenObjectsIfNeeded(
     case ax::mojom::blink::NameFrom::kNone:
     case ax::mojom::blink::NameFrom::kAttributeExplicitlyEmpty:
     case ax::mojom::blink::NameFrom::kContents:
+    case ax::mojom::blink::NameFrom::kProhibited:
       break;
     case ax::mojom::blink::NameFrom::kAttribute:
     case ax::mojom::blink::NameFrom::kCaption:
@@ -5973,34 +5981,6 @@ LayoutObject* AXNodeObject::GetLayoutObject() const {
   return layout_object_;
 }
 
-// TODO(chrishall): consider merging this with AXObject::Language in followup.
-AtomicString AXNodeObject::Language() const {
-  if (!GetNode())
-    return AXObject::Language();
-
-  // If it's the root, get the computed language for the document element,
-  // because the root LayoutObject doesn't have the right value.
-  if (IsWebArea()) {
-    Element* document_element = GetDocument()->documentElement();
-    if (!document_element)
-      return g_empty_atom;
-
-    // Ensure we return only the first language tag. ComputeInheritedLanguage
-    // consults ContentLanguage which can be set from 2 different sources.
-    // DocumentLoader::DidInstallNewDocument from HTTP headers which truncates
-    // until the first comma.
-    // HttpEquiv::Process from <meta> tag which does not truncate.
-    // TODO(chrishall): Consider moving this comma handling to setter side.
-    AtomicString lang = document_element->ComputeInheritedLanguage();
-    Vector<String> languages;
-    String(lang).Split(',', languages);
-    if (!languages.empty())
-      return AtomicString(languages[0].StripWhiteSpace());
-  }
-
-  return AXObject::Language();
-}
-
 bool AXNodeObject::HasAttribute(const QualifiedName& attribute) const {
   Element* element = GetElement();
   if (!element)
@@ -6324,12 +6304,11 @@ String AXNodeObject::TextAlternativeFromTooltip(
   }
   name_from = ax::mojom::blink::NameFrom::kTitle;
   const AtomicString& title = GetAttribute(kTitleAttr);
-  String title_text = *text_alternative = TextAlternativeFromTitleAttribute(
+  String title_text = TextAlternativeFromTitleAttribute(
       title, name_from, name_sources, found_text_alternative);
   // Do not use if empty or if redundant with inner text.
-  if (!title_text.empty() &&
-      title_text.StripWhiteSpace() !=
-          GetElement()->GetInnerTextWithoutUpdate().StripWhiteSpace()) {
+  if (!title_text.empty()) {
+    *text_alternative = title_text;
     return title_text;
   }
 
@@ -6395,13 +6374,16 @@ String AXNodeObject::TextAlternativeFromTitleAttribute(
     ax::mojom::blink::NameFrom& name_from,
     NameSources* name_sources,
     bool* found_text_alternative) const {
+  DCHECK(GetElement());
   String text_alternative;
   if (name_sources) {
     name_sources->push_back(NameSource(*found_text_alternative, kTitleAttr));
     name_sources->back().type = name_from;
   }
   name_from = ax::mojom::blink::NameFrom::kTitle;
-  if (!title.IsNull()) {
+  if (!title.IsNull() &&
+      String(title).StripWhiteSpace() !=
+          GetElement()->GetInnerTextWithoutUpdate().StripWhiteSpace()) {
     text_alternative = title;
     if (name_sources) {
       NameSource& source = name_sources->back();
@@ -6993,6 +6975,38 @@ String AXNodeObject::MaybeAppendFileDescriptionToName(
   return name;
 }
 
+bool AXNodeObject::ShouldIncludeContentInTextAlternative(
+    bool recursive,
+    const AXObject* aria_label_or_description_root,
+    AXObjectSet& visited) const {
+  if (!aria_label_or_description_root && !SupportsNameFromContents(recursive)) {
+    return false;
+  }
+
+  // Avoid option descendent text.
+  if (IsA<HTMLSelectElement>(GetNode())) {
+    return false;
+  }
+
+  // A textfield's name should not include its value (see crbug.com/352665697),
+  // unless aria-labelledby explicitly references its own content.
+  //
+  // Example from aria-labelledby-on-input.html:
+  //   <input id="time" value="10" aria-labelledby="message time unit"/>
+  //
+  // When determining the name for the <input>, we parse the list of IDs in
+  // aria-labelledby. When "time" is reached, aria_label_or_description_root
+  // points to the element we are naming (the <input>) and 'this' refers to the
+  // element we are currently traversing, which is the element with id="time"
+  // (so, aria_label_or_description_root == this). In this case, since the
+  // author explicitly included the input id, the value of the input should be
+  // included in the name.
+  if (IsTextField() && aria_label_or_description_root != this) {
+    return false;
+  }
+  return true;
+}
+
 String AXNodeObject::Description(
     ax::mojom::blink::NameFrom name_from,
     ax::mojom::blink::DescriptionFrom& description_from,
@@ -7117,8 +7131,11 @@ String AXNodeObject::Description(
   // SVG-AAM specifies additional description sources when ARIA sources have not
   // been found. https://w3c.github.io/svg-aam/#mapping_additional_nd
   if (IsA<SVGElement>(GetNode())) {
-    return SVGDescription(name_from, description_from, description_sources,
-                          related_objects);
+    String svg_description = SVGDescription(
+        name_from, description_from, description_sources, related_objects);
+    if (!svg_description.empty()) {
+      return svg_description;
+    }
   }
 
   const auto* input_element = DynamicTo<HTMLInputElement>(GetNode());
@@ -7248,7 +7265,9 @@ String AXNodeObject::Description(
       description_sources->back().type = description_from;
     }
     const AtomicString& title = GetAttribute(kTitleAttr);
-    if (!title.empty()) {
+    if (!title.empty() &&
+        String(title).StripWhiteSpace() !=
+            GetElement()->GetInnerTextWithoutUpdate().StripWhiteSpace()) {
       description = title;
       if (description_sources) {
         found_description = true;
@@ -7294,6 +7313,27 @@ String AXNodeObject::Description(
           }
         }
       }
+    }
+  }
+
+  // There was a name, but it is prohibited for this role. Move to description.
+  if (name_from == ax::mojom::blink::NameFrom::kProhibited) {
+    description_from = ax::mojom::blink::DescriptionFrom::kProhibitedNameRepair;
+    ax::mojom::blink::NameFrom orig_name_from_without_prohibited;
+    HeapHashSet<Member<const AXObject>> visited;
+    description = TextAlternative(false, nullptr, visited,
+                                  orig_name_from_without_prohibited,
+                                  related_objects, nullptr);
+    DCHECK(!description.empty());
+    if (description_sources) {
+      description_sources->push_back(DescriptionSource(found_description));
+      DescriptionSource& source = description_sources->back();
+      source.type = description_from;
+      source.related_objects = *related_objects;
+      source.text = description;
+      found_description = true;
+    } else {
+      return description;
     }
   }
 

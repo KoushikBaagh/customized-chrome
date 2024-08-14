@@ -22,7 +22,6 @@
 #import "ui/base/l10n/l10n_util_mac.h"
 #import "url/gurl.h"
 
-using base::test::ios::kWaitForActionTimeout;
 using chrome_test_util::ManualFallbackFormSuggestionViewMatcher;
 using chrome_test_util::ManualFallbackKeyboardIconMatcher;
 using chrome_test_util::ManualFallbackManageProfilesMatcher;
@@ -43,16 +42,6 @@ constexpr char kFormElementState[] = "state";
 constexpr char kFormElementZip[] = "zip";
 
 constexpr char kFormHTMLFile[] = "/profile_form.html";
-
-// Waits for the keyboard to appear. Returns NO on timeout.
-BOOL WaitForKeyboardToAppear() {
-  GREYCondition* waitForKeyboard = [GREYCondition
-      conditionWithName:@"Wait for keyboard"
-                  block:^BOOL {
-                    return [EarlGrey isKeyboardShownWithError:nil];
-                  }];
-  return [waitForKeyboard waitWithTimeout:kWaitForActionTimeout.InSecondsF()];
-}
 
 // Opens the address manual fill view and verifies that the address view
 // controller is visible afterwards.
@@ -115,8 +104,7 @@ id<GREYMatcher> ChipButton(std::u16string title) {
 // Matcher for the overflow menu button shown in the address cells.
 id<GREYMatcher> OverflowMenuButton() {
   return grey_allOf(
-      chrome_test_util::ButtonWithAccessibilityLabelId(
-          IDS_IOS_MANUAL_FALLBACK_THREE_DOT_MENU_BUTTON_ACCESSIBILITY_LABEL),
+      grey_accessibilityID(manual_fill::kExpandedManualFillOverflowMenuID),
       grey_interactable(), nullptr);
 }
 
@@ -129,8 +117,8 @@ id<GREYMatcher> OverflowMenuEditAction() {
 
 // Matcher for the "Autofill Form" button shown in the address cells.
 id<GREYMatcher> AutofillFormButton() {
-  return grey_allOf(chrome_test_util::ButtonWithAccessibilityLabelId(
-                        IDS_IOS_MANUAL_FALLBACK_AUTOFILL_FORM_BUTTON_TITLE),
+  return grey_allOf(grey_accessibilityID(
+                        manual_fill::kExpandedManualFillAutofillFormButtonID),
                     grey_interactable(), nullptr);
 }
 
@@ -247,9 +235,10 @@ void OpenAddressManualFillViewWithNoSavedAddresses() {
   OpenAddressManualFillView();
 }
 
+// TODO(crbug.com/355146434): Remove FLAKY_ from this test.
 // Tests that the saved address chip buttons are all visible in the address
 // table view controller, and that they have the right accessibility label.
-- (void)testAddressChipButtonsAreAllVisible {
+- (void)FLAKY_testAddressChipButtonsAreAllVisible {
   // Bring up the keyboard.
   [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
       performAction:TapWebElementWithId(kFormElementName)];
@@ -338,8 +327,7 @@ void OpenAddressManualFillViewWithNoSavedAddresses() {
     }
 
     // Verify the keyboard is not covered by the profiles view.
-    GREYAssertTrue([EarlGrey isKeyboardShownWithError:nil],
-                   @"Keyboard should be shown");
+    [ChromeEarlGrey waitForKeyboardToAppear];
   }
 
   [[EarlGrey selectElementWithMatcher:ManualFallbackProfilesTableViewMatcher()]
@@ -418,7 +406,7 @@ void OpenAddressManualFillViewWithNoSavedAddresses() {
       performAction:TapWebElementWithId(kFormElementName)];
 
   // Wait for the keyboard to appear.
-  WaitForKeyboardToAppear();
+  [ChromeEarlGrey waitForKeyboardToAppear];
 
   // Assert the address icon is not visible.
   [[EarlGrey selectElementWithMatcher:ManualFallbackProfilesIconMatcher()]
@@ -478,8 +466,7 @@ void OpenAddressManualFillViewWithNoSavedAddresses() {
   // Bring up the keyboard
   [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
       performAction:TapWebElementWithId(kFormElementName)];
-  GREYAssertTrue([EarlGrey isKeyboardShownWithError:nil],
-                 @"Keyboard Should be Shown");
+  [ChromeEarlGrey waitForKeyboardToAppear];
 
   // Open the address manual fill view.
   OpenAddressManualFillView();
@@ -501,8 +488,7 @@ void OpenAddressManualFillViewWithNoSavedAddresses() {
   // Bring up the keyboard
   [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
       performAction:TapWebElementWithId(kFormElementName)];
-  GREYAssertTrue([EarlGrey isKeyboardShownWithError:nil],
-                 @"Keyboard Should be Shown");
+  [ChromeEarlGrey waitForKeyboardToAppear];
 
   // Open the address manual fill view.
   OpenAddressManualFillView();
@@ -527,8 +513,7 @@ void OpenAddressManualFillViewWithNoSavedAddresses() {
   // Bring up the keyboard
   [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
       performAction:TapWebElementWithId(kFormElementName)];
-  GREYAssertTrue([EarlGrey isKeyboardShownWithError:nil],
-                 @"Keyboard Should be Shown");
+  [ChromeEarlGrey waitForKeyboardToAppear];
 
   // Open the address manual fill view.
   OpenAddressManualFillView();
@@ -543,9 +528,9 @@ void OpenAddressManualFillViewWithNoSavedAddresses() {
   [[EarlGrey selectElementWithMatcher:AddressDetailsPage()]
       assertWithMatcher:grey_sufficientlyVisible()];
 
-  // Edit the address.
-  [[EarlGrey selectElementWithMatcher:grey_text(@"666 Erebus St.")]
-      performAction:grey_replaceText(@"123 new address")];
+  // Edit the city.
+  [[EarlGrey selectElementWithMatcher:grey_text(@"Elysium")]
+      performAction:grey_replaceText(@"Mountain View")];
   [[EarlGrey selectElementWithMatcher:NavigationBarDoneButton()]
       performAction:grey_tap()];
 

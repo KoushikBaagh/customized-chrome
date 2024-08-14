@@ -6,6 +6,7 @@
 
 #include "ash/birch/birch_model.h"
 #include "ash/constants/ash_pref_names.h"
+#include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/wm/overview/birch/birch_bar_constants.h"
 #include "ash/wm/overview/birch/birch_bar_context_menu_model.h"
@@ -19,6 +20,7 @@
 #include "base/containers/unique_ptr_adapters.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/notreached.h"
+#include "components/prefs/pref_registry_simple.h"
 #include "components/prefs/pref_service.h"
 
 namespace ash {
@@ -67,6 +69,8 @@ std::string GetPrefNameFromSuggestionType(BirchSuggestionType type) {
       return prefs::kBirchUseChromeTabs;
     case BirchSuggestionType::kMedia:
       return prefs::kBirchUseLostMedia;
+    case BirchSuggestionType::kCoral:
+      return prefs::kBirchUseCoral;
     case BirchSuggestionType::kExplore:
     case BirchSuggestionType::kUndefined:
       NOTREACHED_NORETURN();
@@ -162,16 +166,20 @@ void BirchBarController::ShowChipContextMenu(BirchChipButton* chip,
 }
 
 void BirchBarController::OnItemHiddenByUser(BirchItem* item) {
+  // Do not remove the item if the bars are animating.
+  if (std::ranges::any_of(bar_views_, [](BirchBarView* bar_view) {
+        return bar_view->IsAnimating();
+      })) {
+    return;
+  }
+
   // Remove the item from birch bars. If there is an extra item not showing in
   // the bars, push it in the bars.
   BirchItem* extra_item = items_.size() > BirchBarView::kMaxChipsNum
                               ? items_[BirchBarView::kMaxChipsNum].get()
                               : nullptr;
   for (auto& bar_view : bar_views_) {
-    bar_view->RemoveChip(item);
-    if (extra_item) {
-      bar_view->AddChip(extra_item);
-    }
+    bar_view->RemoveChip(item, extra_item);
   }
 
   // Erase the item from model and controller.

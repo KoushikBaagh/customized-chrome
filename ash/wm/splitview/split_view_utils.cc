@@ -14,6 +14,7 @@
 #include "ash/public/cpp/window_properties.h"
 #include "ash/root_window_controller.h"
 #include "ash/screen_util.h"
+#include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/system/toast/toast_manager_impl.h"
@@ -716,8 +717,12 @@ int CalculateDividerPosition(aura::Window* root_window,
   // 1-DIP gap between snapped windows precludes multiresizing. See b/262011280.
   const float snap_length = (divider_upper_limit - divider_delta) * snap_ratio;
 
+  const bool is_layout_primary = IsLayoutPrimary(root_window);
+  const bool snap_to_left_or_top =
+      (is_layout_primary && snap_position == SnapPosition::kPrimary) ||
+      (!is_layout_primary && snap_position == SnapPosition::kSecondary);
   return std::clamp(
-      static_cast<int>(snap_position == SnapPosition::kPrimary
+      static_cast<int>(snap_to_left_or_top
                            ? snap_length
                            : divider_upper_limit - snap_length - divider_delta),
       0, divider_upper_limit);

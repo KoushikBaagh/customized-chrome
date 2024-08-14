@@ -9,12 +9,18 @@
 #include "ash/glanceables/common/glanceables_error_message_view.h"
 #include "ash/style/counter_expand_button.h"
 #include "base/functional/callback_forward.h"
+#include "ui/base/models/combobox_model.h"
 #include "ui/compositor/throughput_tracker.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/layout/flex_layout_view.h"
 #include "ui/views/view.h"
 
 namespace ash {
+
+class Combobox;
+class GlanceablesContentsScrollView;
+class GlanceablesListFooterView;
+class GlanceablesProgressBarView;
 
 // Glanceables Time Management bubble container that is a child of
 // `GlanceableTrayChildBubble`.
@@ -39,7 +45,9 @@ class ASH_EXPORT GlanceablesTimeManagementBubbleView
                                       bool expand_by_overscroll) = 0;
   };
 
-  GlanceablesTimeManagementBubbleView();
+  GlanceablesTimeManagementBubbleView(
+      Context context,
+      std::unique_ptr<ui::ComboboxModel> combobox_model);
   GlanceablesTimeManagementBubbleView(
       const GlanceablesTimeManagementBubbleView&) = delete;
   GlanceablesTimeManagementBubbleView& operator=(
@@ -61,13 +69,22 @@ class ASH_EXPORT GlanceablesTimeManagementBubbleView
   void AddObserver(Observer* observer);
   void RemoveObserver(Observer* observer);
 
+  // Creates `this` view's own background and updates layout accordingly.
+  void CreateElevatedBackground();
+
+  // Updates `is_expanded_` and the view layout.
+  // `expand_by_overscroll` indicates whether the expand state change is
+  // triggered by overscroll. More information can be found in
+  // `GlanceablesContentsScrollView` class.
+  void SetExpandState(bool is_expanded, bool expand_by_overscroll);
+
   // Returns the preferred height of `this` in the collapsed state. This is used
   // to calculate the available size for glanceables. This should be constant
   // after the view is laid out.
-  virtual int GetCollapsedStatePreferredHeight() const = 0;
+  int GetCollapsedStatePreferredHeight() const;
 
   // Returns the expanded/collapsed state of the bubble view.
-  virtual bool IsExpanded() const = 0;
+  bool IsExpanded() const { return is_expanded_; }
 
   bool is_animating_resize() const {
     return resize_animation_ && resize_animation_->is_animating();
@@ -79,18 +96,19 @@ class ASH_EXPORT GlanceablesTimeManagementBubbleView
   class GlanceablesExpandButton : public CounterExpandButton {
     METADATA_HEADER(GlanceablesExpandButton, CounterExpandButton)
    public:
-    GlanceablesExpandButton(int expand_tooltip_string_id,
-                            int collapse_tooltip_string_id);
+    GlanceablesExpandButton();
     ~GlanceablesExpandButton() override;
 
+    void SetExpandedStateTooltipStringId(int tooltip_text_id);
+    void SetCollapsedStateTooltipStringId(int tooltip_text_id);
     std::u16string GetExpandedStateTooltipText() const override;
     std::u16string GetCollapsedStateTooltipText() const override;
 
    private:
     // The tooltip string that tells that the button can expand the bubble.
-    const int expand_tooltip_string_id_;
+    int expand_tooltip_string_id_ = 0;
     // The tooltip string that tells that the button can collapse the bubble.
-    const int collapse_tooltip_string_id_;
+    int collapse_tooltip_string_id_ = 0;
   };
 
   // Linear animation to track time management bubble resize animation - as the
@@ -120,6 +138,28 @@ class ASH_EXPORT GlanceablesTimeManagementBubbleView
     const int end_height_;
   };
 
+  // Handles press on the "See all" button in `GlanceablesListFooterView`.
+  virtual void OnFooterButtonPressed() = 0;
+
+  // Called when the selected list changed in `combobox_view_`.
+  virtual void SelectedListChanged() = 0;
+
+  // Triggers bubble view resize animation to new preferred size, if an
+  // animation is required.
+  virtual void AnimateResize(ResizeAnimation::Type resize_type) = 0;
+
+  // Updates the interior margin according to the current view state.
+  void UpdateInteriorMargin();
+
+  // Creates and initializes `combobox_view_`.
+  void CreateComboBoxView();
+
+  // Returns the index that `combobox_view_` is currently selected.
+  size_t GetComboboxSelectedIndex() const;
+
+  // Updates the text on `combobox_replacement_label_`.
+  void UpdateComboboxReplacementLabelText();
+
   void SetUpResizeThroughputTracker(const std::string& histogram_name);
 
   // Removes an active `error_message_` from the view, if any.
@@ -128,7 +168,18 @@ class ASH_EXPORT GlanceablesTimeManagementBubbleView
                         views::Button::PressedCallback callback,
                         GlanceablesErrorMessageView::ButtonActionType type);
 
+  views::FlexLayoutView* header_view() { return header_view_; }
+  Combobox* combobox_view() { return combobox_view_; }
+  GlanceablesExpandButton* expand_button() { return expand_button_; }
+  GlanceablesProgressBarView* progress_bar() { return progress_bar_; }
+  GlanceablesContentsScrollView* content_scroll_view() {
+    return content_scroll_view_;
+  }
+  views::View* items_container_view() { return items_container_view_; }
+  GlanceablesListFooterView* list_footer_view() { return list_footer_view_; }
   GlanceablesErrorMessageView* error_message() { return error_message_; }
+
+  ui::ComboboxModel* combobox_model() { return combobox_model_.get(); }
 
   // Linear animation that drive time management bubble resize animation - the
   // animation updates the time management bubble view preferred size, which
@@ -138,6 +189,30 @@ class ASH_EXPORT GlanceablesTimeManagementBubbleView
   base::ObserverList<Observer> observers_;
 
  private:
+  // Toggles `is_expanded_` and updates the layout.
+  void ToggleExpandState();
+
+  const Context context_;
+
+  // Whether the view is expanded and showing the contents in contents scroll
+  // view.
+  bool is_expanded_ = true;
+
+  // Owned by views hierarchy.
+  raw_ptr<views::FlexLayoutView> header_view_ = nullptr;
+  raw_ptr<Combobox> combobox_view_ = nullptr;
+  // This is a simple label that copies the label style on `combo_box_view_` so
+  // that it can visually replace it when `combo_box_view_` is hidden.
+  raw_ptr<views::Label> combobox_replacement_label_ = nullptr;
+  raw_ptr<GlanceablesExpandButton> expand_button_ = nullptr;
+  raw_ptr<GlanceablesProgressBarView> progress_bar_ = nullptr;
+  raw_ptr<GlanceablesContentsScrollView> content_scroll_view_ = nullptr;
+  raw_ptr<views::View> items_container_view_ = nullptr;
+  raw_ptr<GlanceablesListFooterView> list_footer_view_ = nullptr;
+
+  // The model for `combobox_view_`.
+  const std::unique_ptr<ui::ComboboxModel> combobox_model_;
+
   // Measure animation smoothness metrics for `resize_animation_`.
   std::optional<ui::ThroughputTracker> resize_throughput_tracker_;
 

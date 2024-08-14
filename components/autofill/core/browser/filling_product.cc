@@ -33,6 +33,8 @@ std::string FillingProductToString(FillingProduct filling_product) {
       return "PlusAddresses";
     case FillingProduct::kStandaloneCvc:
       return "VirtualCard.StandaloneCvc";
+    case FillingProduct::kPredictionImprovements:
+      return "PredictionImprovements";
   };
   NOTREACHED_NORETURN();
 }
@@ -49,6 +51,7 @@ FillingProduct GetFillingProductFromSuggestionType(SuggestionType type) {
     case SuggestionType::kEditAddressProfile:
     case SuggestionType::kDeleteAddressProfile:
     case SuggestionType::kDevtoolsTestAddresses:
+    case SuggestionType::kDevtoolsTestAddressByCountry:
     case SuggestionType::kDevtoolsTestAddressEntry:
     case SuggestionType::kManageAddress:
       return FillingProduct::kAddress;

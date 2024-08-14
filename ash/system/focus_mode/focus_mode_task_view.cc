@@ -4,8 +4,10 @@
 
 #include "ash/system/focus_mode/focus_mode_task_view.h"
 
+#include "ash/accessibility/accessibility_controller.h"
 #include "ash/api/tasks/tasks_types.h"
 #include "ash/resources/vector_icons/vector_icons.h"
+#include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/style/system_textfield.h"
 #include "ash/style/system_textfield_controller.h"
@@ -51,6 +53,11 @@ void ClearFocusForTextfield(views::Textfield* textfield) {
   // Avoid having the focus restored to the same view when the parent view is
   // refocused.
   focus_manager->SetStoredFocusView(nullptr);
+}
+
+// Returns true if ChromeVox (spoken feedback) is enabled.
+bool IsSpokenFeedbackEnabled() {
+  return Shell::Get()->accessibility_controller()->spoken_feedback().enabled();
 }
 
 }  // namespace
@@ -175,7 +182,7 @@ class FocusModeTaskView::TaskTextfieldController
 
   bool HandleKeyEvent(views::Textfield* sender,
                       const ui::KeyEvent& key_event) override {
-    if (key_event.type() == ui::ET_KEY_PRESSED &&
+    if (key_event.type() == ui::EventType::kKeyPressed &&
         key_event.key_code() == ui::VKEY_RETURN) {
       // If the textfield is focused but not active, activate the textfield and
       // highlight all the text.
@@ -220,16 +227,16 @@ FocusModeTaskView::FocusModeTaskView(bool is_network_connected)
       views::BoxLayout::Orientation::kHorizontal);
   textfield_container_->SetProperty(views::kBoxLayoutFlexKey,
                                     views::BoxLayoutFlexSpecification());
-  radio_button_ = textfield_container_->AddChildView(
+  complete_button_ = textfield_container_->AddChildView(
       std::make_unique<views::ImageButton>(base::BindRepeating(
           &FocusModeTaskView::OnCompleteTask, base::Unretained(this))));
   const std::u16string radio_text = l10n_util::GetStringUTF16(
       IDS_ASH_STATUS_TRAY_FOCUS_MODE_TASK_VIEW_RADIO_BUTTON);
-  radio_button_->GetViewAccessibility().SetName(radio_text);
-  radio_button_->SetTooltipText(radio_text);
+  complete_button_->GetViewAccessibility().SetName(radio_text);
+  complete_button_->SetTooltipText(radio_text);
 
-  views::FocusRing::Install(radio_button_);
-  views::FocusRing::Get(radio_button_)
+  views::FocusRing::Install(complete_button_);
+  views::FocusRing::Get(complete_button_)
       ->SetColorId(cros_tokens::kCrosSysFocusRing);
 
   add_task_button_ = textfield_container_->AddChildView(
@@ -243,6 +250,8 @@ FocusModeTaskView::FocusModeTaskView(bool is_network_connected)
                                          : cros_tokens::kCrosSysDisabled,
                                      kIconSize));
   add_task_button_->SetFocusBehavior(View::FocusBehavior::NEVER);
+  // Ignore `add_task_button_`for accessibility purposes.
+  add_task_button_->GetViewAccessibility().SetRole(ax::mojom::Role::kNone);
   add_task_button_->SetEnabled(is_network_connected);
 
   textfield_ =
@@ -369,8 +378,8 @@ void FocusModeTaskView::OnTaskCompleted(const FocusModeTask& task) {
 
   // Implement completed task styling before removing the task with an
   // animation.
-  radio_button_->SetEnabled(false);
-  radio_button_->SetImageModel(
+  complete_button_->SetEnabled(false);
+  complete_button_->SetImageModel(
       views::Button::STATE_NORMAL,
       ui::ImageModel::FromVectorIcon(kDoneIcon, cros_tokens::kCrosSysPrimary,
                                      kIconSize));
@@ -395,6 +404,12 @@ void FocusModeTaskView::OnTaskSelectedFromCarousel(
   }
 
   FocusModeController::Get()->tasks_model().SetSelectedTask(task_entry.task_id);
+
+  // When ChromeVox is on, after selecting a task from the chip carousel we
+  // should set focus on the `complete_button_`.
+  if (IsSpokenFeedbackEnabled()) {
+    complete_button_->RequestFocus();
+  }
 }
 
 void FocusModeTaskView::OnClearTask() {
@@ -408,6 +423,10 @@ void FocusModeTaskView::OnClearTask() {
     return;
   }
   FocusModeController::Get()->tasks_model().ClearSelectedTask();
+}
+
+SystemTextfield* FocusModeTaskView::GetTaskTextfieldForTesting() {
+  return textfield_;
 }
 
 void FocusModeTaskView::CommitTextfieldContents(
@@ -434,6 +453,8 @@ void FocusModeTaskView::AddOrUpdateTask(const std::optional<TaskId>& task_id,
     return;
   }
 
+  const bool prev_complete_button_visibility = complete_button_->GetVisible();
+
   FocusModeTasksModel::TaskUpdate update;
   if (task_id_ && !task_id_->empty()) {
     update.task_id = std::make_optional(*task_id_);
@@ -443,6 +464,14 @@ void FocusModeTaskView::AddOrUpdateTask(const std::optional<TaskId>& task_id,
   // UI is updated via `OnSelectedTaskChanged()` once the update has been made
   // to the model.
   FocusModeController::Get()->tasks_model().UpdateTask(update);
+
+  // When ChromeVox is on, we want to set the focus onto `complete_button_`
+  // except for the case that we have already pressed TAB key to focus on
+  // `deselect_button_`.
+  if (IsSpokenFeedbackEnabled() &&
+      (!prev_complete_button_visibility || !deselect_button_->HasFocus())) {
+    complete_button_->RequestFocus();
+  }
 }
 
 void FocusModeTaskView::PaintFocusRingAndUpdateStyle() {
@@ -470,6 +499,16 @@ void FocusModeTaskView::OnCompleteTask() {
 
 void FocusModeTaskView::OnDeselectButtonPressed() {
   OnClearTask();
+
+  // When ChromeVox is on, we want to focus on the textfield_ after removing the
+  // selected task.
+  if (!IsSpokenFeedbackEnabled()) {
+    return;
+  }
+  textfield_->RequestFocus();
+  if (textfield_->HasFocus()) {
+    textfield_->SetActive(true);
+  }
 }
 
 void FocusModeTaskView::OnAddTaskButtonPressed() {
@@ -503,8 +542,17 @@ void FocusModeTaskView::UpdateStyle(bool show_selected_state,
                                 cros_tokens::kCrosSysInputFieldOnShaded,
                                 kTextfieldCornerRadius));
 
-  radio_button_->SetEnabled(is_network_connected);
-  radio_button_->SetVisible(show_selected_state);
+  complete_button_->SetEnabled(is_network_connected);
+  complete_button_->SetVisible(show_selected_state);
+  if (show_selected_state) {
+    complete_button_->GetViewAccessibility().SetDescription(
+        textfield_->GetText());
+  } else {
+    complete_button_->GetViewAccessibility().SetDescription(
+        std::u16string(),
+        ax::mojom::DescriptionFrom::kAttributeExplicitlyEmpty);
+  }
+
   deselect_button_->SetVisible(show_selected_state);
   add_task_button_->SetVisible(!show_selected_state);
 
@@ -512,7 +560,7 @@ void FocusModeTaskView::UpdateStyle(bool show_selected_state,
   chip_carousel_->SetVisible(!show_selected_state &&
                              chip_carousel_->HasTasks());
 
-  radio_button_->SetImageModel(
+  complete_button_->SetImageModel(
       views::Button::STATE_NORMAL,
       ui::ImageModel::FromVectorIcon(kRadioButtonUncheckedIcon,
                                      is_network_connected

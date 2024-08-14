@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "base/check.h"
+#include "base/strings/string_util.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
@@ -23,12 +24,12 @@
 #include "chrome/common/channel_info.h"
 #include "chrome/common/chrome_version.h"
 #include "components/background_task_scheduler/background_task_scheduler_factory.h"
-#include "components/feed/buildflags.h"
 #include "components/feed/core/proto/v2/keyvalue_store.pb.h"
 #include "components/feed/core/proto/v2/store.pb.h"
 #include "components/feed/core/v2/public/feed_service.h"
 #include "components/offline_pages/core/offline_page_feature.h"
 #include "components/search_engines/template_url_service.h"
+#include "components/variations/service/variations_service_utils.h"
 #include "components/version_info/version_info.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/storage_partition.h"
@@ -85,6 +86,7 @@ class FeedServiceDelegateImpl : public FeedService::Delegate {
     return "en";
 #endif
   }
+  std::string GetCountry() override { return FeedServiceFactory::GetCountry(); }
   DisplayMetrics GetDisplayMetrics() override {
 #if BUILDFLAG(IS_ANDROID)
     return FeedServiceBridge::GetDisplayMetrics();
@@ -151,20 +153,22 @@ FeedService* FeedServiceFactory::GetForBrowserContext(
 // Note that if both v1 and v2 are disabled in the build, feed::IsV2Enabled()
 // returns true. In that case, this function will return null. This prevents
 // creation of the Feed surface from triggering any other Feed behavior.
-#if BUILDFLAG(ENABLE_FEED_V2)
   if (context)
     return static_cast<FeedService*>(
         GetInstance()->GetServiceForBrowserContext(context, /*create=*/true));
   return nullptr;
-#else
-  return nullptr;
-#endif
 }
 
 // static
 FeedServiceFactory* FeedServiceFactory::GetInstance() {
   static base::NoDestructor<FeedServiceFactory> instance;
   return instance.get();
+}
+
+// static
+std::string FeedServiceFactory::GetCountry() {
+  return base::ToUpperASCII(variations::GetCurrentCountryCode(
+      g_browser_process->variations_service()));
 }
 
 FeedServiceFactory::FeedServiceFactory()
@@ -199,10 +203,7 @@ FeedServiceFactory::BuildServiceInstanceForBrowserContext(
       IdentityManagerFactory::GetForProfile(profile);
   std::string api_key;
   if (google_apis::IsGoogleChromeAPIKeyUsed()) {
-    bool is_stable_channel =
-        chrome::GetChannel() == version_info::Channel::STABLE;
-    api_key = is_stable_channel ? google_apis::GetAPIKey()
-                                : google_apis::GetNonStableAPIKey();
+    api_key = google_apis::GetAPIKey(chrome::GetChannel());
   }
 
   scoped_refptr<base::SequencedTaskRunner> background_task_runner =

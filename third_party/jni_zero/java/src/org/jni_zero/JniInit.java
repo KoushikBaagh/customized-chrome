@@ -4,33 +4,30 @@
 
 package org.jni_zero;
 
-import java.util.Collections;
-
 /** Used by jni_zero.cc. */
 @JNINamespace("jni_zero")
 public class JniInit {
     @CalledByNative
-    private static Object[] init() {
-        // For JVM (works fine on ART), cannot call from Java -> Native during InitVM because the
-        // System.loadLibrary() call has not yet completed. Could work around this by using
-        // RegisterNatives(), but simpler to return an array than to make Java->Native work.
-        return new Object[] {Collections.EMPTY_LIST, Collections.EMPTY_MAP};
-    }
-
-    @CalledByNative
     private static void crashIfMultiplexingMisaligned(long wholeHash, long priorityHash) {
         try {
-            long javaHash = Class.forName("J.N").getField("MUXING_HASH").getLong(null);
-            // We compare what we have in our Java to what is all in native's JNI, or the "priority"
-            // elements (to cover the case of Webview) in native.
-            if (javaHash != wholeHash && javaHash != priorityHash) {
+            // Reflection is required because we cannot reference the J/N class at compile time -
+            // it gets inserted at the very end of the build process as a srcjar_dep.
+            long javaWholeHash = Class.forName("J.N").getField("WHOLE_HASH").getLong(null);
+            long javaPriorityHash = Class.forName("J.N").getField("PRIORITY_HASH").getLong(null);
+            // We only compare the "priority" to the "whole" - we need the entirety of at least one
+            // to always be compared.
+            if (javaWholeHash != wholeHash
+                    && javaWholeHash != priorityHash
+                    && javaPriorityHash != wholeHash) {
                 throw new RuntimeException(
                         "JNI Zero multiplexing hashes do not align. Native: "
-                                + Long.toString(wholeHash)
+                                + wholeHash
                                 + " or "
-                                + Long.toString(priorityHash)
+                                + priorityHash
                                 + " Java: "
-                                + Long.toString(javaHash));
+                                + javaWholeHash
+                                + " or "
+                                + javaPriorityHash);
             }
         } catch (ReflectiveOperationException e) {
             // This check is just a backup. If we fail to actually do the check, we assert so that

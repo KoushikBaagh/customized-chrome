@@ -6,22 +6,30 @@ package org.chromium.chrome.test.transit.hub;
 
 import static androidx.test.espresso.matcher.ViewMatchers.isSelected;
 
-import static org.hamcrest.CoreMatchers.allOf;
-
-import static org.chromium.base.test.transit.ViewElement.scopedViewElement;
+import static org.chromium.base.test.transit.ViewSpec.viewSpec;
 
 import org.chromium.base.test.transit.Elements;
-import org.chromium.base.test.transit.ViewElement;
+import org.chromium.base.test.transit.ViewSpec;
 import org.chromium.chrome.browser.hub.PaneId;
+import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 
 /** Incognito tab switcher pane station. */
 public class IncognitoTabSwitcherStation extends TabSwitcherStation {
 
-    public static final ViewElement SELECTED_INCOGNITO_TOGGLE_TAB_BUTTON =
-            scopedViewElement(allOf(INCOGNITO_TOGGLE_TAB_BUTTON.getViewMatcher(), isSelected()));
+    public static final ViewSpec SELECTED_INCOGNITO_TOGGLE_TAB_BUTTON =
+            viewSpec(INCOGNITO_TOGGLE_TAB_BUTTON.getViewMatcher(), isSelected());
 
     public IncognitoTabSwitcherStation(boolean regularTabsExist, boolean incognitoTabsExist) {
         super(/* isIncognito= */ true, regularTabsExist, incognitoTabsExist);
+    }
+
+    /**
+     * Build an {@link IncognitoTabSwitcherStation} assuming the tab model doesn't change in the
+     * transition.
+     */
+    public static IncognitoTabSwitcherStation from(TabModelSelector selector) {
+        return new IncognitoTabSwitcherStation(
+                selector.getModel(false).getCount() > 0, selector.getModel(true).getCount() > 0);
     }
 
     @Override

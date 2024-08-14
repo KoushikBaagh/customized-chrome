@@ -7,7 +7,7 @@
 #include "chrome/browser/enterprise/connectors/reporting/extension_telemetry_event_router_factory.h"
 #include "chrome/browser/enterprise/connectors/reporting/realtime_reporting_client.h"
 #include "chrome/browser/enterprise/connectors/reporting/realtime_reporting_client_factory.h"
-#include "components/enterprise/connectors/reporting/reporting_service_settings.h"
+#include "components/enterprise/connectors/core/reporting_service_settings.h"
 #include "components/safe_browsing/core/common/features.h"
 
 namespace enterprise_connectors {
@@ -41,6 +41,19 @@ base::Value::Dict CreateExtensionInfoDict(const ExtensionInfo& extension_info) {
       ExtensionInfo::InstallLocation_Name(extension_info.install_location()));
   dict.Set(ExtensionTelemetryEventRouter::kKeyIsFromStore,
            extension_info.is_from_store());
+  if (extension_info.file_infos_size() > 0) {
+    base::Value::List file_infos_list;
+    for (const auto& file_info : extension_info.file_infos()) {
+      base::Value::Dict file_info_dict;
+      file_info_dict.Set(ExtensionTelemetryEventRouter::kKeyName,
+                         file_info.name());
+      file_info_dict.Set(ExtensionTelemetryEventRouter::kKeyHash,
+                         file_info.hash());
+      file_infos_list.Append(std::move(file_info_dict));
+    }
+    dict.Set(ExtensionTelemetryEventRouter::kKeyFileInfo,
+             std::move(file_infos_list));
+  }
 
   return dict;
 }
@@ -156,32 +169,35 @@ base::Value::Dict CreateExtensionTelemetryReportDict(
   report_dict.Set(ExtensionTelemetryEventRouter::kKeyExtension,
                   CreateExtensionInfoDict(report.extension()));
 
-  for (auto signal : report.signals()) {
+  base::Value::Dict signals_dict;
+  for (const auto& signal : report.signals()) {
     if (signal.has_cookies_get_all_info()) {
-      report_dict.Set(
+      signals_dict.Set(
           ExtensionTelemetryEventRouter::kKeyCookiesGetAllInfo,
           CreateCookiesGetAllInfoDict(signal.cookies_get_all_info()));
     } else if (signal.has_cookies_get_info()) {
-      report_dict.Set(ExtensionTelemetryEventRouter::kKeyCookiesGetInfo,
-                      CreateCookiesGetInfoDict(signal.cookies_get_info()));
+      signals_dict.Set(ExtensionTelemetryEventRouter::kKeyCookiesGetInfo,
+                       CreateCookiesGetInfoDict(signal.cookies_get_info()));
     } else if (signal.has_remote_host_contacted_info()) {
-      report_dict.Set(
+      signals_dict.Set(
           ExtensionTelemetryEventRouter::kKeyRemoteHostContactedInfo,
           CreateRemoteHostContactedInfoDict(
               signal.remote_host_contacted_info()));
     } else if (signal.has_tabs_api_info()) {
-      report_dict.Set(ExtensionTelemetryEventRouter::kKeyTabsApiInfo,
-                      CreateTabsApiInfoDict(signal.tabs_api_info()));
+      signals_dict.Set(ExtensionTelemetryEventRouter::kKeyTabsApiInfo,
+                       CreateTabsApiInfoDict(signal.tabs_api_info()));
     }
   }
 
+  report_dict.Set(ExtensionTelemetryEventRouter::kKeySignals,
+                  std::move(signals_dict));
   return report_dict;
 }
 
 base::Value::Dict CreateExtensionTelemetryReportRequestDict(
     const ExtensionTelemetryReportRequest& request) {
   base::Value::List report_list;
-  for (auto telemetry_report : request.reports()) {
+  for (const auto& telemetry_report : request.reports()) {
     report_list.Append(CreateExtensionTelemetryReportDict(telemetry_report));
   }
 
@@ -190,15 +206,21 @@ base::Value::Dict CreateExtensionTelemetryReportRequestDict(
                    std::move(report_list));
   request_dict.Set(ExtensionTelemetryEventRouter::kKeyCreationTimeMsec,
                    base::NumberToString(request.creation_timestamp_msec()));
-  return request_dict;
+
+  return base::Value::Dict().Set(
+      ExtensionTelemetryEventRouter::kKeyExtensionTelemetryReport,
+      std::move(request_dict));
 }
 
 }  // namespace
 
+const char ExtensionTelemetryEventRouter::kKeyExtensionTelemetryReport[] =
+    "extension_telemetry_report";
 const char ExtensionTelemetryEventRouter::kKeyCreationTimeMsec[] =
     "creation_timestamp_msec";
 const char ExtensionTelemetryEventRouter::kKeyReports[] = "reports";
 const char ExtensionTelemetryEventRouter::kKeyExtension[] = "extension";
+const char ExtensionTelemetryEventRouter::kKeySignals[] = "signals";
 const char ExtensionTelemetryEventRouter::kKeyCookiesGetAllInfo[] =
     "cookies_get_all_info";
 const char ExtensionTelemetryEventRouter::kKeyGetAllArgsInfo[] =
@@ -231,6 +253,8 @@ const char ExtensionTelemetryEventRouter::kKeyCount[] = "count";
 const char ExtensionTelemetryEventRouter::kKeyMethod[] = "method";
 const char ExtensionTelemetryEventRouter::kKeyNewUrl[] = "new_url";
 const char ExtensionTelemetryEventRouter::kKeyCurrentUrl[] = "current_url";
+const char ExtensionTelemetryEventRouter::kKeyFileInfo[] = "file_info";
+const char ExtensionTelemetryEventRouter::kKeyHash[] = "hash";
 
 // static
 ExtensionTelemetryEventRouter* ExtensionTelemetryEventRouter::Get(
@@ -247,7 +271,7 @@ ExtensionTelemetryEventRouter::~ExtensionTelemetryEventRouter() = default;
 
 bool ExtensionTelemetryEventRouter::IsPolicyEnabled() {
   if (!base::FeatureList::IsEnabled(
-          safe_browsing::kExtensionTelemetryForEnteprise)) {
+          safe_browsing::kExtensionTelemetryForEnterprise)) {
     return false;
   }
 
@@ -260,7 +284,7 @@ bool ExtensionTelemetryEventRouter::IsPolicyEnabled() {
   std::optional<ReportingSettings> settings =
       reporting_client->GetReportingSettings();
   return settings.has_value() &&
-         settings->enabled_event_names.count(kExtensionTelemetryEvent) > 0;
+         settings->enabled_opt_in_events.count(kExtensionTelemetryEvent) > 0;
 }
 
 void ExtensionTelemetryEventRouter::UploadTelemetryReport(

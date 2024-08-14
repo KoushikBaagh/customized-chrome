@@ -196,7 +196,7 @@ class WebTransport::DatagramUnderlyingSink final : public UnderlyingSinkBase {
                               WrapWeakPersistent(this)));
     } else {
       Vector<uint8_t> datagram;
-      datagram.Append(data.data(), static_cast<wtf_size_t>(data.size()));
+      datagram.AppendSpan(data);
       pending_datagrams_.push_back(std::move(datagram));
     }
     int high_water_mark = datagrams_->outgoingHighWaterMark();
@@ -384,7 +384,7 @@ class WebTransport::DatagramUnderlyingSource final
                               "supplied view is not large enough.")));
           return;
         }
-        view.ByteSpan().first(data.size()).copy_from(data);
+        view.ByteSpan().copy_prefix_from(data);
         request->respond(script_state_, data.size(), exception_state);
         return;
       }
@@ -654,9 +654,8 @@ class WebTransport::ReceiveStreamVendor final
     auto* receive_stream = MakeGarbageCollected<ReceiveStream>(
         script_state_, web_transport_, stream_id, std::move(readable));
     auto* isolate = script_state_->GetIsolate();
-    ExceptionState exception_state(
-        isolate, ExceptionContextType::kConstructorOperationInvoke,
-        "ReceiveStream");
+    ExceptionState exception_state(isolate, v8::ExceptionContext::kConstructor,
+                                   "ReceiveStream");
     v8::MicrotasksScope microtasks_scope(
         isolate, ToMicrotaskQueue(script_state_),
         v8::MicrotasksScope::kDoNotRunMicrotasks);
@@ -723,9 +722,8 @@ class WebTransport::BidirectionalStreamVendor final
         std::move(incoming_consumer));
 
     auto* isolate = script_state_->GetIsolate();
-    ExceptionState exception_state(
-        isolate, ExceptionContextType::kConstructorOperationInvoke,
-        "BidirectionalStream");
+    ExceptionState exception_state(isolate, v8::ExceptionContext::kConstructor,
+                                   "BidirectionalStream");
     v8::MicrotasksScope microtasks_scope(
         isolate, ToMicrotaskQueue(script_state_),
         v8::MicrotasksScope::kDoNotRunMicrotasks);
@@ -1101,17 +1099,17 @@ void WebTransport::OnClosed(
 
   latest_stats_ = ConvertStatsFromMojom(std::move(final_stats));
 
-  WebTransportCloseInfo idl_close_info;
+  auto* idl_close_info = MakeGarbageCollected<WebTransportCloseInfo>();
   if (close_info) {
-    idl_close_info.setCloseCode(close_info->code);
-    idl_close_info.setReason(close_info->reason);
+    idl_close_info->setCloseCode(close_info->code);
+    idl_close_info->setReason(close_info->reason);
   }
 
   v8::Local<v8::Value> error = WebTransportError::Create(
       isolate, /*stream_error_code=*/std::nullopt, "The session is closed.",
       WebTransportError::Source::kSession);
 
-  Cleanup(&idl_close_info, error, /*abruptly=*/false);
+  Cleanup(idl_close_info, error, /*abruptly=*/false);
 }
 
 void WebTransport::OnOutgoingStreamClosed(uint32_t stream_id) {
@@ -1529,8 +1527,8 @@ void WebTransport::OnCreateSendStreamResponse(
       script_state_, this, stream_id, std::move(producer));
 
   auto* isolate = script_state_->GetIsolate();
-  ExceptionState exception_state(
-      isolate, ExceptionContextType::kConstructorOperationInvoke, "SendStream");
+  ExceptionState exception_state(isolate, v8::ExceptionContext::kConstructor,
+                                 "SendStream");
   v8::MicrotasksScope microtasks_scope(
       isolate, ToMicrotaskQueue(script_state_),
       v8::MicrotasksScope::kDoNotRunMicrotasks);
@@ -1578,9 +1576,8 @@ void WebTransport::OnCreateBidirectionalStreamResponse(
       script_state_, this, stream_id, std::move(outgoing_producer),
       std::move(incoming_consumer));
 
-  ExceptionState exception_state(
-      isolate, ExceptionContextType::kConstructorOperationInvoke,
-      "BidirectionalStream");
+  ExceptionState exception_state(isolate, v8::ExceptionContext::kConstructor,
+                                 "BidirectionalStream");
   v8::MicrotasksScope microtasks_scope(
       isolate, ToMicrotaskQueue(script_state_),
       v8::MicrotasksScope::kDoNotRunMicrotasks);

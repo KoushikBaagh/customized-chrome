@@ -385,6 +385,12 @@ inline constexpr char kAmazonLunaAppIdFR[] = "khklcoifabacgdieoekhmfcilgfmdmbh";
 // The extension id of the Amazon Luna .it Italy PWA.
 inline constexpr char kAmazonLunaAppIdIT[] = "agcdabkknemgfgbjdpckaehhncgkfcdi";
 
+// The extension id of the Amazon Luna .nl Netherlands PWA.
+inline constexpr char kAmazonLunaAppIdNL[] = "opkohmiamoeiojmgmhgelaaieecjifod";
+
+// The extension id of the Amazon Luna .pl Poland PWA.
+inline constexpr char kAmazonLunaAppIdPL[] = "alddamigfjonblpigkpieckmhbjdgadd";
+
 // The extension id of the Amazon Luna .co.uk UK PWA.
 inline constexpr char kAmazonLunaAppIdUK[] = "aolalpmkbpdlpjhmhhmcobipjkhlimkj";
 

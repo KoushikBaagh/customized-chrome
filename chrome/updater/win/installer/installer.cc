@@ -46,6 +46,7 @@
 #include "chrome/updater/win/installer/installer_constants.h"
 #include "chrome/updater/win/installer/pe_resource.h"
 #include "chrome/updater/win/ui/l10n_util.h"
+#include "chrome/updater/win/win_constants.h"
 
 namespace updater {
 
@@ -304,7 +305,7 @@ ProcessExitResult HandleRunElevated(const base::CommandLine& command_line) {
                      return ProcessExitResult(FAILED_TO_ELEVATE_METAINSTALLER,
                                               error);
                    });
-  return ProcessExitResult(result);
+  return ProcessExitResult(UPDATER_EXIT_CODE, result);
 }
 
 ProcessExitResult HandleRunDeElevated(const base::CommandLine& command_line) {
@@ -320,16 +321,17 @@ ProcessExitResult HandleRunDeElevated(const base::CommandLine& command_line) {
       base::win::ScopedCOMInitializer::kMTA);
   CHECK(com_initializer.Succeeded());
 
-  // Deelevate the metainstaller.
-  HRESULT hr =
-      RunDeElevated(command_line.GetProgram().value(), [&command_line] {
+  // De-elevate the metainstaller.
+  ASSIGN_OR_RETURN(
+      DWORD result, RunDeElevated([&] {
         base::CommandLine de_elevate_command_line = command_line;
         de_elevate_command_line.AppendSwitch(kCmdLineExpectDeElevated);
-        return de_elevate_command_line.GetArgumentsString();
-      }());
-  return SUCCEEDED(hr)
-             ? ProcessExitResult(SUCCESS_EXIT_CODE)
-             : ProcessExitResult(FAILED_TO_DE_ELEVATE_METAINSTALLER, hr);
+        return de_elevate_command_line;
+      }()),
+      [](HRESULT error) {
+        return ProcessExitResult(FAILED_TO_DE_ELEVATE_METAINSTALLER, error);
+      });
+  return ProcessExitResult(UPDATER_EXIT_CODE, result);
 }
 
 ProcessExitResult InstallerMain(HMODULE module) {
@@ -363,9 +365,7 @@ ProcessExitResult InstallerMain(HMODULE module) {
 
   if (!::IsUserAnAdmin() && IsSystemInstall(scope)) {
     ProcessExitResult run_elevated_result = HandleRunElevated(command_line);
-    if ((run_elevated_result.exit_code !=
-             RUN_SETUP_FAILED_COULD_NOT_CREATE_PROCESS &&
-         run_elevated_result.exit_code != UNEXPECTED_ELEVATION_LOOP_SILENT) ||
+    if (run_elevated_result.exit_code == UPDATER_EXIT_CODE ||
         !IsPrefersForCommandLine(command_line)) {
       return run_elevated_result;
     }

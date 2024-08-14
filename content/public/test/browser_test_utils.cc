@@ -586,7 +586,7 @@ ProxyHostObserver* GetProxyHostObserver() {
 
 bool IsRequestCompatibleWithSpeculativeRFH(NavigationRequest* request) {
   return request->state() <=
-             NavigationRequest::NavigationState::WILL_START_REQUEST &&
+             NavigationRequest::NavigationState::WILL_PROCESS_RESPONSE &&
          request->GetAssociatedRFHType() ==
              NavigationRequest::AssociatedRenderFrameHostType::NONE;
 }
@@ -1227,8 +1227,6 @@ void SimulateGestureScrollSequence(RenderWidgetHost* render_widget_host,
   scroll_update.SetPositionInWidget(gfx::PointF(point));
   scroll_update.data.scroll_update.delta_x = delta.x();
   scroll_update.data.scroll_update.delta_y = delta.y();
-  scroll_update.data.scroll_update.velocity_x = 0;
-  scroll_update.data.scroll_update.velocity_y = 0;
   render_widget_host->ForwardGestureEvent(scroll_update);
 
   blink::WebGestureEvent scroll_end(
@@ -1313,28 +1311,29 @@ void SimulateLongTapAt(WebContents* web_contents, const gfx::Point& point) {
       web_contents->GetRenderWidgetHostView());
 
   ui::TouchEvent touch_start(
-      ui::ET_TOUCH_PRESSED, point, base::TimeTicks(),
+      ui::EventType::kTouchPressed, point, base::TimeTicks(),
       ui::PointerDetails(ui::EventPointerType::kTouch, 0));
   rwhva->OnTouchEvent(&touch_start);
 
-  ui::GestureEventDetails tap_down_details(ui::ET_GESTURE_TAP_DOWN);
+  ui::GestureEventDetails tap_down_details(ui::EventType::kGestureTapDown);
   tap_down_details.set_device_type(ui::GestureDeviceType::DEVICE_TOUCHSCREEN);
   ui::GestureEvent tap_down(point.x(), point.y(), 0, ui::EventTimeForNow(),
                             tap_down_details, touch_start.unique_event_id());
   rwhva->OnGestureEvent(&tap_down);
 
-  ui::GestureEventDetails long_press_details(ui::ET_GESTURE_LONG_PRESS);
+  ui::GestureEventDetails long_press_details(ui::EventType::kGestureLongPress);
   long_press_details.set_device_type(ui::GestureDeviceType::DEVICE_TOUCHSCREEN);
   ui::GestureEvent long_press(point.x(), point.y(), 0, ui::EventTimeForNow(),
                               long_press_details,
                               touch_start.unique_event_id());
   rwhva->OnGestureEvent(&long_press);
 
-  ui::TouchEvent touch_end(ui::ET_TOUCH_RELEASED, point, base::TimeTicks(),
+  ui::TouchEvent touch_end(ui::EventType::kTouchReleased, point,
+                           base::TimeTicks(),
                            ui::PointerDetails(ui::EventPointerType::kTouch, 0));
   rwhva->OnTouchEvent(&touch_end);
 
-  ui::GestureEventDetails long_tap_details(ui::ET_GESTURE_LONG_TAP);
+  ui::GestureEventDetails long_tap_details(ui::EventType::kGestureLongTap);
   long_tap_details.set_device_type(ui::GestureDeviceType::DEVICE_TOUCHSCREEN);
   ui::GestureEvent long_tap(point.x(), point.y(), 0, ui::EventTimeForNow(),
                             long_tap_details, touch_end.unique_event_id());
@@ -2433,13 +2432,13 @@ RenderFrameMetadataProviderImpl* RenderFrameMetadataProviderFromRenderFrameHost(
 }  // namespace
 
 TitleWatcher::TitleWatcher(WebContents* web_contents,
-                           const std::u16string& expected_title)
+                           std::u16string_view expected_title)
     : WebContentsObserver(web_contents) {
-  expected_titles_.push_back(expected_title);
+  expected_titles_.emplace_back(expected_title);
 }
 
-void TitleWatcher::AlsoWaitForTitle(const std::u16string& expected_title) {
-  expected_titles_.push_back(expected_title);
+void TitleWatcher::AlsoWaitForTitle(std::u16string_view expected_title) {
+  expected_titles_.emplace_back(expected_title);
 }
 
 TitleWatcher::~TitleWatcher() = default;
@@ -4409,6 +4408,36 @@ void SpeculativeRenderFrameHostObserver::RenderFrameCreated(
       IsRequestCompatibleWithSpeculativeRFH(request) &&
       request->GetURL() == url_) {
     run_loop_.Quit();
+  }
+}
+
+SpareRenderProcessObserver::SpareRenderProcessObserver() {
+  subscription_ =
+      RenderProcessHost::RegisterSpareRenderProcessHostChangedCallback(
+          base::BindRepeating(
+              &SpareRenderProcessObserver::SpareRenderProcessHostChanged,
+              weak_factory_.GetWeakPtr()));
+}
+
+SpareRenderProcessObserver::~SpareRenderProcessObserver() = default;
+
+void SpareRenderProcessObserver::SpareRenderProcessHostChanged(
+    RenderProcessHost* render_process_host) {
+  spare_render_process_host_ = render_process_host;
+  if (quit_closure_) {
+    std::move(quit_closure_).Run();
+  }
+}
+
+RenderProcessHost* SpareRenderProcessObserver::spare_render_process_host() {
+  return spare_render_process_host_;
+}
+
+void SpareRenderProcessObserver::WaitForSpareRenderProcessCreation() {
+  base::RunLoop loop;
+  quit_closure_ = loop.QuitClosure();
+  if (!spare_render_process_host_) {
+    loop.Run();
   }
 }
 

@@ -42,9 +42,9 @@ rust_static_library("bridge_rust_side") {
   cxx_bindings = skia_fontations_bridge_sources
   deps = [
     ":path_bridge",
-    "//third_party/rust/font_types/v0_5:lib",
-    "//third_party/rust/read_fonts/v0_19:lib",
-    "//third_party/rust/skrifa/v0_19:lib",
+    "//third_party/rust/font_types/v0_6:lib",
+    "//third_party/rust/read_fonts/v0_20:lib",
+    "//third_party/rust/skrifa/v0_20:lib",
   ]
   configs -= [ "//build/config/compiler:chromium_code" ]
   configs += [
@@ -64,6 +64,9 @@ config("skia_config") {
     "SK_DISABLE_LEGACY_BACKEND_TEXTURE_FUNCS",
     "SK_DISABLE_LEGACY_TEXTURE_INFO_FUNCS",
     "SK_DISABLE_LEGACY_BACKEND_SEMAPHORE_FUNCS",
+    "SK_DISABLE_LEGACY_GRAPHITE_IMAGES",
+    "SK_DISABLE_LEGACY_DAWN_TEXTURE_INFO_FUNCS",
+    "SK_DISABLE_LEGACY_DAWN_BACKEND_TEXTURE_FUNCS",
   ]
 
   include_dirs = [
@@ -137,6 +140,9 @@ config("skia_config") {
     if (skia_use_metal) {
       defines += [ "SK_METAL" ]
     }
+  }
+  if(current_cpu == "loong64") {
+    cflags = [ "-mlsx", "-flax-vector-conversions=all"]
   }
 }
 
@@ -308,6 +314,11 @@ component("skia") {
         "ext/convolver_neon.h",
       ]
     }
+  } else if (current_cpu == "loong64") {
+    sources += [
+      "ext/convolver_LSX.cc",
+      "ext/convolver_LSX.h",
+    ]
   }
 
   if (is_win) {
@@ -681,6 +692,17 @@ if (current_cpu == "x86" || current_cpu == "x64") {
   }
 }
 
+if (current_cpu == "loong64") {
+  skia_source_set("skia_opts_lasx") {
+    sources = skia_opts.lasx_sources
+    cflags = [
+      "-mlasx",
+      "-flax-vector-conversions=all",
+    ]
+    visibility = [ ":skia_opts" ]
+  }
+}
+
 skia_source_set("skia_opts") {
   cflags = []
   defines = []
@@ -719,7 +741,7 @@ skia_source_set("skia_opts") {
   } else if (current_cpu == "riscv64") {
     # Conditional and empty body needed to avoid assert() below.
   } else if (current_cpu == "loong64") {
-    # Conditional and empty body needed to avoid assert() below.
+    deps += [ ":skia_opts_lasx" ]
   } else {
     assert(false, "Unknown cpu target")
   }
@@ -785,6 +807,9 @@ source_set("skcms_TransformBaseline_and_public") {
   # for half-precision floating point data types used by SKCMS on ARM.
   if ((is_linux || is_chromeos) && !is_clang && current_cpu == "arm") {
     cflags += [ "-mfp16-format=ieee" ]
+  }
+  if (current_cpu == "loong64") {
+    cflags += [ "-mlsx" ]
   }
 
   sources = rebase_path(skcms_TransformBaseline + skcms_public,

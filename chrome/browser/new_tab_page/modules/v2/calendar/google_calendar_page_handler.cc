@@ -9,6 +9,8 @@
 #include <utility>
 #include <vector>
 
+#include "base/hash/hash.h"
+#include "base/metrics/histogram_functions.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
@@ -104,6 +106,7 @@ ntp::calendar::mojom::CalendarEventPtr GetFakeEvent(int index) {
   event->conference_url =
       GURL("https://foo.com/conference" + base::NumberToString(index));
   event->is_accepted = true;
+  event->has_other_attendee = false;
   return event;
 }
 
@@ -195,6 +198,8 @@ void GoogleCalendarPageHandler::GetEvents(GetEventsCallback callback) {
             /*event_types=*/event_types,
             ntp_features::kNtpCalendarModuleExperimentParam.Get(),
             /*order_by=*/"startTime"));
+    base::UmaHistogramSparse("NewTabPage.Modules.DataRequest",
+                             base::PersistentHash("google_calendar"));
   }
 }
 
@@ -216,6 +221,8 @@ void GoogleCalendarPageHandler::OnRequestComplete(
   size_t max_events =
       static_cast<size_t>(ntp_features::kNtpCalendarModuleMaxEventsParam.Get());
   if (response_code == google_apis::ApiErrorCode::HTTP_SUCCESS) {
+    base::UmaHistogramCounts100("NewTabPage.GoogleCalendar.RequestResult",
+                                events->items().size());
     for (const auto& event : events->items()) {
       // If the result is already at max length, stop.
       if (result.size() == max_events) {
@@ -223,6 +230,11 @@ void GoogleCalendarPageHandler::OnRequestComplete(
       }
       // Do not include all day events in response.
       if (event->all_day_event()) {
+        continue;
+      }
+      // Do not include declined events in response.
+      if (event->self_response_status() ==
+          google_apis::calendar::CalendarEvent::ResponseStatus::kDeclined) {
         continue;
       }
       ntp::calendar::mojom::CalendarEventPtr formatted_event =
@@ -244,6 +256,7 @@ void GoogleCalendarPageHandler::OnRequestComplete(
       formatted_event->is_accepted =
           event->self_response_status() ==
           google_apis::calendar::CalendarEvent::ResponseStatus::kAccepted;
+      formatted_event->has_other_attendee = event->has_other_attendee();
       result.push_back(std::move(formatted_event));
     }
   }

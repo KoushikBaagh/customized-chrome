@@ -36,6 +36,14 @@ bool IsAccessibilityPruneRedundantInlineTextEnabled() {
       ::features::kAccessibilityPruneRedundantInlineText);
 }
 
+BASE_FEATURE(kAccessibilityPruneRedundantInlineConnectivity,
+             "AccessibilityPruneRedundantInlineConnectivity",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+bool IsAccessibilityPruneRedundantInlineConnectivityEnabled() {
+  return base::FeatureList::IsEnabled(
+      ::features::kAccessibilityPruneRedundantInlineConnectivity);
+}
+
 BASE_FEATURE(kImageDescriptionsAlternateRouting,
              "ImageDescriptionsAlternateRouting",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -147,7 +155,7 @@ bool IsDictationOfflineAvailable() {
 
 BASE_FEATURE(kAccessibilityAccelerator,
              "AccessibilityAccelerator",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 bool IsAccessibilityAcceleratorEnabled() {
   return base::FeatureList::IsEnabled(::features::kAccessibilityAccelerator);
 }
@@ -169,7 +177,7 @@ bool IsAccessibilityFaceGazeEnabled() {
 
 BASE_FEATURE(kAccessibilityReducedAnimationsInKiosk,
              "AccessibilityReducedAnimationsInKiosk",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 bool IsAccessibilityReducedAnimationsInKioskEnabled() {
   return base::FeatureList::IsEnabled(
       ::features::kAccessibilityReducedAnimationsInKiosk);
@@ -232,7 +240,7 @@ bool IsAccessibilityOverscrollSettingFeatureEnabled() {
 
 BASE_FEATURE(kAccessibilitySelectToSpeakShortcut,
              "AccessibilitySelectToSpeakShortcut",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 bool IsAccessibilitySelectToSpeakShortcutEnabled() {
   return base::FeatureList::IsEnabled(
       ::features::kAccessibilitySelectToSpeakShortcut);
@@ -244,6 +252,14 @@ BASE_FEATURE(kAccessibilityDisableTrackpad,
 bool IsAccessibilityDisableTrackpadEnabled() {
   return base::FeatureList::IsEnabled(
       ::features::kAccessibilityDisableTrackpad);
+}
+
+BASE_FEATURE(kAccessibilityFlashScreenFeature,
+             "AccessibilityFlashScreenFeature",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+bool IsAccessibilityFlashScreenFeatureEnabled() {
+  return base::FeatureList::IsEnabled(
+      ::features::kAccessibilityFlashScreenFeature);
 }
 
 BASE_FEATURE(kAccessibilityShakeToLocate,
@@ -319,13 +335,6 @@ BASE_FEATURE(kPdfOcr,
 
 bool IsPdfOcrEnabled() {
   return base::FeatureList::IsEnabled(::features::kPdfOcr);
-}
-
-BASE_FEATURE(kReadAnythingLocalSidePanel,
-             "ReadAnythingLocalSidePanel",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-bool IsReadAnythingLocalSidePanelEnabled() {
-  return base::FeatureList::IsEnabled(::features::kReadAnythingLocalSidePanel);
 }
 
 BASE_FEATURE(kReadAnythingReadAloud,

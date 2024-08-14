@@ -118,6 +118,7 @@
 #include "third_party/blink/renderer/core/html_names.h"
 #include "third_party/blink/renderer/core/input/event_handler.h"
 #include "third_party/blink/renderer/core/input/input_device_capabilities.h"
+#include "third_party/blink/renderer/core/inspector/console_message.h"
 #include "third_party/blink/renderer/core/inspector/inspector_trace_events.h"
 #include "third_party/blink/renderer/core/layout/layout_box.h"
 #include "third_party/blink/renderer/core/layout/layout_embedded_content.h"
@@ -400,6 +401,12 @@ Node* Node::PseudoAwarePreviousSibling() const {
         return previous;
       }
       [[fallthrough]];
+    case kPseudoIdScrollNextButton:
+      if (Node* next =
+              parent->GetPseudoElement(kPseudoIdScrollMarkerGroupAfter)) {
+        return next;
+      }
+      [[fallthrough]];
     case kPseudoIdScrollMarkerGroupAfter:
       if (Node* next = parent->GetPseudoElement(kPseudoIdAfter)) {
         return next;
@@ -430,6 +437,11 @@ Node* Node::PseudoAwarePreviousSibling() const {
       }
       [[fallthrough]];
     case kPseudoIdScrollMarkerGroupBefore:
+      if (Node* next = parent->GetPseudoElement(kPseudoIdScrollPrevButton)) {
+        return next;
+      }
+      [[fallthrough]];
+    case kPseudoIdScrollPrevButton:
       return nullptr;
     // The pseudos of the view transition subtree have a known structure and
     // cannot create other pseudos so these are handled separately of the above
@@ -471,6 +483,12 @@ Node* Node::PseudoAwareNextSibling() const {
 
   // See comments in PseudoAwarePreviousSibling.
   switch (GetPseudoId()) {
+    case kPseudoIdScrollPrevButton:
+      if (Node* next =
+              parent->GetPseudoElement(kPseudoIdScrollMarkerGroupBefore)) {
+        return next;
+      }
+      [[fallthrough]];
     case kPseudoIdScrollMarkerGroupBefore:
       if (Node* next = parent->GetPseudoElement(kPseudoIdMarker)) {
         return next;
@@ -500,6 +518,11 @@ Node* Node::PseudoAwareNextSibling() const {
       }
       [[fallthrough]];
     case kPseudoIdScrollMarkerGroupAfter:
+      if (Node* next = parent->GetPseudoElement(kPseudoIdScrollNextButton)) {
+        return next;
+      }
+      [[fallthrough]];
+    case kPseudoIdScrollNextButton:
       if (Node* next = parent->GetPseudoElement(kPseudoIdViewTransition)) {
         return next;
       }
@@ -563,6 +586,10 @@ Node* Node::PseudoAwareFirstChild() const {
       return current_element->GetPseudoElement(kPseudoIdViewTransitionNew,
                                                name);
     }
+    if (Node* first =
+            current_element->GetPseudoElement(kPseudoIdScrollPrevButton)) {
+      return first;
+    }
     if (Node* first = current_element->GetPseudoElement(
             kPseudoIdScrollMarkerGroupBefore)) {
       return first;
@@ -582,6 +609,10 @@ Node* Node::PseudoAwareFirstChild() const {
     }
     if (Node* first = current_element->GetPseudoElement(
             kPseudoIdScrollMarkerGroupAfter)) {
+      return first;
+    }
+    if (Node* first =
+            current_element->GetPseudoElement(kPseudoIdScrollNextButton)) {
       return first;
     }
     return current_element->GetPseudoElement(kPseudoIdViewTransition);
@@ -623,6 +654,10 @@ Node* Node::PseudoAwareLastChild() const {
             current_element->GetPseudoElement(kPseudoIdViewTransition)) {
       return last;
     }
+    if (Node* last =
+            current_element->GetPseudoElement(kPseudoIdScrollNextButton)) {
+      return last;
+    }
     if (Node* last = current_element->GetPseudoElement(
             kPseudoIdScrollMarkerGroupAfter)) {
       return last;
@@ -639,7 +674,11 @@ Node* Node::PseudoAwareLastChild() const {
     if (Node* last = current_element->GetPseudoElement(kPseudoIdMarker)) {
       return last;
     }
-    return current_element->GetPseudoElement(kPseudoIdScrollMarkerGroupBefore);
+    if (Node* last = current_element->GetPseudoElement(
+            kPseudoIdScrollMarkerGroupBefore)) {
+      return last;
+    }
+    return current_element->GetPseudoElement(kPseudoIdScrollPrevButton);
   }
 
   return lastChild();
@@ -3452,6 +3491,15 @@ void Node::SetCachedDirectionality(TextDirection direction) {
       ClearFlag(kCachedDirectionalityIsRtl);
       break;
   }
+}
+
+void Node::AddConsoleMessage(mojom::blink::ConsoleMessageSource source,
+                             mojom::blink::ConsoleMessageLevel level,
+                             const String& message) {
+  auto* console_message =
+      MakeGarbageCollected<ConsoleMessage>(source, level, message);
+  console_message->SetNodes(GetDocument().GetFrame(), {GetDomNodeId()});
+  GetDocument().AddConsoleMessage(console_message);
 }
 
 void Node::Trace(Visitor* visitor) const {

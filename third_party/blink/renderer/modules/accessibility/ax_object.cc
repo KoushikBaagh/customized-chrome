@@ -277,24 +277,6 @@ bool IsValidRole(ax::mojom::blink::Role role) {
 }
 #endif
 
-HashSet<ax::mojom::blink::Role> GetExpectedParentRole(
-    ax::mojom::blink::Role role) {
-  switch (role) {
-      // TODO(crbug.com/341369908): Add other roles that have required parents.
-      // kListItem is a special case, handled in
-      // ComputeFinalRoleForSerialization().
-    case ax::mojom::blink::Role::kRow:
-      return {ax::mojom::blink::Role::kTable, ax::mojom::blink::Role::kGrid,
-              ax::mojom::blink::Role::kRowGroup,
-              ax::mojom::blink::Role::kTreeGrid};
-    case ax::mojom::blink::Role::kRowGroup:
-      return {ax::mojom::blink::Role::kTable, ax::mojom::blink::Role::kGrid,
-              ax::mojom::blink::Role::kTreeGrid};
-    default:
-      return {};
-  }
-}
-
 constexpr wtf_size_t kNumRoles =
     static_cast<wtf_size_t>(ax::mojom::blink::Role::kMaxValue) + 1;
 
@@ -1656,7 +1638,7 @@ void AXObject::SerializeInlineTextBoxAttributes(
 void AXObject::SerializeLangAttribute(ui::AXNodeData* node_data) const {
   AXObject* parent = ParentObject();
   if (Language().length()) {
-    // TODO(chrishall): should we still trim redundant languages off here?
+    // Trim redundant languages.
     if (!parent || parent->Language() != Language()) {
       TruncateAndAddStringAttribute(
           node_data, ax::mojom::blink::StringAttribute::kLanguage, Language());
@@ -1746,6 +1728,7 @@ void AXObject::SerializeNameAndDescriptionAttributes(
     node_data->SetNameFrom(
         ax::mojom::blink::NameFrom::kAttributeExplicitlyEmpty);
   } else if (!name.empty()) {
+    DCHECK_NE(name_from, ax::mojom::blink::NameFrom::kProhibited);
     int max_length = node_data->role == ax::mojom::blink::Role::kStaticText
                          ? kMaxStaticTextLength
                          : kMaxStringAttributeLength;
@@ -1755,14 +1738,21 @@ void AXObject::SerializeNameAndDescriptionAttributes(
     AddIntListAttributeFromObjects(
         ax::mojom::blink::IntListAttribute::kLabelledbyIds, name_objects,
         node_data);
+  } else if (name_from == ax::mojom::blink::NameFrom::kProhibited) {
+    DCHECK(name.empty());
+    node_data->SetNameFrom(ax::mojom::blink::NameFrom::kProhibited);
   }
 
   ax::mojom::blink::DescriptionFrom description_from;
   AXObjectVector description_objects;
   String description =
       Description(name_from, description_from, &description_objects);
-  if (!description.empty()) {
-    DCHECK(description_from != ax::mojom::blink::DescriptionFrom::kNone);
+  if (description.empty()) {
+    DCHECK_NE(name_from, ax::mojom::blink::NameFrom::kProhibited)
+        << "Should expose prohibited name as description: " << GetNode();
+  } else {
+    DCHECK_NE(description_from, ax::mojom::blink::DescriptionFrom::kNone)
+        << this << "\n* Description: " << description;
     TruncateAndAddStringAttribute(
         node_data, ax::mojom::blink::StringAttribute::kDescription,
         description);
@@ -2670,7 +2660,7 @@ ax::mojom::blink::Role AXObject::ComputeFinalRoleForSerialization() const {
   // possible to create these internal roles / platform mappings with a listitem
   // (native or ARIA) inside of a doc-bibliography or doc-endnotes section.
   if (role_ == ax::mojom::blink::Role::kListItem) {
-    AXObject* ancestor = ParentObjectUnignoredNonGeneric();
+    AXObject* ancestor = ParentObject();
     if (ancestor && ancestor->RoleValue() == ax::mojom::blink::Role::kList) {
       // Go up to the root, or next list, checking to see if the list item is
       // inside an endnote or bibliography section. If it is, remap the role.
@@ -2687,14 +2677,6 @@ ax::mojom::blink::Role AXObject::ComputeFinalRoleForSerialization() const {
         if (ancestor_role == ax::mojom::blink::Role::kDocEndnotes)
           return ax::mojom::blink::Role::kDocEndnote;
       }
-    } else {
-      // If listitem is not the child of a list, return the native role (CORE
-      // AAM 1.2). If the native role is also listitem, return generic container
-      // (HTML AAM 1.0).
-      ax::mojom::blink::Role native_role = NativeRoleIgnoringAria();
-      return native_role == ax::mojom::blink::Role::kListItem
-                 ? ax::mojom::blink::Role::kGenericContainer
-                 : native_role;
     }
   }
 
@@ -2736,19 +2718,6 @@ ax::mojom::blink::Role AXObject::ComputeFinalRoleForSerialization() const {
         (ancestor.current_->RoleValue() == ax::mojom::blink::Role::kGrid ||
          ancestor.current_->RoleValue() == ax::mojom::blink::Role::kTreeGrid)) {
       return ax::mojom::blink::Role::kGridCell;
-    }
-  }
-
-  // CORE-AAM requires that, for elements with roles not contained in the
-  // required context, user agents must ignore the role token and return the
-  // computed role as if the ignored role token had not been included.
-  // See https://w3c.github.io/core-aam/#roleMappingComputedRole
-  HashSet<ax::mojom::blink::Role> expected_parent_role =
-      GetExpectedParentRole(role_);
-  if (!expected_parent_role.empty()) {
-    AXObject* ancestor = ParentObjectUnignoredNonGeneric();
-    if (!ancestor || !expected_parent_role.Contains(ancestor->RoleValue())) {
-      return NativeRoleIgnoringAria();
     }
   }
 
@@ -3226,7 +3195,9 @@ void AXObject::UpdateCachedAttributeValuesIfNeeded(
 
   // Must be after inert computation, because focusability depends on that, but
   // before the included in tree computation, which depends on focusability.
+  CHECK(!IsDetached());
   cached_can_set_focus_attribute_ = ComputeCanSetFocusAttribute();
+  CHECK(!IsDetached());
 
   // Must be computed before is_used_for_label_or_description computation.
   bool was_included_in_tree = IsIncludedInTree();
@@ -3887,6 +3858,8 @@ bool AXObject::IsExcludedByFormControlsFilter() const {
 }
 
 bool AXObject::ComputeIsIgnoredButIncludedInTree() {
+  CHECK(!IsDetached());
+
   // If an inline text box is ignored, it is never included in the tree.
   if (IsAXInlineTextBox()) {
     return false;
@@ -4005,6 +3978,8 @@ bool AXObject::ComputeIsIgnoredButIncludedInTree() {
   if (element && (element->GetPseudoElement(kPseudoIdBefore) ||
                   element->GetPseudoElement(kPseudoIdAfter) ||
                   element->GetPseudoElement(kPseudoIdMarker) ||
+                  element->GetPseudoElement(kPseudoIdScrollNextButton) ||
+                  element->GetPseudoElement(kPseudoIdScrollPrevButton) ||
                   element->GetPseudoElement(kPseudoIdScrollMarkerGroupBefore) ||
                   element->GetPseudoElement(kPseudoIdScrollMarkerGroupAfter) ||
                   element->GetPseudoElement(kPseudoIdScrollMarker))) {
@@ -4289,11 +4264,14 @@ bool AXObject::IsKeyboardFocusable() const {
   CHECK(!element.NeedsStyleRecalc())
       << "\n* Element: " << element << "\n* Object: " << this
       << "\n* LayoutObject: " << GetLayoutObject();
-  if (!element.IsFocusable(Element::UpdateBehavior::kNoneForAccessibility)) {
-    return false;
+
+  if (element.IsKeyboardFocusable(
+          Element::UpdateBehavior::kNoneForAccessibility)) {
+    DCHECK(element.IsFocusable(Element::UpdateBehavior::kNoneForAccessibility));
+    return true;
   }
-  return element.IsKeyboardFocusable(
-      Element::UpdateBehavior::kNoneForAccessibility);
+
+  return false;
 }
 
 bool AXObject::CanSetSelectedAttribute() const {
@@ -4400,7 +4378,7 @@ String AXObject::SimplifyName(const String& str,
     if (!name_on_prohibited_role_error_shown) {
       name_on_prohibited_role_error_shown = true;  // Reduce console spam.
 #if DCHECK_IS_ON()
-      if (AXObjectCache().IsInternalUICheckerOn()) {
+      if (AXObjectCache().IsInternalUICheckerOn(*this)) {
         DCHECK(false)
             << "A prohibited accessible name was used in chromium web UI:\n"
             << GetProhibitedNameError(str, name_from)
@@ -4419,12 +4397,13 @@ String AXObject::SimplifyName(const String& str,
       }
     }
 
-    // TODO(crbug.com/350528330): Uncomment the following in a future CL.
-    // Prohibited names are repaired by moving them to the description field,
-    // where they will not override the contents of the element for screen
-    // reader users.
-    // name_from = ax::mojom::blink::NameFrom::kProhibited;
-    // return "";
+    if (RuntimeEnabledFeatures::AccessibilityProhibitedNamesEnabled()) {
+      // Prohibited names are repaired by moving them to the description field,
+      // where they will not override the contents of the element for screen
+      // reader users.
+      name_from = ax::mojom::blink::NameFrom::kProhibited;
+      return "";
+    }
   }
 #endif
 
@@ -4453,14 +4432,20 @@ String AXObject::ComputedName(ax::mojom::blink::NameFrom* name_from_out) const {
 }
 
 bool AXObject::IsNameProhibited() const {
-  if (CanSetFocusAttribute()) {
+  if (CanSetFocusAttribute() &&
+      !RuntimeEnabledFeatures::AccessibilityMinRoleTabbableEnabled()) {
     // Make an exception for focusable elements. ATs will likely read the name
     // of a focusable element even if it has the wrong role.
+    // We do not need to do this if/when AccessibilityMinRoleTabbableEnabled
+    // becomes enabled by default, because focusable objects will get a
+    // minimum role of group, which can support an accessible name.
     // TODO(crbug.com/350528330): Test to see whether the following content
-    // works in all screen readers we support, and not, we should return true
-    // here: <div tabindex="0" aria-label="Some label"></div>.
+    // works in all screen readers we support, and if not, we should return true
+    // here: <div tabindex="0" aria-label="Some label"></div>. Either way,
+    // we should still disallow this pattern in Chromium Web UI.
     return false;
   }
+
   // Will not be in platform tree.
   if (IsIgnored()) {
     return false;
@@ -4608,7 +4593,7 @@ bool AXObject::ComputeIsHiddenViaStyle(const ComputedStyle* style) {
 
     // TODO(crbug.com/1286465): It's not consistent to only check
     // IsEnsuredInDisplayNone() on layoutless elements.
-    return GetNode()->IsElementNode() &&
+    return GetNode() && GetNode()->IsElementNode() &&
            (style->IsEnsuredInDisplayNone() ||
             style->Visibility() != EVisibility::kVisible);
   }
@@ -5443,9 +5428,18 @@ ax::mojom::blink::Role AXObject::DetermineAriaRole() const {
   //   <input role="combobox">
   // ax::mojom::blink::Role::kComboBoxMenuButton:
   //   <div tabindex=0 role="combobox">Select</div>
+  // Note: make sure to exclude this aria role if the element is a <select>,
+  // where this role would be redundant and may cause problems for screen
+  // readers.
   if (role == ax::mojom::blink::Role::kComboBoxGrouping) {
     if (IsAtomicTextField()) {
       role = ax::mojom::blink::Role::kTextFieldWithComboBox;
+    } else if (auto* select_element =
+                   DynamicTo<HTMLSelectElement>(*GetNode())) {
+      if (select_element->UsesMenuList() && !select_element->IsMultiple()) {
+        // This is a select element. Don't set the aria role for it.
+        role = ax::mojom::blink::Role::kUnknown;
+      }
     } else if (GetElement() &&
                GetElement()->SupportsFocus(
                    Element::UpdateBehavior::kNoneForAccessibility)) {
@@ -6004,19 +5998,6 @@ AXObject* AXObject::ParentObjectUnignored() const {
   return parent;
 }
 
-AXObject* AXObject::ParentObjectUnignoredNonGeneric() const {
-  AXObject* parent;
-  // Null check for parent is not needed here since the root is never ignored.
-  for (parent = ParentObject();
-       parent->IsIgnored() ||
-       parent->RoleValue() == ax::mojom::blink::Role::kGenericContainer ||
-       parent->RoleValue() == ax::mojom::blink::Role::kNone;
-       parent = parent->ParentObject()) {
-  }
-
-  return parent;
-}
-
 AXObject* AXObject::ParentObjectIncludedInTree() const {
   AXObject* parent;
   for (parent = ParentObject();
@@ -6427,54 +6408,49 @@ LocalFrameView* AXObject::DocumentFrameView() const {
 }
 
 AtomicString AXObject::Language() const {
-  // This method is used when the style engine is either not available on this
-  // object, e.g. for canvas fallback content, or is unable to determine the
-  // document's language. We use the following signals to detect the element's
-  // language, in decreasing priority:
-  // 1. The [language of a node] as defined in HTML, if known.
-  // 2. The list of languages the browser sends in the [Accept-Language] header.
-  // 3. The browser's default language.
-
   const AtomicString& lang = GetAttribute(html_names::kLangAttr);
-  if (!lang.empty())
+  if (!lang.empty()) {
     return lang;
-
-  // Only fallback for the root node, propagating this value down the tree is
-  // handled browser side within AXNode::GetLanguage.
-  //
-  // TODO(chrishall): Consider moving this to AXNodeObject as
-  // the web area node is currently an AXNodeObject.
-  if (IsWebArea()) {
-    const Document* document = GetDocument();
-    if (document) {
-      // Fall back to the first content language specified in the meta tag.
-      // This is not part of what the HTML5 Standard suggests but it still
-      // appears to be necessary.
-      if (document->ContentLanguage()) {
-        const String content_languages = document->ContentLanguage();
-        Vector<String> languages;
-        content_languages.Split(',', languages);
-        if (!languages.empty())
-          return AtomicString(languages[0].StripWhiteSpace());
-      }
-
-      if (document->GetPage()) {
-        // Use the first accept language preference if present.
-        const String accept_languages =
-            document->GetPage()->GetChromeClient().AcceptLanguages();
-        Vector<String> languages;
-        accept_languages.Split(',', languages);
-        if (!languages.empty())
-          return AtomicString(languages[0].StripWhiteSpace());
-      }
-    }
-
-    // As a last resort, return the default language of the browser's UI.
-    AtomicString default_language = DefaultLanguage();
-    return default_language;
   }
 
-  return g_null_atom;
+  // Return early for non-root nodes. The root node's language can't be set by
+  // the author so we need to determine its language below.
+  if (!IsWebArea()) {
+    return g_null_atom;
+  }
+
+  // Return the language of the <html> element if present.
+  const Document* document = GetDocument();
+  DCHECK(document);
+  if (Element* html_element = document->documentElement()) {
+    if (const AtomicString& html_lang =
+            html_element->getAttribute(html_names::kLangAttr)) {
+      return html_lang;
+    }
+  }
+
+  // Fall back to the content language specified in the meta tag.
+  // This is not part of what the HTML5 Standard suggests but it still
+  // appears to be necessary.
+  if (const String languages = document->ContentLanguage()) {
+    String first_language = languages.Substring(0, languages.Find(","));
+    if (!first_language.empty()) {
+      return AtomicString(first_language.StripWhiteSpace());
+    }
+  }
+
+  // Use the first accept language preference if present.
+  if (Page* page = document->GetPage()) {
+    const String languages = page->GetChromeClient().AcceptLanguages();
+    String first_language = languages.Substring(0, languages.Find(","));
+    if (!first_language.empty()) {
+      return AtomicString(first_language.StripWhiteSpace());
+    }
+  }
+
+  // As a last resort, return the default language of the browser's UI.
+  AtomicString default_language = DefaultLanguage();
+  return default_language;
 }
 
 //
@@ -7322,7 +7298,7 @@ bool AXObject::OnNativeScrollToMakeVisibleAction() const {
   PhysicalRect target_rect(layout_object->AbsoluteBoundingBoxRect());
   scroll_into_view_util::ScrollRectToVisible(
       *layout_object, target_rect,
-      ScrollAlignment::CreateScrollIntoViewParams(
+      scroll_into_view_util::CreateScrollIntoViewParams(
           ScrollAlignment::CenterIfNeeded(), ScrollAlignment::CenterIfNeeded(),
           mojom::blink::ScrollType::kProgrammatic, false,
           mojom::blink::ScrollBehavior::kAuto));
@@ -7343,7 +7319,7 @@ bool AXObject::OnNativeScrollToMakeVisibleWithSubFocusAction(
       layout_object->LocalToAbsoluteRect(PhysicalRect(rect));
   scroll_into_view_util::ScrollRectToVisible(
       *layout_object, target_rect,
-      ScrollAlignment::CreateScrollIntoViewParams(
+      scroll_into_view_util::CreateScrollIntoViewParams(
           horizontal_scroll_alignment, vertical_scroll_alignment,
           mojom::blink::ScrollType::kProgrammatic,
           false /* make_visible_in_visual_viewport */,
@@ -7363,7 +7339,7 @@ bool AXObject::OnNativeScrollToGlobalPointAction(
   target_rect.Move(-PhysicalOffset(global_point));
   scroll_into_view_util::ScrollRectToVisible(
       *layout_object, target_rect,
-      ScrollAlignment::CreateScrollIntoViewParams(
+      scroll_into_view_util::CreateScrollIntoViewParams(
           ScrollAlignment::LeftAlways(), ScrollAlignment::TopAlways(),
           mojom::blink::ScrollType::kProgrammatic, false,
           mojom::blink::ScrollBehavior::kAuto));
@@ -7444,24 +7420,6 @@ bool AXObject::OnNativeShowContextMenuAction() {
   }
 
   return true;
-}
-
-// static
-bool AXObject::IsARIAControl(ax::mojom::blink::Role aria_role) {
-  return IsARIAInput(aria_role) ||
-         aria_role == ax::mojom::blink::Role::kButton ||
-         aria_role == ax::mojom::blink::Role::kComboBoxMenuButton ||
-         aria_role == ax::mojom::blink::Role::kSlider;
-}
-
-// static
-bool AXObject::IsARIAInput(ax::mojom::blink::Role aria_role) {
-  return aria_role == ax::mojom::blink::Role::kRadioButton ||
-         aria_role == ax::mojom::blink::Role::kCheckBox ||
-         aria_role == ax::mojom::blink::Role::kTextField ||
-         aria_role == ax::mojom::blink::Role::kSwitch ||
-         aria_role == ax::mojom::blink::Role::kSearchBox ||
-         aria_role == ax::mojom::blink::Role::kTextFieldWithComboBox;
 }
 
 // static
@@ -7783,6 +7741,9 @@ bool AXObject::SupportsNameFromContents(bool recursive) const {
         // affect the final serialized name for this object, but it allows it
         // to contribute to an ancestor name.
         result = true;
+      } else if (!GetElement() || GetElement()->IsInUserAgentShadowRoot()) {
+        // Built-in UI must have correct accessibility without needing repairs.
+        result = false;
       } else if (IsEditable() || GetAOMPropertyOrARIAAttribute(
                                      AOMRelationProperty::kActiveDescendant)) {
         // Handle exceptions:
@@ -7801,6 +7762,19 @@ bool AXObject::SupportsNameFromContents(bool recursive) const {
         result = GetDocument()->FocusedElement() == GetElement() ||
                  GetElement()->IsKeyboardFocusable(
                      Element::UpdateBehavior::kNoneForAccessibility);
+#if DCHECK_IS_ON()
+        // TODO(crbug.com/350528330): Add this check and address focusable
+        // UI elements that are missing a role, or using an improper role.
+        // DCHECK(!result || !AXObjectCache().IsInternalUICheckerOn(*this))
+        //     << "A focusable node lacked proper accessibility markup, "
+        //        "causing a repair situation:"
+        //     << "\n* Is name prohibited: " << IsNameProhibited()
+        //     << "\n* Role: " << RoleValue()
+        //     << "\n* URL: " << GetDocument()->Url()
+        //     << "\n* Outer html: " << GetElement()->outerHTML()
+        //     << "\n* AXObject ancestry:\n"
+        //     << ParentChainToStringHelper(this);
+#endif
       }
       break;
 

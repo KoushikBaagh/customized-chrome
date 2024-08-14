@@ -11,6 +11,7 @@
 #include "base/rand_util.h"
 #include "base/values.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/global_features.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
@@ -27,6 +28,7 @@
 #include "components/prefs/pref_change_registrar.h"
 #include "components/prefs/pref_service.h"
 #include "components/user_education/common/user_education_features.h"
+#include "components/user_education/webui/whats_new_registry.h"
 #include "components/variations/service/variations_service.h"
 #include "url/gurl.h"
 
@@ -51,19 +53,51 @@ void WhatsNewHandler::RecordTimeToLoadContent(base::Time time) {
 
 void WhatsNewHandler::RecordVersionPageLoaded(bool is_auto_open) {
   base::RecordAction(base::UserMetricsAction("UserEducation.WhatsNew.Shown"));
+  base::RecordAction(
+      base::UserMetricsAction("UserEducation.WhatsNew.VersionShown"));
   if (!is_auto_open) {
     base::RecordAction(base::UserMetricsAction(
         "UserEducation.WhatsNew.ShownByManualNavigation"));
   }
 }
 
-void WhatsNewHandler::RecordModuleImpression(const std::string& module_name) {
+void WhatsNewHandler::RecordEditionPageLoaded(const std::string& page_uid,
+                                              bool is_auto_open) {
+  if (user_education::features::IsWhatsNewV2()) {
+    g_browser_process->GetFeatures()->whats_new_registry()->SetEditionUsed(
+        page_uid);
+  }
+
+  base::RecordAction(base::UserMetricsAction("UserEducation.WhatsNew.Shown"));
+
+  base::RecordAction(
+      base::UserMetricsAction("UserEducation.WhatsNew.EditionShown"));
+
+  if (!page_uid.empty()) {
+    std::string action_name = "UserEducation.WhatsNew.EditionShown.";
+    action_name.append(page_uid);
+    base::RecordComputedAction(action_name);
+  }
+
+  if (!is_auto_open) {
+    base::RecordAction(base::UserMetricsAction(
+        "UserEducation.WhatsNew.ShownByManualNavigation"));
+  }
+}
+
+void WhatsNewHandler::RecordModuleImpression(
+    const std::string& module_name,
+    whats_new::mojom::ModulePosition position) {
   base::RecordAction(
       base::UserMetricsAction("UserEducation.WhatsNew.ModuleShown"));
 
   std::string action_name = "UserEducation.WhatsNew.ModuleShown.";
   action_name.append(module_name);
   base::RecordComputedAction(action_name);
+
+  std::string base_histogram_name = "UserEducation.WhatsNew.ModuleShown.";
+  base_histogram_name.append(module_name);
+  base::UmaHistogramEnumeration(action_name, position);
 }
 
 void WhatsNewHandler::RecordExploreMoreToggled(bool expanded) {
@@ -79,13 +113,19 @@ void WhatsNewHandler::RecordTimeOnPage(base::TimeDelta time) {
   base::UmaHistogramMediumTimes("UserEducation.WhatsNew.TimeOnPage", time);
 }
 
-void WhatsNewHandler::RecordModuleLinkClicked(const std::string& module_name) {
+void WhatsNewHandler::RecordModuleLinkClicked(
+    const std::string& module_name,
+    whats_new::mojom::ModulePosition position) {
   base::RecordAction(
       base::UserMetricsAction("UserEducation.WhatsNew.ModuleLinkClicked"));
 
   std::string action_name = "UserEducation.WhatsNew.ModuleLinkClicked.";
   action_name.append(module_name);
   base::RecordComputedAction(action_name);
+
+  std::string base_histogram_name = "UserEducation.WhatsNew.ModuleLinkClicked.";
+  base_histogram_name.append(module_name);
+  base::UmaHistogramEnumeration(action_name, position);
 }
 
 void WhatsNewHandler::GetServerUrl(GetServerUrlCallback callback) {
@@ -159,7 +199,16 @@ void WhatsNewHandler::TryShowHatsSurveyWithTimeout() {
     return;
   }
 
-  if (IsHaTSActivated()) {
+  if (user_education::features::IsWhatsNewV2()) {
+    // V2 survey
+    hats_service->LaunchDelayedSurveyForWebContents(
+        kHatsSurveyTriggerWhatsNewV2, web_contents_,
+        features::kHappinessTrackingSurveysForDesktopWhatsNewV2Time.Get()
+            .InMilliseconds(),
+        /*product_specific_bits_data=*/{},
+        /*product_specific_string_data=*/{},
+        /*navigation_behaviour=*/HatsService::REQUIRE_SAME_ORIGIN);
+  } else if (IsHaTSActivated()) {
     hats_service->LaunchDelayedSurveyForWebContents(
         kHatsSurveyTriggerWhatsNew, web_contents_,
         features::kHappinessTrackingSurveysForDesktopWhatsNewTime.Get()

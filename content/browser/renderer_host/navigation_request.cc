@@ -460,7 +460,7 @@ bool ShouldPropagateUserActivation(const url::Origin& previous_origin,
 }
 
 // LOG_NAVIGATION_TIMING_HISTOGRAM logs |value| for "Navigation.<histogram>" UMA
-// as well as supplementary UMAs (depending on |transition| and |is_background|)
+// as well as supplementary UMAs (depending on |transition| and |priority|)
 // for BackForward/Reload/NewNavigation variants.
 //
 // kMaxTime and kBuckets constants are consistent with
@@ -470,7 +470,7 @@ bool ShouldPropagateUserActivation(const url::Origin& previous_origin,
 // TODO(csharrison,nasko): This macro is incorrect for subframe navigations,
 // which will only have subframe-specific transition types. This means that all
 // subframes currently are tagged as NewNavigations.
-#define LOG_NAVIGATION_TIMING_HISTOGRAM(histogram, transition, is_background, \
+#define LOG_NAVIGATION_TIMING_HISTOGRAM(histogram, transition, priority,      \
                                         duration)                             \
   do {                                                                        \
     const base::TimeDelta kMinTime = base::Milliseconds(1);                   \
@@ -491,8 +491,8 @@ bool ShouldPropagateUserActivation(const url::Origin& previous_origin,
     } else {                                                                  \
       NOTREACHED_IN_MIGRATION() << "Invalid page transition: " << transition; \
     }                                                                         \
-    if (is_background.has_value()) {                                          \
-      if (is_background.value()) {                                            \
+    if (priority.has_value()) {                                               \
+      if (priority.value() == base::Process::Priority::kBestEffort) {         \
         UMA_HISTOGRAM_CUSTOM_TIMES("Navigation." histogram                    \
                                    ".BackgroundProcessPriority",              \
                                    duration, kMinTime, kMaxTime, kBuckets);   \
@@ -507,44 +507,43 @@ bool ShouldPropagateUserActivation(const url::Origin& previous_origin,
 void RecordStartToCommitMetrics(base::TimeTicks navigation_start_time,
                                 ui::PageTransition transition,
                                 const base::TimeTicks& ready_to_commit_time,
-                                std::optional<bool> is_background,
+                                std::optional<base::Process::Priority> priority,
                                 bool is_same_process,
                                 bool is_main_frame) {
   base::TimeTicks now = base::TimeTicks::Now();
   base::TimeDelta delta = now - navigation_start_time;
-  LOG_NAVIGATION_TIMING_HISTOGRAM("StartToCommit", transition, is_background,
-                                  delta);
+  LOG_NAVIGATION_TIMING_HISTOGRAM("StartToCommit", transition, priority, delta);
   if (is_main_frame) {
     LOG_NAVIGATION_TIMING_HISTOGRAM("StartToCommit.MainFrame", transition,
-                                    is_background, delta);
+                                    priority, delta);
   } else {
     LOG_NAVIGATION_TIMING_HISTOGRAM("StartToCommit.Subframe", transition,
-                                    is_background, delta);
+                                    priority, delta);
   }
   if (is_same_process) {
     LOG_NAVIGATION_TIMING_HISTOGRAM("StartToCommit.SameProcess", transition,
-                                    is_background, delta);
+                                    priority, delta);
     if (is_main_frame) {
       LOG_NAVIGATION_TIMING_HISTOGRAM("StartToCommit.SameProcess.MainFrame",
-                                      transition, is_background, delta);
+                                      transition, priority, delta);
     } else {
       LOG_NAVIGATION_TIMING_HISTOGRAM("StartToCommit.SameProcess.Subframe",
-                                      transition, is_background, delta);
+                                      transition, priority, delta);
     }
   } else {
     LOG_NAVIGATION_TIMING_HISTOGRAM("StartToCommit.CrossProcess", transition,
-                                    is_background, delta);
+                                    priority, delta);
     if (is_main_frame) {
       LOG_NAVIGATION_TIMING_HISTOGRAM("StartToCommit.CrossProcess.MainFrame",
-                                      transition, is_background, delta);
+                                      transition, priority, delta);
     } else {
       LOG_NAVIGATION_TIMING_HISTOGRAM("StartToCommit.CrossProcess.Subframe",
-                                      transition, is_background, delta);
+                                      transition, priority, delta);
     }
   }
   if (!ready_to_commit_time.is_null()) {
     LOG_NAVIGATION_TIMING_HISTOGRAM("ReadyToCommitUntilCommit2", transition,
-                                    is_background, now - ready_to_commit_time);
+                                    priority, now - ready_to_commit_time);
   }
 }
 
@@ -610,32 +609,32 @@ void RecordReadyToCommitMetrics(
 
   // TimeToReadyToCommit2
   {
-    constexpr std::optional<bool> kIsBackground = std::nullopt;
+    constexpr std::optional<base::Process::Priority> kPriority = std::nullopt;
     base::TimeDelta delta =
         ready_to_commit_time - common_params.navigation_start;
     ui::PageTransition transition =
         ui::PageTransitionFromInt(common_params.transition);
 
     LOG_NAVIGATION_TIMING_HISTOGRAM("TimeToReadyToCommit2", transition,
-                                    kIsBackground, delta);
+                                    kPriority, delta);
     if (is_main_frame) {
       LOG_NAVIGATION_TIMING_HISTOGRAM("TimeToReadyToCommit2.MainFrame",
-                                      transition, kIsBackground, delta);
+                                      transition, kPriority, delta);
     } else {
       LOG_NAVIGATION_TIMING_HISTOGRAM("TimeToReadyToCommit2.Subframe",
-                                      transition, kIsBackground, delta);
+                                      transition, kPriority, delta);
     }
     if (is_same_process) {
       LOG_NAVIGATION_TIMING_HISTOGRAM("TimeToReadyToCommit2.SameProcess",
-                                      transition, kIsBackground, delta);
+                                      transition, kPriority, delta);
     } else {
       LOG_NAVIGATION_TIMING_HISTOGRAM("TimeToReadyToCommit2.CrossProcess",
-                                      transition, kIsBackground, delta);
+                                      transition, kPriority, delta);
     }
     if (did_receive_early_hints_before_cross_origin_redirect) {
       LOG_NAVIGATION_TIMING_HISTOGRAM(
           "TimeToReadyToCommit2.CrossOriginRedirectAfterEarlyHints", transition,
-          kIsBackground, delta);
+          kPriority, delta);
     }
   }
 
@@ -1392,6 +1391,7 @@ std::unique_ptr<NavigationRequest> NavigationRequest::CreateRendererInitiated(
           /*data_url_as_string=*/std::string(),
 #endif
           /*is_browser_initiated=*/false,
+          /*has_ua_visual_transition*/ false,
           /*document_ukm_source_id=*/ukm::kInvalidSourceId,
           frame_tree_node->pending_frame_policy(),
           /*force_enabled_origin_trials=*/std::vector<std::string>(),
@@ -1540,6 +1540,7 @@ NavigationRequest::CreateForSynchronousRendererCommit(
           /*data_url_as_string=*/std::string(),
 #endif
           /*is_browser_initiated=*/false,
+          /*has_ua_visual_transition*/ false,
           /*document_ukm_source_id=*/ukm::kInvalidSourceId,
           frame_tree_node->pending_frame_policy(),
           /*force_enabled_origin_trials=*/std::vector<std::string>(),
@@ -1706,7 +1707,8 @@ NavigationRequest::NavigationRequest(
               ? std::make_optional(FencedFrameProperties(common_params_->url))
               : std::nullopt),
       embedder_shared_storage_context_(embedder_shared_storage_context),
-      has_ad_auction_headers_attribute_(frame_tree_node->ad_auction_headers()) {
+      has_ad_auction_headers_attribute_(frame_tree_node->ad_auction_headers()),
+      request_method_(common_params_->method) {
   TRACE_EVENT_WITH_FLOW0("navigation", "NavigationRequest::NavigationRequest",
                          TRACE_ID_WITH_SCOPE(kNavigationRequestScope,
                                              TRACE_ID_LOCAL(navigation_id_)),
@@ -1981,8 +1983,11 @@ NavigationRequest::NavigationRequest(
       // sent back to the renderer in the CommitNavigation IPC. The renderer
       // will then send it back with the post body so that we can access it
       // along with the body in FrameNavigationEntry::page_state_.
-      headers.GetHeader(net::HttpRequestHeaders::kContentType,
-                        &commit_params_->post_content_type);
+      if (std::optional<std::string> content_type =
+              headers.GetHeader(net::HttpRequestHeaders::kContentType);
+          content_type) {
+        commit_params_->post_content_type = std::move(content_type).value();
+      }
     }
 
     TopicsHeaderValueResult topics_header_value_result =
@@ -4066,8 +4071,7 @@ UrlInfo NavigationRequest::GetUrlInfo() {
   // Propagate the tentative origin to commit value (for data: URLs that will be
   // rendered) to the UrlInfo, to make sure the nonce remains the same
   // throughout the navigation.
-  if (GetURL().SchemeIs(url::kDataScheme) &&
-      base::FeatureList::IsEnabled(features::kDataUrlsHaveStableNonce)) {
+  if (GetURL().SchemeIs(url::kDataScheme)) {
     // The function for computing the request's origin depends on the stage of
     // the request, but the same opaque nonce value is preserved across both
     // functions for data: URLs.
@@ -5363,13 +5367,38 @@ void NavigationRequest::OnStartChecksComplete(
 
   // Try to create the speculative RFH after sending the network request
   // if DeferSpeculativeRFHCreation is enabled.
+  // Only create the speculative RFH if it is a normal loading rather than
+  // a BFCache restore or prerender activation. Otherwise `OnResponseStarted`
+  // will be called instantly and the creation of the speculative RFH is
+  // redundant.
   if (base::FeatureList::IsEnabled(features::kDeferSpeculativeRFHCreation) &&
       GetAssociatedRFHType() == AssociatedRenderFrameHostType::NONE) {
-    auto rfh_creation_result =
-        frame_tree_node_->render_manager()->GetFrameHostForNavigation(
-            this, &browsing_context_group_swap_);
-    if (rfh_creation_result.has_value()) {
-      SetExpectedProcessIfAssociated();
+    if (features::kCreateSpeculativeRFHFilterRestore.Get() &&
+        loader_type != NavigationURLLoader::LoaderType::kRegular) {
+      return;
+    }
+    auto create_speculative_rfh_task = base::BindOnce(
+        [](base::WeakPtr<NavigationRequest> request) {
+          if (!request || request->state_ >= WILL_PROCESS_RESPONSE ||
+              request->HasRenderFrameHost()) {
+            return;
+          }
+          auto rfh_creation_result =
+              request->frame_tree_node_->render_manager()
+                  ->GetFrameHostForNavigation(
+                      request.get(), &request->browsing_context_group_swap_);
+          if (rfh_creation_result.has_value()) {
+            request->SetExpectedProcessIfAssociated();
+          }
+        },
+        weak_factory_.GetWeakPtr());
+    int delay_ms = features::kCreateSpeculativeRFHDelayMs.Get();
+    if (delay_ms > 0) {
+      GetUIThreadTaskRunner()->PostDelayedTask(
+          FROM_HERE, std::move(create_speculative_rfh_task),
+          base::Milliseconds(delay_ms));
+    } else {
+      std::move(create_speculative_rfh_task).Run();
     }
   }
 }
@@ -6222,6 +6251,37 @@ void NavigationRequest::CommitNavigation() {
     fenced_frame_properties_->SetAllowCrossOriginEventReporting();
   }
 
+  if (base::FeatureList::IsEnabled(
+          blink::features::kFencedFramesSrcPermissionsPolicy)) {
+    std::optional<url::Origin> mapped_origin;
+    if (fenced_frame_properties_.has_value()) {
+      mapped_origin = url::Origin::Create(
+          fenced_frame_properties_->mapped_url()->GetValueIgnoringVisibility());
+    } else if (frame_tree_node_->HasFencedFrameProperties() &&
+               frame_tree_node_->GetFencedFrameProperties()->mapped_url()) {
+      mapped_origin =
+          url::Origin::Create(frame_tree_node_->GetFencedFrameProperties()
+                                  ->mapped_url()
+                                  ->GetValueIgnoringVisibility());
+    }
+
+    // Container policy allowlists are first calculated by the embedder where
+    // origin of the fenced frame is opaque. Now that the mapped URL is known,
+    // update the container policy allowlists so that any allowlist with
+    // "matches_opaque_src=true" points to the final mapped origin. This will be
+    // the container policy that is sent to the inner root to construct the
+    // final permissions policy.
+    if (mapped_origin.has_value()) {
+      for (auto& declaration : commit_params_->frame_policy.container_policy) {
+        if (declaration.matches_opaque_src) {
+          CHECK(!declaration.self_if_matches.has_value());
+          declaration.matches_opaque_src = false;
+          declaration.self_if_matches = mapped_origin.value();
+        }
+      }
+    }
+  }
+
   // Create a view of the fenced frame properties from the perspective of the
   // fenced frame content, which will be sent to its renderer.
   // On each navigation commit within the fenced frame tree:
@@ -6528,6 +6588,16 @@ void NavigationRequest::UpdateNavigationHandleTimingsOnResponseReceived(
     bool is_first_response) {
   base::TimeTicks loader_callback_time = base::TimeTicks::Now();
 
+  const base::TimeDelta domain_lookup_delay =
+      response_head_->load_timing.connect_timing.domain_lookup_end -
+      response_head_->load_timing.connect_timing.domain_lookup_start;
+  const base::TimeDelta connect_delay =
+      response_head_->load_timing.connect_timing.connect_end -
+      response_head_->load_timing.connect_timing.connect_start;
+  const base::TimeDelta ssl_delay =
+      response_head_->load_timing.connect_timing.ssl_end -
+      response_head_->load_timing.connect_timing.ssl_start;
+
   if (is_first_response) {
     DCHECK(navigation_handle_timing_.first_request_start_time.is_null());
     DCHECK(navigation_handle_timing_.first_response_start_time.is_null());
@@ -6537,6 +6607,12 @@ void NavigationRequest::UpdateNavigationHandleTimingsOnResponseReceived(
     navigation_handle_timing_.first_response_start_time =
         response_head_->load_timing.receive_headers_start;
     navigation_handle_timing_.first_loader_callback_time = loader_callback_time;
+
+    navigation_handle_timing_.first_request_domain_lookup_delay =
+        domain_lookup_delay;
+    navigation_handle_timing_.first_request_connect_delay = connect_delay;
+    navigation_handle_timing_.first_request_ssl_delay = ssl_delay;
+
     first_fetch_start_time_ = response_head_->request_start;
   }
 
@@ -6556,6 +6632,10 @@ void NavigationRequest::UpdateNavigationHandleTimingsOnResponseReceived(
   navigation_handle_timing_.final_non_informational_response_start_time =
       response_head_->load_timing.receive_non_informational_headers_start;
   navigation_handle_timing_.final_loader_callback_time = loader_callback_time;
+  navigation_handle_timing_.final_request_domain_lookup_delay =
+      domain_lookup_delay;
+  navigation_handle_timing_.final_request_connect_delay = connect_delay;
+  navigation_handle_timing_.final_request_ssl_delay = ssl_delay;
   final_receive_headers_end_time_ =
       response_head_->load_timing.receive_headers_end;
 
@@ -7607,6 +7687,9 @@ void NavigationRequest::DidCommitNavigation(
   common_params_->url = params.url;
   did_replace_entry_ = did_replace_entry;
   should_update_history_ = params.should_update_history;
+  navigation_handle_timing_.navigation_commit_received_time =
+      params.commit_navigation_start;
+  navigation_handle_timing_.navigation_did_commit_time = base::TimeTicks::Now();
   // A same document navigation with the same url, and no user-gesture is
   // typically the result of 'history.replaceState().' As the page is
   // controlling this, the user doesn't really think of this as a navigation
@@ -7672,12 +7755,12 @@ void NavigationRequest::DidCommitNavigation(
   if (!IsSameDocument() && state_ != DID_COMMIT_ERROR_PAGE) {
     ui::PageTransition transition =
         ui::PageTransitionFromInt(common_params_->transition);
-    std::optional<bool> is_background =
-        GetRenderFrameHost()->GetProcess()->IsProcessBackgrounded();
+    base::Process::Priority priority =
+        GetRenderFrameHost()->GetProcess()->GetPriority();
 
     RecordStartToCommitMetrics(
         common_params_->navigation_start, transition, ready_to_commit_time_,
-        is_background, is_same_process_, frame_tree_node_->IsMainFrame());
+        priority, is_same_process_, frame_tree_node_->IsMainFrame());
   }
 
   DCHECK(!frame_tree_node_->IsMainFrame() || navigation_entry_committed)
@@ -8316,6 +8399,12 @@ bool NavigationRequest::SetNavigationTimeout(base::TimeDelta timeout) {
   return false;
 }
 
+void NavigationRequest::CancelNavigationTimeout() {
+  if (loader_) {
+    loader_->CancelNavigationTimeout();
+  }
+}
+
 void NavigationRequest::SetAllowCookiesFromBrowser(
     bool allow_cookies_from_browser) {
   allow_cookies_from_browser_ = allow_cookies_from_browser;
@@ -8681,6 +8770,10 @@ const NavigationHandleTiming& NavigationRequest::GetNavigationHandleTiming() {
 
 bool NavigationRequest::IsPost() {
   return common_params().method == "POST";
+}
+
+std::string NavigationRequest::GetRequestMethod() {
+  return request_method_;
 }
 
 const blink::mojom::Referrer& NavigationRequest::GetReferrer() {
@@ -9052,10 +9145,7 @@ network::CrossOriginEmbedderPolicy
 NavigationRequest::ComputeCrossOriginEmbedderPolicy() {
   const auto& url = common_params_->url;
   // Fenced Frames should respect the outer frame's COEP.
-  RenderFrameHostImpl* const parent =
-      GetNavigatingFrameType() == FrameType::kFencedFrameRoot
-          ? GetParentFrameOrOuterDocument()
-          : GetParentFrame();
+  RenderFrameHostImpl* const parent = GetParentFrameOrOuterDocument();
   bool is_fenced_frame_from_local_scheme =
       GetNavigatingFrameType() == FrameType::kFencedFrameRoot &&
       (url.SchemeIsBlob() || url.SchemeIs(url::kDataScheme));
@@ -9113,10 +9203,7 @@ bool NavigationRequest::CheckResponseAdherenceToCoep(const GURL& url) {
       policy_container_builder_->FinalPolicies().cross_origin_embedder_policy;
 
   // Fenced Frames should respect the outer frame's COEP.
-  RenderFrameHostImpl* const parent =
-      GetNavigatingFrameType() == FrameType::kFencedFrameRoot
-          ? GetParentFrameOrOuterDocument()
-          : GetParentFrame();
+  RenderFrameHostImpl* const parent = GetParentFrameOrOuterDocument();
 
   // [spec]: 1. If target is not a child browsing context, then return true.
   if (!parent)
@@ -9164,10 +9251,7 @@ NavigationRequest::EnforceCOEP() {
   // https://github.com/shivanigithub/fenced-frame/issues/11
 
   // Fenced frames should be treated as an embedded frame, thus COEP must apply.
-  RenderFrameHostImpl* const parent_frame =
-      GetNavigatingFrameType() == FrameType::kFencedFrameRoot
-          ? GetParentFrameOrOuterDocument()
-          : GetParentFrame();
+  RenderFrameHostImpl* const parent_frame = GetParentFrameOrOuterDocument();
   if (!parent_frame) {
     return std::nullopt;
   }
@@ -9488,7 +9572,7 @@ void NavigationRequest::OnCookiesAccessed(
       for (const net::CookieWithAccessResult& cookie_with_access_result :
            allowed.cookie_access_result_list) {
         if (cookie_with_access_result.cookie.IsHttpOnly()) {
-          http_only_cookie_modification_count += details->count;
+          http_only_cookie_modification_count++;
         }
       }
       if (cookie_change_listener_) {
@@ -10627,8 +10711,7 @@ NavigationRequest::GetOriginForURLLoaderFactoryUncheckedWithDebugInfo() {
   // the nonce from the origin and that of the site URL to match, which will let
   // us uniquely identify the correct data: SiteInstance.
   if (common_params().url.SchemeIs(url::kDataScheme) &&
-      tentative_data_origin_to_commit_.has_value() &&
-      base::FeatureList::IsEnabled(features::kDataUrlsHaveStableNonce)) {
+      tentative_data_origin_to_commit_.has_value()) {
     return std::make_pair(tentative_data_origin_to_commit_.value(),
                           "data: URL");
   }
@@ -10660,8 +10743,7 @@ NavigationRequest::GetOriginForURLLoaderFactoryUncheckedWithDebugInfo() {
       common_params().url,
       common_params().initiator_origin.value_or(url::Origin()));
 
-  if (common_params().url.SchemeIs(url::kDataScheme) &&
-      base::FeatureList::IsEnabled(features::kDataUrlsHaveStableNonce)) {
+  if (common_params().url.SchemeIs(url::kDataScheme)) {
     // Cache the origin for data: URLs, so that its nonce remains stable.
     tentative_data_origin_to_commit_ = resolved_origin;
   }

@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "chromeos/components/kcer/kcer_nss/kcer_token_impl_nss.h"
 
 #include <certdb.h>
@@ -265,8 +270,7 @@ void ImportCertOnWorkerThread(
                             base::expected<void, Error> /*result*/)> callback) {
   net::ScopedCERTCertificateList certs =
       net::x509_util::CreateCERTCertificateListFromBytes(
-          reinterpret_cast<char*>(cert_der->data()), cert_der->size(),
-          net::X509Certificate::FORMAT_AUTO);
+          *cert_der, net::X509Certificate::FORMAT_AUTO);
 
   if (certs.empty() || (certs.size() != 1)) {
     return std::move(callback).Run(
@@ -372,6 +376,9 @@ void ListCertsOnWorkerThread(
   if (cert_list) {
     for (CERTCertListNode* node = CERT_LIST_HEAD(cert_list);
          !CERT_LIST_END(node, cert_list); node = CERT_LIST_NEXT(node)) {
+      if (!CERT_IsUserCert(node->cert)) {
+        continue;
+      }
       result.push_back(net::x509_util::DupCERTCertificate(node->cert));
     }
   }
@@ -931,8 +938,13 @@ scoped_refptr<const Cert> BuildKcerCert(
   Pkcs11Id id_bytes(SECItemToBytes(crypto::MakeNssIdFromSpki(base::make_span(
       nss_cert->derPublicKey.data, nss_cert->derPublicKey.len))));
 
+  std::string nickname;
+  if (nss_cert->nickname) {
+    nickname = nss_cert->nickname;
+  }
+
   return base::MakeRefCounted<Cert>(
-      token, std::move(id_bytes), nss_cert->nickname,
+      token, std::move(id_bytes), std::move(nickname),
       net::x509_util::CreateX509CertificateFromCERTCertificate(nss_cert.get()));
 }
 
@@ -985,7 +997,7 @@ void KcerTokenImplNss::GenerateRsaKey(RsaModulusLength modulus_length_bits,
                                       Kcer::GenerateKeyCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   }
   if (is_blocked_) {
@@ -1011,7 +1023,7 @@ void KcerTokenImplNss::GenerateEcKey(EllipticCurve curve,
                                      Kcer::GenerateKeyCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   } else if (is_blocked_) {
     return task_queue_.push_back(base::BindOnce(
@@ -1035,7 +1047,7 @@ void KcerTokenImplNss::ImportKey(
     Kcer::ImportKeyCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   } else if (is_blocked_) {
     return task_queue_.push_back(base::BindOnce(
@@ -1059,7 +1071,7 @@ void KcerTokenImplNss::ImportCertFromBytes(CertDer cert_der,
                                            Kcer::StatusCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   }
   if (is_blocked_) {
@@ -1093,7 +1105,7 @@ void KcerTokenImplNss::ImportPkcs12Cert(Pkcs12Blob pkcs12_blob,
                                         Kcer::StatusCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   }
   if (is_blocked_) {
@@ -1168,7 +1180,7 @@ void KcerTokenImplNss::RemoveKeyAndCerts(PrivateKeyHandle key,
                                          Kcer::StatusCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   }
   if (is_blocked_) {
@@ -1197,7 +1209,7 @@ void KcerTokenImplNss::RemoveCert(scoped_refptr<const Cert> cert,
                                   Kcer::StatusCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   } else if (is_blocked_) {
     return task_queue_.push_back(base::BindOnce(
@@ -1224,7 +1236,7 @@ void KcerTokenImplNss::RemoveCert(scoped_refptr<const Cert> cert,
 void KcerTokenImplNss::ListKeys(TokenListKeysCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   } else if (is_blocked_) {
     return task_queue_.push_back(base::BindOnce(&KcerTokenImplNss::ListKeys,
@@ -1246,7 +1258,7 @@ void KcerTokenImplNss::ListKeys(TokenListKeysCallback callback) {
 void KcerTokenImplNss::ListCerts(TokenListCertsCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   }
   if (is_blocked_) {
@@ -1264,7 +1276,7 @@ void KcerTokenImplNss::DoesPrivateKeyExist(
     Kcer::DoesKeyExistCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   } else if (is_blocked_) {
     return task_queue_.push_back(base::BindOnce(
@@ -1289,7 +1301,7 @@ void KcerTokenImplNss::Sign(PrivateKeyHandle key,
                             Kcer::SignCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   }
   if (is_blocked_) {
@@ -1315,7 +1327,7 @@ void KcerTokenImplNss::SignRsaPkcs1Raw(PrivateKeyHandle key,
                                        Kcer::SignCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   }
   if (is_blocked_) {
@@ -1339,7 +1351,7 @@ void KcerTokenImplNss::SignRsaPkcs1Raw(PrivateKeyHandle key,
 void KcerTokenImplNss::GetTokenInfo(Kcer::GetTokenInfoCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   }
   if (is_blocked_) {
@@ -1363,7 +1375,7 @@ void KcerTokenImplNss::GetKeyInfo(PrivateKeyHandle key,
                                   Kcer::GetKeyInfoCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   } else if (is_blocked_) {
     return task_queue_.push_back(base::BindOnce(
@@ -1387,7 +1399,7 @@ void KcerTokenImplNss::GetKeyPermissions(
     Kcer::GetKeyPermissionsCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   } else if (is_blocked_) {
     return task_queue_.push_back(base::BindOnce(
@@ -1412,7 +1424,7 @@ void KcerTokenImplNss::GetCertProvisioningProfileId(
     Kcer::GetCertProvisioningProfileIdCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   } else if (is_blocked_) {
     return task_queue_.push_back(base::BindOnce(
@@ -1437,7 +1449,7 @@ void KcerTokenImplNss::SetKeyNickname(PrivateKeyHandle key,
                                       Kcer::StatusCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   } else if (is_blocked_) {
     return task_queue_.push_back(base::BindOnce(
@@ -1462,7 +1474,7 @@ void KcerTokenImplNss::SetKeyPermissions(PrivateKeyHandle key,
                                          Kcer::StatusCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   } else if (is_blocked_) {
     return task_queue_.push_back(base::BindOnce(
@@ -1489,7 +1501,7 @@ void KcerTokenImplNss::SetCertProvisioningProfileId(
     Kcer::StatusCallback callback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
-  if (UNLIKELY(state_ == State::kInitializationFailed)) {
+  if (state_ == State::kInitializationFailed) [[unlikely]] {
     return HandleInitializationFailed(std::move(callback));
   } else if (is_blocked_) {
     return task_queue_.push_back(
@@ -1601,8 +1613,8 @@ void KcerTokenImplNss::UpdateCacheWithCerts(
   // For every cert that was found, either take it from the previous cache or
   // create a kcer::Cert object for it.
   for (const net::ScopedCERTCertificate& new_cert : new_certs) {
-    const base::span<const uint8_t> cert_span(new_cert->derCert.data,
-                                              new_cert->derCert.len);
+    const base::span<const uint8_t> cert_span(
+        net::x509_util::CERTCertificateAsSpan(new_cert.get()));
     scoped_refptr<const Cert> cert = cert_cache_.FindCert(cert_span);
     if (!cert) {
       cert = BuildKcerCert(token_, new_cert);
@@ -1637,7 +1649,7 @@ void KcerTokenImplNss::SetAttributeTranslationForTesting(bool is_enabled) {
 
 KeyPermissionsAttributeId KcerTokenImplNss::GetKeyPermissionsAttributeId()
     const {
-  if (UNLIKELY(translate_attributes_for_testing_)) {
+  if (translate_attributes_for_testing_) [[unlikely]] {
     CHECK_IS_TEST();
     return KeyPermissionsAttributeId(CKA_END_DATE);
   }
@@ -1647,7 +1659,7 @@ KeyPermissionsAttributeId KcerTokenImplNss::GetKeyPermissionsAttributeId()
 
 CertProvisioningIdAttributeId
 KcerTokenImplNss::GetCertProvisioningIdAttributeId() const {
-  if (UNLIKELY(translate_attributes_for_testing_)) {
+  if (translate_attributes_for_testing_) [[unlikely]] {
     CHECK_IS_TEST();
     return CertProvisioningIdAttributeId(CKA_START_DATE);
   }

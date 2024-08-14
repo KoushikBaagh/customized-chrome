@@ -115,12 +115,12 @@ const char kAudioCapturerWithEchoCancellation[] =
     "audio-capturer-with-echo-cancellation";
 #endif  // BUILDFLAG(IS_FUCHSIA)
 
-#if defined(USE_CRAS)
+#if BUILDFLAG(USE_CRAS)
 // Use CRAS, the ChromeOS audio server.
 const char kUseCras[] = "use-cras";
 // Enforce system audio echo cancellation.
 const char kSystemAecEnabled[] = "system-aec-enabled";
-#endif  // defined(USE_CRAS)
+#endif  // BUILDFLAG(USE_CRAS)
 
 // For automated testing of protected content, this switch allows specific
 // domains (e.g. example.com) to always allow the permission to share the
@@ -837,21 +837,17 @@ BASE_FEATURE(kVaapiVp9SModeHWEncoding,
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif  // defined(ARCH_CPU_X86_FAMILY) && BUILDFLAG(IS_CHROMEOS)
 #if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX)
-// Enables the new V4L2 flat video decoder clients instead of V4L2VideoDecoder.
-// Owners: frkoenig@chromium.org, mcasas@chromium.org
-// Expiry: When flat decoders are supported on all platforms and the legacy
-//         decoders have been deprecated.
-BASE_FEATURE(kV4L2FlatVideoDecoder,
-             "V4L2FlatVideoDecoder",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Enables the new V4L2StatefulVideoDecoder instead of V4L2VideoDecoder.
 // Owners: frkoenig@chromium.org, mcasas@chromium.org
-// Expiry: When the |V4L2FlatVideoDecoder| flag handles both stateful and
-//         stateless decoders.
+// Expiry: When the |V4L2FlatVideoDecoder| flag handles stateful decoding on
+// all platforms.
 BASE_FEATURE(kV4L2FlatStatefulVideoDecoder,
              "V4L2FlatStatefulVideoDecoder",
              base::FEATURE_ENABLED_BY_DEFAULT);
+// Enable H264 temporal layer encoding with V4L2 HW encoder on ChromeOS.
+BASE_FEATURE(kV4L2H264TemporalLayerHWEncoding,
+             "V4L2H264TemporalLayerHWEncoding",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
 // Inform video blitter of video color space.
@@ -905,6 +901,12 @@ BASE_FEATURE(kExternalClearKeyForTesting,
 // Specifies the path to the MediaFoundation Clear Key CDM for testing.
 const base::FeatureParam<std::string> kMediaFoundationClearKeyCdmPathForTesting{
     &kExternalClearKeyForTesting, "media_foundation_cdm_path", ""};
+
+// Enables the use of a faulty GPU for MediaFoundation. This is used for testing
+// purposes only.
+BASE_FEATURE(kEnableFaultyGPUForMediaFoundation,
+             "EnableFaultyGPUForMediaFoundation",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_WIN)
 
 // Enables the On-Device Web Speech feature on supported devices.
@@ -1119,6 +1121,17 @@ BASE_FEATURE(kAVDColorSpaceChanges,
              "AVDColorSpaceChanges",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Whether FFmpeg supports decoding H.264 video in software. Has no effect if
+// BUILDFLAG(ENABLE_FFMPEG_VIDEO_DECODERS) is false.
+BASE_FEATURE(kBuiltInH264Decoder,
+             "BuiltInH264Decoder",
+#if BUILDFLAG(IS_ANDROID) || !BUILDFLAG(ENABLE_FFMPEG_VIDEO_DECODERS)
+             base::FEATURE_DISABLED_BY_DEFAULT
+#else
+             base::FEATURE_ENABLED_BY_DEFAULT
+#endif
+);
+
 #if BUILDFLAG(IS_ANDROID)
 // Should we allow video playback to use an overlay if it's not needed for
 // security?  Normally, we'd always want to allow this, except as part of the
@@ -1171,11 +1184,6 @@ BASE_FEATURE(kMediaDrmGetStatusForPolicy,
              "MediaDrmGetStatusForPolicy",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables CanPlayType() (and other queries) for HLS MIME types. Note that
-// disabling this also causes navigation to .m3u8 files to trigger downloading
-// instead of playback.
-BASE_FEATURE(kCanPlayHls, "CanPlayHls", base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables the use of MediaPlayerRenderer for HLS playback. When disabled,
 // HLS manifests will fail to load (triggering source fallback or load error).
 BASE_FEATURE(kHlsPlayer, "HlsPlayer", base::FEATURE_ENABLED_BY_DEFAULT);
@@ -1206,6 +1214,13 @@ BASE_FEATURE(kUsePooledSharedImageVideoProvider,
 BASE_FEATURE(kAllowMediaCodecSoftwareDecoder,
              "AllowMediaCodecSoftwareDecoder",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// This feature allows for some MediaDrm functions to be executed in a separate
+// process so that crashes do not bring down the browser. Flag is available so
+// that it can be disabled for WebView as separate processes are not allowed.
+BASE_FEATURE(kAllowMediaCodecCallsInSeparateProcess,
+             "AllowMediaCodecCallsInSeparateProcess",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -1240,17 +1255,6 @@ BASE_FEATURE(kChromeOSHWVBREncoding,
              base::FEATURE_DISABLED_BY_DEFAULT
 #endif
 );
-
-#if !BUILDFLAG(USE_VAAPI)
-// Enable the hardware-accelerated direct video decoder instead of the one
-// needing the VdaVideoDecoder adapter. This flag is used mainly as a
-// chrome:flag for developers debugging issues as well as to be able to
-// experiment with direct VideoDecoder path on Linux Desktop.
-// TODO(b/159825227): remove when the direct video decoder is fully launched.
-BASE_FEATURE(kUseChromeOSDirectVideoDecoder,
-             "UseChromeOSDirectVideoDecoder",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-#endif  // !BUILDFLAG(USE_VAAPI)
 
 // Limit the number of concurrent hardware decoder instances on ChromeOS.
 BASE_FEATURE(kLimitConcurrentDecoderInstances,
@@ -1310,15 +1314,6 @@ BASE_FEATURE(kEnableArmHwdrm,
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(USE_CHROMEOS_PROTECTED_MEDIA)
 #endif  // defined(ARCH_CPU_ARM_FAMILY)
-#if BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(USE_VAAPI)
-// ChromeOS has one of two VideoDecoder implementations active based on
-// SoC/board specific configurations that are sent via command line flags. This
-// switch allows using the non default implementation for testing.
-// TODO(b/159825227): remove when the "old" video decoder is fully launched.
-BASE_FEATURE(kUseAlternateVideoDecoderImplementation,
-             "UseAlternateVideoDecoderImplementation",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif  // BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(USE_VAAPI)
 #endif  // BUILDFLAG(USE_CHROMEOS_MEDIA_ACCELERATION)
 
 #if BUILDFLAG(IS_WIN)

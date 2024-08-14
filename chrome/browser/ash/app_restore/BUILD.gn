@@ -46,6 +46,8 @@ static_library("app_restore") {
     "//ash/components/arc/mojom",
     "//ash/public/cpp",
     "//base",
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/ash/scheduler_config",
     "//chrome/browser/profiles:profile",
     "//chrome/common:buildflags",
     "//chromeos/ash/components/dbus/resourced",
@@ -89,6 +91,7 @@ static_library("app_restore") {
     "//chrome/browser/ash/crosapi:browser_util",
     "//chrome/browser/ash/login/demo_mode",
     "//chrome/browser/ash/login/session",
+    "//chrome/browser/ash/policy/scheduled_task_handler",
     "//chrome/browser/ash/profiles",
     "//chrome/browser/chromeos/full_restore",
     "//chrome/browser/web_applications",
@@ -128,6 +131,7 @@ static_library("app_restore") {
     "//chrome/browser/ash/arc/window_predictor",
     "//chrome/browser/ash/login/demo_mode",
     "//chrome/browser/ash/login/session",
+    "//chrome/browser/ash/policy/scheduled_task_handler",
   ]
 }
 
@@ -152,7 +156,7 @@ static_library("test_support") {
     "//chrome/browser/ash/arc",
     "//chrome/browser/ash/arc/session",
     "//chrome/browser/profiles:profile",
-    "//chrome/browser/ui",
+    "//chrome/browser/ui/ash/shelf/app_service",
     "//components/app_restore",
     "//components/exo",
     "//content/test:test_support",
@@ -261,8 +265,8 @@ source_set("unit_tests") {
     "//chrome/browser",
     "//chrome/browser/apps/app_service",
     "//chrome/browser/ash",
-    "//chrome/browser/ash:test_support",
     "//chrome/browser/ash/arc/window_predictor",
+    "//chrome/browser/ash/login/users:test_support",
     "//chrome/common:constants",
     "//chrome/common:non_code_constants",
     "//chrome/test:test_support",

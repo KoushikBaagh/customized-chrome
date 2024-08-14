@@ -17,6 +17,7 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.Px;
 import androidx.annotation.VisibleForTesting;
 import androidx.browser.customtabs.CustomTabsIntent;
@@ -24,6 +25,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.chromium.base.IntentUtils;
+import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.blink.mojom.RpContext;
 import org.chromium.blink.mojom.RpMode;
 import org.chromium.chrome.browser.IntentHandler;
@@ -33,6 +35,7 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.ui.android.webid.data.Account;
 import org.chromium.chrome.browser.ui.android.webid.data.ClientIdMetadata;
 import org.chromium.chrome.browser.ui.android.webid.data.IdentityCredentialTokenError;
+import org.chromium.chrome.browser.ui.android.webid.data.IdentityProviderData;
 import org.chromium.chrome.browser.ui.android.webid.data.IdentityProviderMetadata;
 import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerItemDecoration;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
@@ -107,7 +110,10 @@ public class AccountSelectionCoordinator
         // Setup the bottom sheet content view.
         mBottomSheetContent =
                 new AccountSelectionBottomSheetContent(
-                        contentView, mSheetItemListView::computeVerticalScrollOffset, rpMode);
+                        contentView,
+                        mBottomSheetController,
+                        mSheetItemListView::computeVerticalScrollOffset,
+                        rpMode);
 
         ImageFetcher imageFetcher =
                 ImageFetcherFactory.createImageFetcher(
@@ -119,7 +125,10 @@ public class AccountSelectionCoordinator
         @Px
         int avatarSize =
                 context.getResources()
-                        .getDimensionPixelSize(R.dimen.account_selection_account_avatar_size);
+                        .getDimensionPixelSize(
+                                rpMode == RpMode.BUTTON
+                                        ? R.dimen.account_selection_button_mode_sheet_avatar_size
+                                        : R.dimen.account_selection_account_avatar_size);
         mMediator =
                 new AccountSelectionMediator(
                         tab,
@@ -202,7 +211,8 @@ public class AccountSelectionCoordinator
             ClientIdMetadata clientMetadata,
             boolean isAutoReauthn,
             @RpContext.EnumType int rpContext,
-            boolean requestPermission) {
+            boolean requestPermission,
+            @Nullable IdentityProviderData newAccountsIdp) {
         mMediator.showAccounts(
                 rpEtldPlusOne,
                 idpEtldPlusOne,
@@ -211,7 +221,8 @@ public class AccountSelectionCoordinator
                 clientMetadata,
                 isAutoReauthn,
                 rpContext,
-                requestPermission);
+                requestPermission,
+                newAccountsIdp);
     }
 
     @Override
@@ -356,7 +367,12 @@ public class AccountSelectionCoordinator
     }
 
     @Override
-    public void onActivityDestroyed() {}
+    public void onActivityDestroyed() {
+        // The observer is only registered while the popup is being
+        // shown, so we can just unconditionally record this histogram.
+        RecordHistogram.recordBooleanHistogram(
+                "Blink.FedCm.Android.ActivityDestroyedWhileCctShown", true);
+    }
 
     @VisibleForTesting
     AccountSelectionMediator getMediator() {

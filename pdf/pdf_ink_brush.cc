@@ -21,7 +21,7 @@ namespace chrome_pdf {
 namespace {
 
 std::string CreateBrushUri() {
-  // TODO(crbug.com/335524380): Use real value here.
+  // TODO(crbug.com/353942923): Use real value here.
   return "ink://ink/texture:test-texture";
 }
 
@@ -38,7 +38,7 @@ std::unique_ptr<InkBrush> CreateInkBrush(PdfInkBrush::Type type,
                                          PdfInkBrush::Params params) {
   CHECK_GT(params.size, 0);
 
-  // TODO(crbug.com/335524380): Use real values here.
+  // TODO(crbug.com/353942923): Use real values here.
   InkBrushTip tip;
   tip.corner_rounding = 0;
   tip.opacity_multiplier = GetOpacity(type);
@@ -91,6 +91,12 @@ std::optional<PdfInkBrush::Type> PdfInkBrush::StringToType(
   return std::nullopt;
 }
 
+// static
+void PdfInkBrush::CheckToolSizeIsInRange(float size) {
+  CHECK_GE(size, 1);
+  CHECK_LE(size, 16);
+}
+
 PdfInkBrush::PdfInkBrush(Type brush_type, Params brush_params)
     : ink_brush_(CreateInkBrush(brush_type, brush_params)) {
   CHECK(ink_brush_);
@@ -102,8 +108,6 @@ const InkBrush& PdfInkBrush::GetInkBrush() const {
   return *ink_brush_;
 }
 
-// Determine the area to invalidate encompassing a line between two
-// consecutive points where a brush is applied.
 gfx::Rect PdfInkBrush::GetInvalidateArea(const gfx::PointF& center1,
                                          const gfx::PointF& center2) const {
   // For a line connecting `center1` to `center2`, the invalidate

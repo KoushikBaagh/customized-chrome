@@ -27,12 +27,13 @@ constexpr int kNavEntryId = 10;
 class AutofillSaveCardInfoBarDelegateTest : public PlatformTest {
  public:
   void LocalSaveCardPromptCallbackFn(
-      AutofillClient::SaveCardOfferUserDecision user_decision) {
+      payments::PaymentsAutofillClient::SaveCardOfferUserDecision
+          user_decision) {
     last_user_decision_ = user_decision;
   }
 
   void UploadSaveCardPromptCallbackFn(
-      AutofillClient::SaveCardOfferUserDecision user_decision,
+      payments::PaymentsAutofillClient::SaveCardOfferUserDecision user_decision,
       const AutofillClient::UserProvidedCardDetails&
           user_provided_card_details) {
     last_user_decision_ = user_decision;
@@ -60,9 +61,11 @@ class AutofillSaveCardInfoBarDelegateTest : public PlatformTest {
   std::unique_ptr<AutofillSaveCardInfoBarDelegateIOS> CreateDelegate(
       absl::variant<
           payments::PaymentsAutofillClient::LocalSaveCardPromptCallback,
-          AutofillClient::UploadSaveCardPromptCallback> save_card_callback) {
+          payments::PaymentsAutofillClient::UploadSaveCardPromptCallback>
+          save_card_callback) {
     auto save_card_delegate = std::make_unique<AutofillSaveCardDelegate>(
-        std::move(save_card_callback), AutofillClient::SaveCreditCardOptions());
+        std::move(save_card_callback),
+        payments::PaymentsAutofillClient::SaveCreditCardOptions());
     return std::make_unique<AutofillSaveCardInfoBarDelegateIOS>(
         AutofillSaveCardUiInfo(), std::move(save_card_delegate));
   }
@@ -77,7 +80,8 @@ class AutofillSaveCardInfoBarDelegateTest : public PlatformTest {
       .is_form_submission = false,
       .has_user_gesture = true};
   std::unique_ptr<AutofillSaveCardInfoBarDelegateIOS> delegate_;
-  std::optional<AutofillClient::SaveCardOfferUserDecision> last_user_decision_;
+  std::optional<payments::PaymentsAutofillClient::SaveCardOfferUserDecision>
+      last_user_decision_;
   std::optional<AutofillClient::UserProvidedCardDetails>
       last_user_provided_card_details_;
   std::optional<bool> card_saved_;
@@ -99,15 +103,17 @@ TEST_F(AutofillSaveCardInfoBarDelegateTest, UpdateAndAccept_Local) {
       /*expiration_date_year=*/u"24"));
 
   ASSERT_TRUE(last_user_decision_);
-  EXPECT_EQ(AutofillClient::SaveCardOfferUserDecision::kAccepted,
-            last_user_decision_);
+  EXPECT_EQ(
+      payments::PaymentsAutofillClient::SaveCardOfferUserDecision::kAccepted,
+      last_user_decision_);
 }
 
 // Tests that the user decision is propagated when accepting upload.
 TEST_F(AutofillSaveCardInfoBarDelegateTest, UpdateAndAccept_Upload) {
-  AutofillClient::UploadSaveCardPromptCallback callback = base::BindOnce(
-      &AutofillSaveCardInfoBarDelegateTest::UploadSaveCardPromptCallbackFn,
-      base::Unretained(this));
+  payments::PaymentsAutofillClient::UploadSaveCardPromptCallback callback =
+      base::BindOnce(
+          &AutofillSaveCardInfoBarDelegateTest::UploadSaveCardPromptCallbackFn,
+          base::Unretained(this));
   std::unique_ptr<AutofillSaveCardInfoBarDelegateIOS> delegate =
       CreateDelegate(std::move(callback));
 
@@ -121,8 +127,9 @@ TEST_F(AutofillSaveCardInfoBarDelegateTest, UpdateAndAccept_Upload) {
       /*expiration_date_year=*/expiration_date_year));
 
   ASSERT_TRUE(last_user_decision_ && last_user_provided_card_details_);
-  EXPECT_EQ(AutofillClient::SaveCardOfferUserDecision::kAccepted,
-            last_user_decision_);
+  EXPECT_EQ(
+      payments::PaymentsAutofillClient::SaveCardOfferUserDecision::kAccepted,
+      last_user_decision_);
   EXPECT_THAT(
       *last_user_provided_card_details_,
       ::testing::FieldsAre(/*cardholder_name=*/cardholder_name,
@@ -137,9 +144,10 @@ TEST_F(AutofillSaveCardInfoBarDelegateTest,
   feature_list_.InitAndEnableFeature(
       autofill::features::kAutofillEnableSaveCardLoadingAndConfirmation);
 
-  AutofillClient::UploadSaveCardPromptCallback callback = base::BindOnce(
-      &AutofillSaveCardInfoBarDelegateTest::UploadSaveCardPromptCallbackFn,
-      base::Unretained(this));
+  payments::PaymentsAutofillClient::UploadSaveCardPromptCallback callback =
+      base::BindOnce(
+          &AutofillSaveCardInfoBarDelegateTest::UploadSaveCardPromptCallbackFn,
+          base::Unretained(this));
   std::unique_ptr<AutofillSaveCardInfoBarDelegateIOS> delegate =
       CreateDelegate(std::move(callback));
 
@@ -149,11 +157,7 @@ TEST_F(AutofillSaveCardInfoBarDelegateTest,
                              CreditCardUploadCompletionCallbackFn,
                          base::Unretained(this));
 
-  delegate->UpdateAndAccept(
-      /*cardholder_name=*/u"",
-      /*expiration_date_month=*/u"",
-      /*expiration_date_year=*/u"",
-      /*credit_card_upload_completion_callback=*/
+  delegate->SetCreditCardUploadCompletionCallback(
       std::move(credit_card_upload_completion_callback));
 
   delegate->CreditCardUploadCompleted(
@@ -168,9 +172,10 @@ TEST_F(AutofillSaveCardInfoBarDelegateTest,
   feature_list_.InitAndEnableFeature(
       autofill::features::kAutofillEnableSaveCardLoadingAndConfirmation);
 
-  AutofillClient::UploadSaveCardPromptCallback callback = base::BindOnce(
-      &AutofillSaveCardInfoBarDelegateTest::UploadSaveCardPromptCallbackFn,
-      base::Unretained(this));
+  payments::PaymentsAutofillClient::UploadSaveCardPromptCallback callback =
+      base::BindOnce(
+          &AutofillSaveCardInfoBarDelegateTest::UploadSaveCardPromptCallbackFn,
+          base::Unretained(this));
   std::unique_ptr<AutofillSaveCardInfoBarDelegateIOS> delegate =
       CreateDelegate(std::move(callback));
 
@@ -180,16 +185,37 @@ TEST_F(AutofillSaveCardInfoBarDelegateTest,
                              CreditCardUploadCompletionCallbackFn,
                          base::Unretained(this));
 
-  delegate->UpdateAndAccept(
-      /*cardholder_name=*/u"",
-      /*expiration_date_month=*/u"",
-      /*expiration_date_year=*/u"",
-      /*credit_card_upload_completion_callback=*/
+  delegate->SetCreditCardUploadCompletionCallback(
       std::move(credit_card_upload_completion_callback));
 
   delegate->CreditCardUploadCompleted(
       /*card_saved=*/false, /*on_confirmation_closed_callback=*/std::nullopt);
   EXPECT_FALSE(card_saved_.value());
+}
+
+// Tests that CreditCardUploadCompleted() runs
+// `on_confirmation_closed_callback_` when infobar is not presenting.
+TEST_F(AutofillSaveCardInfoBarDelegateTest,
+       CreditCardUploadCompleted_InfobarNotPresenting) {
+  feature_list_.InitAndEnableFeature(
+      autofill::features::kAutofillEnableSaveCardLoadingAndConfirmation);
+
+  payments::PaymentsAutofillClient::UploadSaveCardPromptCallback callback =
+      base::BindOnce(
+          &AutofillSaveCardInfoBarDelegateTest::UploadSaveCardPromptCallbackFn,
+          base::Unretained(this));
+  std::unique_ptr<AutofillSaveCardInfoBarDelegateIOS> delegate =
+      CreateDelegate(std::move(callback));
+
+  delegate->SetInfobarIsPresenting(false);
+
+  delegate->CreditCardUploadCompleted(
+      /*card_saved=*/true, /*on_confirmation_closed_callback=*/base::BindOnce(
+          &AutofillSaveCardInfoBarDelegateTest::OnConfirmationClosedCallbackFn,
+          base::Unretained(this)));
+
+  EXPECT_FALSE(card_saved_.has_value());
+  EXPECT_TRUE(ran_on_confirmation_closed_callback_);
 }
 
 // Tests that `OnConfirmationClosed()` runs
@@ -198,8 +224,9 @@ TEST_F(AutofillSaveCardInfoBarDelegateTest, OnConfirmationClosedCallbackSet) {
   feature_list_.InitAndEnableFeature(
       autofill::features::kAutofillEnableSaveCardLoadingAndConfirmation);
 
-  std::unique_ptr<AutofillSaveCardInfoBarDelegateIOS> delegate =
-      CreateDelegate(static_cast<AutofillClient::UploadSaveCardPromptCallback>(
+  std::unique_ptr<AutofillSaveCardInfoBarDelegateIOS> delegate = CreateDelegate(
+      static_cast<
+          payments::PaymentsAutofillClient::UploadSaveCardPromptCallback>(
           base::DoNothing()));
 
   delegate->CreditCardUploadCompleted(
@@ -218,8 +245,9 @@ TEST_F(AutofillSaveCardInfoBarDelegateTest,
   feature_list_.InitAndEnableFeature(
       autofill::features::kAutofillEnableSaveCardLoadingAndConfirmation);
 
-  std::unique_ptr<AutofillSaveCardInfoBarDelegateIOS> delegate =
-      CreateDelegate(static_cast<AutofillClient::UploadSaveCardPromptCallback>(
+  std::unique_ptr<AutofillSaveCardInfoBarDelegateIOS> delegate = CreateDelegate(
+      static_cast<
+          payments::PaymentsAutofillClient::UploadSaveCardPromptCallback>(
           base::DoNothing()));
 
   // `on_confirmation_closed_callback_` doesn't hold a value when

@@ -37,6 +37,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/bind.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/simple_test_tick_clock.h"
 #include "build/build_config.h"
@@ -97,6 +98,8 @@ namespace ash {
 
 namespace {
 
+const char* kChromeVoxPerformCommandMetric =
+    "Accessibility.ChromeVox.PerformCommand";
 const double kExpectedPhoneticSpeechAndHintDelayMS = 1000;
 
 }  // namespace
@@ -364,7 +367,7 @@ IN_PROC_BROWSER_TEST_F(LoggedInSpokenFeedbackTest, LearnModeHardwareKeys) {
   sm_.Call([this]() { SendKeyPress(ui::VKEY_F4); });
   sm_.ExpectSpeech("toggle full screen");
   sm_.Call([this]() { SendKeyPress(ui::VKEY_F5); });
-  sm_.ExpectSpeech("window overview");
+  sm_.ExpectSpeech("show windows");
   sm_.Call([this]() { SendKeyPress(ui::VKEY_F6); });
   sm_.ExpectSpeech("Brightness down");
   sm_.Call([this]() { SendKeyPress(ui::VKEY_F7); });
@@ -442,6 +445,44 @@ IN_PROC_BROWSER_TEST_F(LoggedInSpokenFeedbackTest, OpenLogPage) {
   });
   sm_.ExpectSpeech("chromevox-log");
   sm_.Replay();
+}
+
+IN_PROC_BROWSER_TEST_F(LoggedInSpokenFeedbackTest,
+                       CheckChromeVoxPerformCommandMetric) {
+  EnableChromeVox(/*check_for_intro=*/false);
+  base::HistogramTester histogram_tester;
+
+  // Command.ANNOUNCE_BATTERY_DESCRIPTION
+  sm_.Call(
+      [this]() { ExecuteCommandHandlerCommand("announceBatteryDescription"); });
+  sm_.ExpectSpeechPattern("*");
+  // Command.NEXT_OBJECT
+  sm_.Call([this]() { ExecuteCommandHandlerCommand("nextObject"); });
+  sm_.ExpectSpeechPattern("*");
+  // Command.DECREASE_TTS_RATE
+  sm_.Call([this]() { ExecuteCommandHandlerCommand("decreaseTtsRate"); });
+  sm_.ExpectSpeechPattern("*");
+  // Command.NEXT_BUTTON
+  sm_.Call([this]() { ExecuteCommandHandlerCommand("nextButton"); });
+  sm_.ExpectSpeechPattern("*");
+  // Command.HELP
+  sm_.Call([this]() { ExecuteCommandHandlerCommand("help"); });
+  sm_.ExpectSpeechPattern("*");
+  sm_.Replay();
+
+  histogram_tester.ExpectBucketCount(
+      kChromeVoxPerformCommandMetric,
+      0 /*ChromeVoxCommand.ANNOUNCE_BATTERY_DESCRIPTION*/, 1);
+  histogram_tester.ExpectBucketCount(kChromeVoxPerformCommandMetric,
+                                     81 /*ChromeVoxCommand.NEXT_OBJECT*/, 1);
+  histogram_tester.ExpectBucketCount(kChromeVoxPerformCommandMetric,
+                                     12 /*ChromeVoxCommand.DECREASE_TTS_RATE*/,
+                                     1);
+  histogram_tester.ExpectBucketCount(kChromeVoxPerformCommandMetric,
+                                     55 /*ChromeVoxCommand.NEXT_BUTTON*/, 1);
+  histogram_tester.ExpectBucketCount(kChromeVoxPerformCommandMetric,
+                                     36 /*ChromeVoxCommand.HELP*/, 1);
+  histogram_tester.ExpectTotalCount(kChromeVoxPerformCommandMetric, 5);
 }
 
 class NotificationCenterSpokenFeedbackTest : public LoggedInSpokenFeedbackTest {
@@ -1229,9 +1270,6 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, OverviewMode) {
       "a keyboard.");
 
   sm_.Call([this]() { SendKeyPress(ui::VKEY_TAB); });
-  if (!ash::features::IsOverviewNewFocusEnabled()) {
-    sm_.ExpectSpeechPattern(", window");
-  }
   sm_.ExpectSpeechPattern(
       "*data:text slash html;charset equal utf-8, percent 0A less than "
       "button autofocus greater than Click me less than slash button greater "
@@ -1411,14 +1449,14 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, DISABLED_TouchExploreStatusTray) {
                                         .CenterPoint();
 
     ui::TouchEvent touch_press(
-        ui::ET_TOUCH_PRESSED, tray_center, base::TimeTicks::Now(),
+        ui::EventType::kTouchPressed, tray_center, base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_press);
 
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move(
-        ui::ET_TOUCH_MOVED, tray_center, base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, tray_center, base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move);
   });
@@ -1476,21 +1514,24 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest,
   // Touch and slide on the right edge of the screen.
   sm_.Call([clock_ptr, generator_ptr]() {
     ui::TouchEvent touch_press(
-        ui::ET_TOUCH_PRESSED, gfx::Point(1280, 200), base::TimeTicks::Now(),
+        ui::EventType::kTouchPressed, gfx::Point(1280, 200),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_press);
 
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move(
-        ui::ET_TOUCH_MOVED, gfx::Point(1280, 300), base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, gfx::Point(1280, 300),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move);
 
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move2(
-        ui::ET_TOUCH_MOVED, gfx::Point(1280, 400), base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, gfx::Point(1280, 400),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move2);
   });
@@ -1538,21 +1579,24 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest,
   sm_.Call([widget, clock_ptr, generator_ptr]() {
     widget->Show();
     ui::TouchEvent touch_press(
-        ui::ET_TOUCH_PRESSED, gfx::Point(1080, 200), base::TimeTicks::Now(),
+        ui::EventType::kTouchPressed, gfx::Point(1080, 200),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_press);
 
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move(
-        ui::ET_TOUCH_MOVED, gfx::Point(1080, 300), base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, gfx::Point(1080, 300),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move);
 
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move2(
-        ui::ET_TOUCH_MOVED, gfx::Point(1080, 400), base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, gfx::Point(1080, 400),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move2);
   });
@@ -1618,21 +1662,24 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TouchExploreSecondaryDisplay) {
     widget->Show();
 
     ui::TouchEvent touch_press(
-        ui::ET_TOUCH_PRESSED, gfx::Point(1580, 200), base::TimeTicks::Now(),
+        ui::EventType::kTouchPressed, gfx::Point(1580, 200),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_press);
 
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move(
-        ui::ET_TOUCH_MOVED, gfx::Point(1580, 300), base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, gfx::Point(1580, 300),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move);
 
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move2(
-        ui::ET_TOUCH_MOVED, gfx::Point(1580, 400), base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, gfx::Point(1580, 400),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move2);
   });
@@ -1674,21 +1721,24 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TouchExploreWebContents) {
     b3_bounds = test_utils.GetNodeBoundsInRoot("Third", "button");
 
     ui::TouchEvent touch_press(
-        ui::ET_TOUCH_PRESSED, b2_bounds.top_center(), base::TimeTicks::Now(),
+        ui::EventType::kTouchPressed, b2_bounds.top_center(),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_press);
 
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move(
-        ui::ET_TOUCH_MOVED, b2_bounds.CenterPoint(), base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, b2_bounds.CenterPoint(),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move);
 
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move2(
-        ui::ET_TOUCH_MOVED, b2_bounds.left_center(), base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, b2_bounds.left_center(),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move2);
   });
@@ -1697,14 +1747,16 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TouchExploreWebContents) {
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move(
-        ui::ET_TOUCH_MOVED, b3_bounds.right_center(), base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, b3_bounds.right_center(),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move);
 
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move2(
-        ui::ET_TOUCH_MOVED, b3_bounds.CenterPoint(), base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, b3_bounds.CenterPoint(),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move2);
   });
@@ -1748,21 +1800,24 @@ IN_PROC_BROWSER_TEST_P(SpokenFeedbackTest, TouchExploreWebContentsHighDPI) {
     b2_bounds.set_height(b2_bounds.height() * scale_factor);
 
     ui::TouchEvent touch_press(
-        ui::ET_TOUCH_PRESSED, b2_bounds.bottom_center(), base::TimeTicks::Now(),
+        ui::EventType::kTouchPressed, b2_bounds.bottom_center(),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_press);
 
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move(
-        ui::ET_TOUCH_MOVED, b2_bounds.CenterPoint(), base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, b2_bounds.CenterPoint(),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move);
 
     clock_ptr->Advance(base::Seconds(1));
 
     ui::TouchEvent touch_move2(
-        ui::ET_TOUCH_MOVED, b2_bounds.right_center(), base::TimeTicks::Now(),
+        ui::EventType::kTouchMoved, b2_bounds.right_center(),
+        base::TimeTicks::Now(),
         ui::PointerDetails(ui::EventPointerType::kTouch, 0));
     generator_ptr->Dispatch(&touch_move2);
   });
@@ -2416,13 +2471,9 @@ IN_PROC_BROWSER_TEST_F(DeskTemplatesSpokenFeedbackTest, DeskTemplatesBasic) {
 
   // The first item in the tab order is the template card, which is a button. It
   // has the same name as the desk it was created from, in this case the default
-  // desk name is "Desk 1". With new focus enabled, we focus the name view
-  // first. Then we can go backwards to the template card, which is a button.
-  if (ash::features::IsOverviewNewFocusEnabled()) {
-    sm_.Call([this]() { SendKeyPressWithShift(ui::VKEY_TAB); });
-  } else {
-    sm_.Call([this]() { SendKeyPress(ui::VKEY_TAB); });
-  }
+  // desk name is "Desk 1". The name view will be focused first, then we can go
+  // backwards to the template card, which is a button.
+  sm_.Call([this]() { SendKeyPressWithShift(ui::VKEY_TAB); });
   sm_.ExpectSpeechPattern("Template, Desk 1");
   sm_.ExpectSpeech("Button");
   sm_.ExpectSpeech("Press Ctrl plus W to delete");

@@ -35,12 +35,13 @@
     getVirtualCardEnrollUiModel;
 
 // Returns the error context provided to showAutofillErrorDialog.
-- (const autofill::AutofillErrorDialogContext&)autofillErrorDialogContext;
+- (const std::optional<autofill::AutofillErrorDialogContext>&)
+    autofillErrorDialogContext;
 @end
 
 @implementation FakeAutofillCommands {
   std::unique_ptr<autofill::VirtualCardEnrollUiModel> _virtualCardEnrollUiModel;
-  autofill::AutofillErrorDialogContext _errorContext;
+  std::optional<autofill::AutofillErrorDialogContext> _errorContext;
 }
 
 - (std::unique_ptr<autofill::VirtualCardEnrollUiModel>)
@@ -48,7 +49,8 @@
   return std::move(_virtualCardEnrollUiModel);
 }
 
-- (const autofill::AutofillErrorDialogContext&)autofillErrorDialogContext {
+- (const std::optional<autofill::AutofillErrorDialogContext>&)
+    autofillErrorDialogContext {
   return _errorContext;
 }
 
@@ -117,9 +119,17 @@ class TestChromeAutofillClient : public ChromeAutofillClientIOS {
     return save_card_delegate_.get();
   }
 
+  void RemoveAutofillSaveCardInfoBar() override {
+    removed_save_card_infobar_ = true;
+  }
+
+  bool DidRemoveSaveCardInfobar() { return removed_save_card_infobar_; }
+
  private:
   std::unique_ptr<MockAutofillSaveCardInfoBarDelegateMobile>
       save_card_delegate_;
+
+  bool removed_save_card_infobar_ = false;
 };
 
 class IOSChromePaymentsAutofillClientTest : public PlatformTest {
@@ -189,6 +199,7 @@ TEST_F(IOSChromePaymentsAutofillClientTest,
               CreditCardUploadCompleted(/*card_saved=*/true, _));
   payments_client()->CreditCardUploadCompleted(
       /*card_saved=*/true, /*on_confirmation_closed_callback=*/std::nullopt);
+  EXPECT_FALSE(client()->DidRemoveSaveCardInfobar());
 }
 
 TEST_F(IOSChromePaymentsAutofillClientTest,
@@ -197,12 +208,15 @@ TEST_F(IOSChromePaymentsAutofillClientTest,
       autofill::features::kAutofillEnableSaveCardLoadingAndConfirmation);
   EXPECT_CALL(*(client()->GetAutofillSaveCardInfoBarDelegateIOS()),
               CreditCardUploadCompleted(/*card_saved=*/false, _));
+
   payments_client()->CreditCardUploadCompleted(
       /*card_saved=*/false, /*on_confirmation_closed_callback=*/std::nullopt);
 
-  const AutofillErrorDialogContext& error_context =
+  EXPECT_TRUE(client()->DidRemoveSaveCardInfobar());
+  const std::optional<AutofillErrorDialogContext>& error_context =
       [autofill_commands() autofillErrorDialogContext];
-  EXPECT_EQ(error_context.type,
+  EXPECT_TRUE(error_context.has_value());
+  EXPECT_EQ(error_context.value().type,
             AutofillErrorDialogType::kCreditCardUploadError);
 }
 
@@ -220,7 +234,7 @@ TEST_F(IOSChromePaymentsAutofillClientTest,
 }
 
 TEST_F(IOSChromePaymentsAutofillClientTest,
-       VirtualCardEnrollCompletedWithFailure) {
+       VirtualCardEnrollCompletedWithFailureSetsEnrollmentProgress) {
   base::test::ScopedFeatureList scoped_feature_list(
       autofill::features::kAutofillEnableVcnEnrollLoadingAndConfirmation);
   std::unique_ptr<VirtualCardEnrollUiModel> ui_model =
@@ -274,6 +288,33 @@ TEST_F(IOSChromePaymentsAutofillClientTest,
   histogram_tester.ExpectUniqueSample(
       "Autofill.CreditCardUpload.ConfirmationShown.CardUploaded",
       /*is_shown=*/false, 1);
+}
+
+TEST_F(IOSChromePaymentsAutofillClientTest,
+       VirtualCardEnrollCompletedWithFailureShowsErrorDialog) {
+  base::test::ScopedFeatureList scoped_feature_list(
+      autofill::features::kAutofillEnableVcnEnrollLoadingAndConfirmation);
+  ShowVirtualCardEnrollDialog();
+
+  payments_client()->VirtualCardEnrollCompleted(/*is_vcn_enrolled=*/false);
+
+  autofill::AutofillErrorDialogContext expected_context;
+  expected_context.type =
+      autofill::AutofillErrorDialogType::kVirtualCardEnrollmentTemporaryError;
+  EXPECT_EQ([autofill_commands_ autofillErrorDialogContext],
+            std::make_optional(expected_context));
+}
+
+TEST_F(IOSChromePaymentsAutofillClientTest,
+       VirtualCardEnrollCompletedWithSuccessDoesNotShowAlert) {
+  base::test::ScopedFeatureList scoped_feature_list(
+      autofill::features::kAutofillEnableVcnEnrollLoadingAndConfirmation);
+  ShowVirtualCardEnrollDialog();
+
+  payments_client()->VirtualCardEnrollCompleted(/*is_vcn_enrolled=*/true);
+
+  // Expect showAutofillErrorDialog has not been called.
+  EXPECT_EQ([autofill_commands_ autofillErrorDialogContext], std::nullopt);
 }
 
 }  // namespace

@@ -666,6 +666,11 @@ Permissions you've already given to websites and apps may apply to this account.
                desc="Text for the link to the help page about why Chrome blocks some downloaded files.">
         Learn why Chrome blocks some downloads
       </message>
+      <message name="IDS_DOWNLOAD_WARNING_BYPASS_PROMPT_LEARN_MORE_LINK_ACCESSIBLE"
+               desc="On the downloads page, accessible text for the link to the help center in the prompt to bypass a dangerous download warning.">
+        Learn why Chrome blocks some files, opens in new tab
+      </message>
+
       <message name="IDS_DOWNLOAD_BUBBLE_SUBPAGE_SUMMARY_DEEP_SCANNING_PROMPT_LOCAL_DECRYPTION"
         desc="Subpage summary of warning for a file where we recommend providing the password for on-device decryption">
         This file may be dangerous<ph name="LINE_BREAK">$1</ph>Chrome can check this download for you if you provide the password. Info about the file gets sent to Google Safe Browsing, but the file content and password stay on your device.
@@ -980,6 +985,17 @@ Permissions you've already given to websites and apps may apply to this account.
         </message>
       </if>
 
+      <!-- Management bubble -->
+      <message name="IDS_MANAGEMENT_DIALOG_BROWSER_MANAGED" desc="Disclosure that an unnamed organization is managing the browser.">
+        Your organization manages Chrome
+      </message>
+      <message name="IDS_MANAGEMENT_DIALOG_BROWSER_MANAGED_BY" desc="Disclosure that a known organization is managing the browser.">
+        <ph name="MANAGER">$1<ex>The Company</ex></ph> manages Chrome
+      </message>
+      <message name="IDS_MANAGEMENT_DIALOG_BROWSER_MANAGED_BY_MULTIPLE_ORGANIZATIONS" desc="Disclosure that multiple organization are managing the browser and profile.">
+        Multiple organizations manage Chrome
+      </message>
+
       <!-- Extension requests sign in to Chrome through chrome.identity API -->
       <if expr="enable_extensions">
         <message name="IDS_EXTENSION_ASKS_IDENTITY_WHILE_SIGNED_IN_WEB_ONLY_TITLE" desc="This string is the heading of a dialog intended to inform the user that one of their installed extensions wants them to sign in to Chrome to be able to use their Google Account.">
@@ -1051,7 +1067,10 @@ Permissions you've already given to websites and apps may apply to this account.
           Sign in to Chrome so that your parents can help you stay safe on the web
         </message>
         <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_BUBBLE_CHROME_SIGNIN_IPH_TEXT_SIGNIN_REMINDER" desc="This string is the body text of a reminder message, which is intended to help users understand that they have been signed in to Chrome. The user previously signed in to a Google service (like Gmail or Maps), and saw the Chrome Signin Bubble intercept; when asked whether the user wanted to sign in to Chrome as well, the user selected yes. After a period of time, this reminder message appears at the top right of Chrome (pointing at the Profile Menu) to remind the user that they made this choice a while ago. This body text string comes after the 'Welcome back, USER_NAME' string. We are focusing on the benefit that user enjoys, now that they're signed in to Chrome. The tone should be welcoming.">
-          While you're signed in, you can use your passwords and more from your Google Account in Chrome
+          While you're signed in, you can use your passwords and more from your Google Account in Chrome. You can change this at any time in settings.
+        </message>
+        <message name="IDS_SIGNIN_DICE_WEB_INTERCEPT_BUBBLE_CHROME_SIGNIN_IPH_TEXT_SIGNIN_REMINDER_SCREENREADER" desc="This string is the accessibility text of a reminder message, which is intended to help users understand that they have been signed in to Chrome.">
+          While you're signed in, you can use your passwords and more from your Google Account in Chrome. <ph name="SHORTCUT">$1<ex>CTRL+SHIFT+M</ex></ph> can change your Google services settings.
         </message>
         <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_VERIFY_BODY" desc="This is the subtitle of an error message dialog that appears when the user opens the Chrome Profile Menu and chooses 'Sign out of Chrome'. The error message appears when the user has saved some data (like a password or payment method) to Chrome, but Chrome wasn't able to save the data to the user's Google Account due to a sign-in error; but, the data has been saved locally to Chrome. This subtitle is after the 'Some data isn’t saved yet' string. The tone should be cautionary, because we want to explain to the user that their data is not saved to their Google Account. This string provides a path to resolution because it explains how the user can properly save their data before they sign out of Chrome.">
           Chrome needs to verify it’s you before some data can be saved in your Google Account and used on all your devices. If you sign out, this data will stay on this device.
@@ -1894,6 +1913,10 @@ Permissions you've already given to websites and apps may apply to this account.
       </if>
 
       <if expr="not chromeos_ash and not is_android">
+        <!-- Enterprise profile welcome screen -->
+        <message name="IDS_ENTERPRISE_OIDC_WELCOME_TIMEOUT_SUBTITLE" desc="Subtitle of a section telling the user that their work profile was created but is not fully ready yet.">
+          While we're setting up account access, you can still use Chrome. You may not be able to access some resources until setup is complete.
+        </message>
         <!-- Profile Picker -->
         <if expr="chromeos_lacros">
           <message name="IDS_PROFILE_PICKER_MAIN_VIEW_SUBTITLE_LACROS" desc="Profile picker main view subtitle">
@@ -2021,8 +2044,8 @@ Permissions you've already given to websites and apps may apply to this account.
       </message>
 
       <!-- Device Chooser Prompt -->
-      <message name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH" desc="Text shown in the Chooser when browser does not have Bluetooth permission. The '&#10;' is a newline character to force the desired line wrapping.">
-        Google Chrome needs Bluetooth access to continue &#10; pairing. <ph name="IDS_BLUETOOTH_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK">$1<ex>Open Preferences</ex></ph>
+      <message name="IDS_SERIAL_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH" desc="Text shown in the Web Serial Chooser when browser does not have Bluetooth permission. The '&#10;' is a newline character to force the desired line wrapping.">
+        Google Chrome needs Bluetooth access to explore &#10; Bluetooth devices. <ph name="IDS_SERIAL_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK">$1<ex>Open Preferences</ex></ph>
       </message>
 
       <!-- Tailored Security -->
@@ -2344,6 +2367,15 @@ Permissions you've already given to websites and apps may apply to this account.
         </message>
         <message name="IDS_PERFORMANCE_INTERVENTION_DIALOG_BODY_V3" desc="Body text for a dialog suggesting users to deactivate certain tabs to improve performance.">
           Chrome can make these tabs inactive to improve your browsing experience and keep things fast.
+        </message>
+        <message name="IDS_PERFORMANCE_INTERVENTION_DIALOG_BODY_SINGULAR_V1" desc="Body text for a dialog suggesting users to deactivate certain tabs to improve performance.">
+          This tab is using extra resources. To improve your performance, let Chrome make it inactive.
+        </message>
+        <message name="IDS_PERFORMANCE_INTERVENTION_DIALOG_BODY_SINGULAR_V2" desc="Body text for a dialog suggesting users to deactivate certain tabs to improve performance.">
+          Chrome can make this tab inactive to improve your browsing experience and free up resources.
+        </message>
+        <message name="IDS_PERFORMANCE_INTERVENTION_DIALOG_BODY_SINGULAR_V3" desc="Body text for a dialog suggesting users to deactivate certain tabs to improve performance.">
+          Chrome can make this tab inactive to improve your browsing experience and keep things fast.
         </message>
       </if>
 

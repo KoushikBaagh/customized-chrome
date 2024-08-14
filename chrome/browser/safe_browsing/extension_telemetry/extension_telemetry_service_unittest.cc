@@ -24,7 +24,7 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/crx_file/id_util.h"
-#include "components/enterprise/connectors/reporting/reporting_service_settings.h"
+#include "components/enterprise/connectors/core/reporting_service_settings.h"
 #include "components/policy/core/common/cloud/mock_cloud_policy_client.h"
 #include "components/prefs/pref_service.h"
 #include "components/safe_browsing/core/common/features.h"
@@ -62,13 +62,13 @@ namespace safe_browsing {
 
 namespace {
 
-constexpr const char* kExtensionId[] = {
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "cccccccccccccccccccccccccccccccc", "dddddddddddddddddddddddddddddddd",
-    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"};
-constexpr const char* kExtensionName[] = {
-    "Test Extension 0", "Test Extension 1", "Test Extension 2",
-    "Test Extension 3", "Test Extension 4"};
+constexpr auto kExtensionId = std::to_array(
+    {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "cccccccccccccccccccccccccccccccc", "dddddddddddddddddddddddddddddddd",
+     "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"});
+constexpr auto kExtensionName =
+    std::to_array({"Test Extension 0", "Test Extension 1", "Test Extension 2",
+                   "Test Extension 3", "Test Extension 4"});
 constexpr const char kExtensionVersion[] = "1";
 constexpr const char kScriptCode[] = "document.write('Hello World')";
 constexpr const char kCookieName[] = "cookie-1";
@@ -192,7 +192,7 @@ ExtensionTelemetryServiceTest::ExtensionTelemetryServiceTest()
   scoped_feature_list_.InitWithFeatures(
       /*enabled_features=*/{kExtensionTelemetryDisableOffstoreExtensions,
                             kExtensionTelemetryFileDataForCommandLineExtensions,
-                            kExtensionTelemetryForEnteprise},
+                            kExtensionTelemetryForEnterprise},
       /*disabled_features=*/{});
 
   // Create extension prefs and registry instances.
@@ -346,9 +346,9 @@ TEST_F(ExtensionTelemetryServiceTest, CheckEnableConditionsForEnterprise) {
   enterprise_connectors::test::SetOnSecurityEventReporting(
       /*prefs=*/prefs(),
       /*enabled=*/true,
-      /*enabled_event_names=*/
-      {enterprise_connectors::kExtensionTelemetryEvent},
-      /*enabled_opt_in_events=*/{});
+      /*enabled_event_names=*/{},
+      /*enabled_opt_in_events=*/
+      {{enterprise_connectors::kExtensionTelemetryEvent, {"*"}}});
   EXPECT_TRUE(IsTelemetryServiceEnabledForEnterprise());
 
   // Destruct and restart service and verify that it starts enabled.
@@ -360,8 +360,7 @@ TEST_F(ExtensionTelemetryServiceTest, CheckEnableConditionsForEnterprise) {
   enterprise_connectors::test::SetOnSecurityEventReporting(
       /*prefs=*/prefs(),
       /*enabled=*/false,
-      /*enabled_event_names=*/
-      {},
+      /*enabled_event_names=*/{},
       /*enabled_opt_in_events=*/{});
   EXPECT_FALSE(IsTelemetryServiceEnabledForEnterprise());
 }
@@ -385,9 +384,9 @@ TEST_F(ExtensionTelemetryServiceTest, ProcessesSignalForEnterprise) {
   enterprise_connectors::test::SetOnSecurityEventReporting(
       /*prefs=*/prefs(),
       /*enabled=*/true,
-      /*enabled_event_names=*/
-      {enterprise_connectors::kExtensionTelemetryEvent},
-      /*enabled_opt_in_events=*/{});
+      /*enabled_event_names=*/{},
+      /*enabled_opt_in_events=*/
+      {{enterprise_connectors::kExtensionTelemetryEvent, {"*"}}});
   PrimeTelemetryServiceWithSignal();
   // Verify that the registered extension information is saved in the
   // telemetry service's enterprise extension store.
@@ -455,6 +454,25 @@ TEST_F(ExtensionTelemetryServiceTest, DoesNotGenerateEmptyTelemetryReport) {
 
   // Verify that no telemetry report is generated.
   EXPECT_FALSE(GetTelemetryReport());
+}
+
+TEST_F(ExtensionTelemetryServiceTest,
+       DoesNotGenerateEmptyTelemetryReportForEnterprise) {
+  // Enable enterprise policy.
+  enterprise_connectors::test::SetOnSecurityEventReporting(
+      /*prefs=*/prefs(),
+      /*enabled=*/true,
+      /*enabled_event_names=*/
+      {enterprise_connectors::kExtensionTelemetryEvent},
+      /*enabled_opt_in_events=*/{});
+
+  // Check that telemetry service does not generate a telemetry report for
+  // enterprise when there are no signals.
+  task_environment_.FastForwardBy(
+      telemetry_service_->current_reporting_interval());
+
+  // Verify that no telemetry report is generated.
+  EXPECT_FALSE(GetTelemetryReportForEnterprise());
 }
 
 TEST_F(ExtensionTelemetryServiceTest, GeneratesTelemetryReportWithNoSignals) {
@@ -538,9 +556,9 @@ TEST_F(ExtensionTelemetryServiceTest,
   enterprise_connectors::test::SetOnSecurityEventReporting(
       /*prefs=*/prefs(),
       /*enabled=*/true,
-      /*enabled_event_names=*/
-      {enterprise_connectors::kExtensionTelemetryEvent},
-      /*enabled_opt_in_events=*/{});
+      /*enabled_event_names=*/{},
+      /*enabled_opt_in_events=*/
+      {{enterprise_connectors::kExtensionTelemetryEvent, {"*"}}});
   PrimeTelemetryServiceWithSignal();
 
   // Since ESB is disabled, verify that extension store is empty and no ESB
@@ -581,9 +599,9 @@ TEST_F(ExtensionTelemetryServiceTest,
   enterprise_connectors::test::SetOnSecurityEventReporting(
       /*prefs=*/prefs(),
       /*enabled=*/true,
-      /*enabled_event_names=*/
-      {enterprise_connectors::kExtensionTelemetryEvent},
-      /*enabled_opt_in_events=*/{});
+      /*enabled_event_names=*/{},
+      /*enabled_opt_in_events=*/
+      {{enterprise_connectors::kExtensionTelemetryEvent, {"*"}}});
   PrimeTelemetryServiceWithSignal();
 
   std::unique_ptr<TelemetryReport> esb_telemetry_report = GetTelemetryReport();

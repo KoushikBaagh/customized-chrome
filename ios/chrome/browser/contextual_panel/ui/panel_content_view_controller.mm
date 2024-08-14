@@ -14,6 +14,7 @@
 #import "ios/chrome/browser/contextual_panel/ui/panel_block_data.h"
 #import "ios/chrome/browser/contextual_panel/ui/panel_block_metrics_data.h"
 #import "ios/chrome/browser/contextual_panel/ui/panel_item_collection_view_cell.h"
+#import "ios/chrome/browser/contextual_panel/ui/trait_collection_change_delegate.h"
 #import "ios/chrome/browser/contextual_panel/utils/contextual_panel_metrics.h"
 #import "ios/chrome/browser/shared/public/commands/contextual_sheet_commands.h"
 #import "ios/chrome/browser/shared/ui/symbols/symbols.h"
@@ -180,12 +181,18 @@ NSString* const kCloseButtonAccessibilityIdentifier = @"PanelCloseButtonAXID";
       ios::provider::GetBrandedProductRegularFont(kLogoLabelFontSize);
   logoLabel.font = [[[UIFontMetrics alloc]
       initForTextStyle:UIFontTextStyleCaption1] scaledFontForFont:productFont];
+  logoLabel.adjustsFontForContentSizeCategory = YES;
   logoLabel.textColor = [UIColor colorNamed:kGrey700Color];
 
   UIStackView* logo = [[UIStackView alloc]
       initWithArrangedSubviews:@[ logoImageView, logoLabel ]];
   logo.translatesAutoresizingMaskIntoConstraints = NO;
   logo.spacing = 5;
+  logo.alignment = UIStackViewAlignmentCenter;
+
+  logo.isAccessibilityElement = true;
+  logo.accessibilityLabel = l10n_util::GetNSString(
+      IDS_IOS_CONTEXTUAL_PANEL_BRANDING_ACCESSIBILITY_LABEL);
 
   [_headerView.contentView addSubview:logo];
   [NSLayoutConstraint activateConstraints:@[
@@ -195,6 +202,31 @@ NSString* const kCloseButtonAccessibilityIdentifier = @"PanelCloseButtonAXID";
         constraintEqualToAnchor:_headerView.contentView.centerYAnchor],
   ]];
 
+  [self.view layoutIfNeeded];
+  [self.sheetDisplayController
+      setContentHeight:[self preferredHeightForContent]];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+
+  [[NSNotificationCenter defaultCenter]
+      addObserver:self
+         selector:@selector(handleKeyboardWillShow:)
+             name:UIKeyboardWillShowNotification
+           object:nil];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+  [super viewDidAppear:animated];
+  _appearanceTime = base::Time::Now();
+  UIAccessibilityPostNotification(UIAccessibilityScreenChangedNotification,
+                                  _headerView);
+}
+
+- (void)viewDidLayoutSubviews {
+  [super viewDidLayoutSubviews];
+
   // One of UIVisualEffectView's subviews has a white-ish background color,
   // which is not desired for this feature.
   for (UIView* subview in _headerView.subviews) {
@@ -203,15 +235,12 @@ NSString* const kCloseButtonAccessibilityIdentifier = @"PanelCloseButtonAXID";
       subview.backgroundColor = UIColor.clearColor;
     }
   }
-
-  [self.view layoutIfNeeded];
-  [self.sheetDisplayController
-      setContentHeight:[self preferredHeightForContent]];
 }
 
-- (void)viewDidAppear:(BOOL)animated {
-  [super viewDidAppear:animated];
-  _appearanceTime = base::Time::Now();
+- (void)viewSafeAreaInsetsDidChange {
+  [super viewSafeAreaInsetsDidChange];
+
+  [self setCollectionViewScrollIndicatorInsets];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
@@ -220,7 +249,7 @@ NSString* const kCloseButtonAccessibilityIdentifier = @"PanelCloseButtonAXID";
   base::UmaHistogramTimes("IOS.ContextualPanel.VisibleTime",
                           base::Time::Now() - _appearanceTime);
 
-  // First alert all visible cells that the will disappear.
+  // First alert all visible cells that they will disappear.
   for (NSIndexPath* indexPath in _collectionView.indexPathsForVisibleItems) {
     UICollectionViewCell* cell =
         [_collectionView cellForItemAtIndexPath:indexPath];
@@ -272,6 +301,12 @@ NSString* const kCloseButtonAccessibilityIdentifier = @"PanelCloseButtonAXID";
     base::UmaHistogramEnumeration(impressionTypeHistogramName,
                                   blockImpressionType);
   }
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+  [super traitCollectionDidChange:previousTraitCollection];
+
+  [self.traitCollectionDelegate traitCollectionDidChangeForViewController:self];
 }
 
 #pragma mark - Public methods
@@ -346,6 +381,13 @@ NSString* const kCloseButtonAccessibilityIdentifier = @"PanelCloseButtonAXID";
   metricsData.timeVisible += cell.timeSinceAppearance;
 }
 
+- (void)setCollectionViewScrollIndicatorInsets {
+  // The bottom inset should not include the safe area height.
+  _collectionView.verticalScrollIndicatorInsets = UIEdgeInsetsMake(
+      kHeaderHeight, 0, _bottomToolbarHeight - self.view.safeAreaInsets.bottom,
+      0);
+}
+
 #pragma mark - View Initialization
 
 // Creates the layout for the collection view.
@@ -381,6 +423,7 @@ NSString* const kCloseButtonAccessibilityIdentifier = @"PanelCloseButtonAXID";
   _collectionView.backgroundColor = UIColor.clearColor;
   _collectionView.contentInset = UIEdgeInsetsMake(
       kHeaderHeight, 0, _bottomToolbarHeight + kContentBottomMargin, 0);
+  [self setCollectionViewScrollIndicatorInsets];
   _collectionView.contentInsetAdjustmentBehavior =
       UIScrollViewContentInsetAdjustmentNever;
   _collectionView.delegate = self;
@@ -466,8 +509,9 @@ NSString* const kCloseButtonAccessibilityIdentifier = @"PanelCloseButtonAXID";
   _bottomToolbarHeight = height;
   if (_collectionView) {
     UIEdgeInsets insets = _collectionView.contentInset;
-    insets.bottom = height;
+    insets.bottom = height + kContentBottomMargin;
     _collectionView.contentInset = insets;
+    [self setCollectionViewScrollIndicatorInsets];
     [self.sheetDisplayController
         setContentHeight:[self preferredHeightForContent]];
   }
@@ -517,6 +561,14 @@ NSString* const kCloseButtonAccessibilityIdentifier = @"PanelCloseButtonAXID";
 
   UIPointerStyle* style = [UIPointerStyle styleWithEffect:effect shape:shape];
   return style;
+}
+
+#pragma mark - Keyboard notifications
+
+- (void)handleKeyboardWillShow:(NSNotification*)notification {
+  base::UmaHistogramEnumeration("IOS.ContextualPanel.DismissedReason",
+                                ContextualPanelDismissedReason::KeyboardOpened);
+  [self.contextualSheetCommandHandler closeContextualSheet];
 }
 
 @end

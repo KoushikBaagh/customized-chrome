@@ -64,6 +64,7 @@
 #include "third_party/blink/public/mojom/commit_result/commit_result.mojom-blink.h"
 #include "third_party/blink/public/mojom/fetch/fetch_api_request.mojom-blink.h"
 #include "third_party/blink/public/mojom/frame/frame.mojom-blink.h"
+#include "third_party/blink/public/mojom/loader/same_document_navigation_type.mojom-shared.h"
 #include "third_party/blink/public/mojom/origin_trial_feature/origin_trial_feature.mojom-shared.h"
 #include "third_party/blink/public/mojom/page/page.mojom-blink.h"
 #include "third_party/blink/public/mojom/service_worker/service_worker_fetch_handler_bypass_option.mojom-blink.h"
@@ -437,7 +438,7 @@ class DocumentLoader::EncodedBodyData : public BodyData {
   }
 
   void AppendToParser(DocumentLoader* loader) override {
-    loader->parser_->AppendBytes(data_.data(), data_.size());
+    loader->parser_->AppendBytes(base::as_bytes(data_));
   }
 
   void Buffer(DocumentLoader* loader) override {
@@ -751,8 +752,16 @@ LocalFrameClient& DocumentLoader::GetLocalFrameClient() const {
 DocumentLoader::~DocumentLoader() {
   TRACE_EVENT_WITH_FLOW0("loading", "DocumentLoader::~DocumentLoader",
                          TRACE_ID_LOCAL(this), TRACE_EVENT_FLAG_FLOW_IN);
-  DCHECK(!frame_);
   DCHECK_EQ(state_, kSentDidFinishLoad);
+
+  // Before being collected by the GC, it is expected the DocumentLoader to be
+  // detached from the frame, and it should have stopped loading.
+  //
+  // Note that the WebNavigationBodyLoader implementation is not a GCed class
+  // and it could call `this` back. It is important it gets removed before
+  // collecting `this`.
+  DCHECK(!frame_);
+  DCHECK(!body_loader_);
 }
 
 void DocumentLoader::Trace(Visitor* visitor) const {
@@ -1032,7 +1041,7 @@ void DocumentLoader::UpdateForSameDocumentNavigation(
   GetLocalFrameClient().DidFinishSameDocumentNavigation(
       commit_type, is_synchronously_committed, same_document_navigation_type,
       is_client_redirect_, is_browser_initiated);
-  probe::DidNavigateWithinDocument(frame_);
+  probe::DidNavigateWithinDocument(frame_, same_document_navigation_type);
 
   // If intercept() was called during this same-document navigation's
   // NavigateEvent, the navigation will finish asynchronously, so
@@ -1570,6 +1579,7 @@ mojom::CommitResult DocumentLoader::CommitSameDocumentNavigation(
     Element* source_element,
     mojom::blink::TriggeringEventInfo triggering_event_info,
     bool is_browser_initiated,
+    bool has_ua_visual_transition,
     std::optional<scheduler::TaskAttributionId>
         soft_navigation_heuristics_task_id) {
   DCHECK(!IsReloadLoadType(frame_load_type));
@@ -1637,6 +1647,7 @@ mojom::CommitResult DocumentLoader::CommitSameDocumentNavigation(
     params->source_element = source_element;
     params->destination_item = history_item;
     params->is_browser_initiated = is_browser_initiated;
+    params->has_ua_visual_transition = has_ua_visual_transition;
     params->is_synchronously_committed_same_document =
         is_synchronously_committed;
     params->soft_navigation_heuristics_task_id =
@@ -1822,6 +1833,8 @@ void DocumentLoader::SetDefersLoading(LoaderFreezeMode mode) {
 void DocumentLoader::DetachFromFrame(bool flush_microtask_queue) {
   DCHECK(frame_);
   StopLoading();
+  DCHECK(!body_loader_);
+
   // `frame_` may become null because this method can get re-entered. If it
   // is null we've already run the code below so just return early.
   if (!frame_)
@@ -2882,10 +2895,13 @@ void DocumentLoader::CommitNavigation() {
   // resulting `document`. The `visited_link_salt_` allows the `document` to
   // hash and identify which links should be styled as :visited. Without the
   // salt, the hashtable is unreadable to the Document.
-  if (visited_link_salt_.has_value() &&
-      base::FeatureList::IsEnabled(
-          blink::features::kPartitionVisitedLinkDatabase)) {
-    document->GetVisitedLinkState().UpdateSalt(visited_link_salt_.value());
+  if (visited_link_salt_.has_value()) {
+    if (base::FeatureList::IsEnabled(
+            blink::features::kPartitionVisitedLinkDatabase) ||
+        base::FeatureList::IsEnabled(
+            blink::features::kPartitionVisitedLinkDatabaseWithSelfLinks)) {
+      document->GetVisitedLinkState().UpdateSalt(visited_link_salt_.value());
+    }
   }
 
   // The navigation API is not initialized on the initial about:blank document

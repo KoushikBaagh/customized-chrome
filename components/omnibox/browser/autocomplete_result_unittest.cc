@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "components/omnibox/browser/autocomplete_result.h"
 
 #include <stddef.h>
@@ -144,6 +149,8 @@ class AutocompleteResultTest : public testing::Test {
 
     // Inline autocompletion.
     std::string inline_autocompletion;
+
+    IphType iph_type = IphType::kNone;
   };
 
   AutocompleteResultTest() {
@@ -251,6 +258,7 @@ AutocompleteMatch AutocompleteResultTest::PopulateAutocompleteMatch(
     match.suggestion_group_id = data.suggestion_group_id.value();
   }
   match.inline_autocompletion = base::UTF8ToUTF16(data.inline_autocompletion);
+  match.iph_type = data.iph_type;
   return match;
 }
 
@@ -1353,9 +1361,8 @@ TEST_F(AutocompleteResultTest, DemoteByType) {
   // page classification of fakebox/realbox, and make sure history-title is now
   // demoted. We also make sure history-URL is the last match due to the logic
   // which groups searches and URLs together.
-  SortMatchesAndVerifyOrder(
-      "a", OmniboxEventProto::INSTANT_NTP_WITH_FAKEBOX_AS_STARTING_FOCUS,
-      matches, expected_demoted_order, data);
+  SortMatchesAndVerifyOrder("a", OmniboxEventProto::NTP_REALBOX, matches,
+                            expected_demoted_order, data);
   SortMatchesAndVerifyOrder("a", OmniboxEventProto::NTP_REALBOX, matches,
                             expected_demoted_order, data);
 
@@ -1364,10 +1371,8 @@ TEST_F(AutocompleteResultTest, DemoteByType) {
   // clearly trying to navigate. So here we re-sort with a page classification
   // of fakebox/realbox and an input that's a URL, and make sure history-title
   // is once again the default match.
-  SortMatchesAndVerifyOrder(
-      "www.example.com",
-      OmniboxEventProto::INSTANT_NTP_WITH_FAKEBOX_AS_STARTING_FOCUS, matches,
-      expected_natural_order, data);
+  SortMatchesAndVerifyOrder("www.example.com", OmniboxEventProto::NTP_REALBOX,
+                            matches, expected_natural_order, data);
   SortMatchesAndVerifyOrder("www.example.com", OmniboxEventProto::NTP_REALBOX,
                             matches, expected_natural_order, data);
 }
@@ -2653,7 +2658,9 @@ TEST_F(AutocompleteResultTest, Desktop_ZpsGroupingIPH) {
        false,
        {},
        AutocompleteMatchType::NULL_RESULT_MESSAGE,
-       group2},
+       group2,
+       "",
+       IphType::kFeaturedEnterpriseSearch},
   };
   ACMatches matches;
   PopulateAutocompleteMatches(data, std::size(data), &matches);

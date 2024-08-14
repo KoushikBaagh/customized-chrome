@@ -168,8 +168,9 @@ class RenderWidgetHostViewAura::EventObserverForPopupExit
   explicit EventObserverForPopupExit(RenderWidgetHostViewAura* rwhva)
       : rwhva_(rwhva) {
     aura::Env* env = aura::Env::GetInstance();
-    env->AddEventObserver(this, env,
-                          {ui::ET_MOUSE_PRESSED, ui::ET_TOUCH_PRESSED});
+    env->AddEventObserver(
+        this, env,
+        {ui::EventType::kMousePressed, ui::EventType::kTouchPressed});
   }
 
   EventObserverForPopupExit(const EventObserverForPopupExit&) = delete;
@@ -191,8 +192,8 @@ class RenderWidgetHostViewAura::EventObserverForPopupExit
 
 void RenderWidgetHostViewAura::ApplyEventObserverForPopupExit(
     const ui::LocatedEvent& event) {
-  CHECK(event.type() == ui::ET_MOUSE_PRESSED ||
-        event.type() == ui::ET_TOUCH_PRESSED);
+  CHECK(event.type() == ui::EventType::kMousePressed ||
+        event.type() == ui::EventType::kTouchPressed);
 
   if (in_shutdown_)
     return;
@@ -1135,6 +1136,7 @@ void RenderWidgetHostViewAura::DidOverscroll(
 
 void RenderWidgetHostViewAura::GestureEventAck(
     const blink::WebGestureEvent& event,
+    blink::mojom::InputEventResultSource ack_source,
     blink::mojom::InputEventResultState ack_result) {
   TRACE_EVENT1("input", "RenderWidgetHostViewAura::GestureEventAck", "type",
                blink::WebInputEvent::GetName(event.GetType()));
@@ -1349,6 +1351,10 @@ RenderWidgetHostViewAura::GetKeyboardLayoutMap() {
 
 ////////////////////////////////////////////////////////////////////////////////
 // RenderWidgetHostViewAura, ui::TextInputClient implementation:
+base::WeakPtr<ui::TextInputClient> RenderWidgetHostViewAura::AsWeakPtr() {
+  return weak_ptr_factory_.GetWeakPtr();
+}
+
 void RenderWidgetHostViewAura::SetCompositionText(
     const ui::CompositionText& composition) {
   if (!text_input_manager_ || !text_input_manager_->GetActiveWidget())
@@ -2090,7 +2096,7 @@ void RenderWidgetHostViewAura::OnKeyEvent(ui::KeyEvent* event) {
 
 void RenderWidgetHostViewAura::OnMouseEvent(ui::MouseEvent* event) {
 #if BUILDFLAG(IS_WIN)
-  if (event->type() == ui::ET_MOUSE_MOVED) {
+  if (event->type() == ui::EventType::kMouseMoved) {
     if (event->location() == last_mouse_move_location_ &&
         event->movement().IsZero()) {
       event->SetHandled();

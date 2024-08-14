@@ -37,6 +37,7 @@ import org.chromium.chrome.browser.optimization_guide.OptimizationGuidePushNotif
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
 import org.chromium.chrome.browser.searchwidget.SearchActivity;
+import org.chromium.chrome.browser.suggestions.SuggestionsNavigationDelegate;
 import org.chromium.chrome.browser.tab.state.ShoppingPersistedTabDataService;
 import org.chromium.chrome.browser.tab_resumption.TabResumptionModuleUtils;
 import org.chromium.chrome.browser.tabbed_mode.TabbedSystemUiCoordinator;
@@ -47,6 +48,7 @@ import org.chromium.chrome.browser.tasks.tab_management.TabManagementFieldTrial;
 import org.chromium.chrome.browser.ui.google_bottom_bar.BottomBarConfigCreator;
 import org.chromium.chrome.browser.webapps.WebappLauncherActivity;
 import org.chromium.components.omnibox.OmniboxFeatures;
+import org.chromium.components.signin.SigninFeatureMap;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -84,7 +86,9 @@ public class ChromeCachedFlags {
         FirstRunUtils.cacheFirstRunPrefs();
 
         CachedFlagUtils.cacheNativeFlags(
-                ChromeFeatureList.sFlagsCachedFullBrowser, OmniboxFeatures.getFieldTrialsToCache());
+                ChromeFeatureList.sFlagsCachedFullBrowser,
+                OmniboxFeatures.getFieldTrialsToCache(),
+                SigninFeatureMap.sCachedFlags);
         cacheAdditionalNativeFlags();
 
         List<CachedFieldTrialParameter> fieldTrialsToCache =
@@ -102,7 +106,11 @@ public class ChromeCachedFlags {
                         DseNewTabUrlManager.SWAP_OUT_NTP,
                         BottomBarConfigCreator.GOOGLE_BOTTOM_BAR_PARAM_BUTTON_LIST,
                         BottomBarConfigCreator.GOOGLE_BOTTOM_BAR_VARIANT_LAYOUT_VALUE,
+                        BottomBarConfigCreator.GOOGLE_BOTTOM_BAR_NO_VARIANT_HEIGHT_DP_PARAM_VALUE,
+                        BottomBarConfigCreator
+                                .GOOGLE_BOTTOM_BAR_SINGLE_DECKER_HEIGHT_DP_PARAM_VALUE,
                         BottomBarConfigCreator.IS_GOOGLE_DEFAULT_SEARCH_ENGINE_CHECK_ENABLED,
+                        HubFieldTrial.ALTERNATIVE_FAB_COLOR,
                         HubFieldTrial.PANE_SWITCHER_USES_TEXT,
                         HubFieldTrial.SUPPORTS_OTHER_TABS,
                         HubFieldTrial.SUPPORTS_SEARCH,
@@ -118,9 +126,14 @@ public class ChromeCachedFlags {
                         ReturnToChromeUtil.HOME_SURFACE_RETURN_TIME_SECONDS,
                         LogoUtils.LOGO_POLISH_LARGE_SIZE,
                         LogoUtils.LOGO_POLISH_MEDIUM_SIZE,
+                        SuggestionsNavigationDelegate.MOST_VISITED_TILES_RESELECT_LAX_HOST,
+                        SuggestionsNavigationDelegate.MOST_VISITED_TILES_RESELECT_LAX_PATH,
+                        SuggestionsNavigationDelegate.MOST_VISITED_TILES_RESELECT_LAX_QUERY,
+                        SuggestionsNavigationDelegate.MOST_VISITED_TILES_RESELECT_LAX_REF,
                         TabManagementFieldTrial.DELAY_TEMP_STRIP_TIMEOUT_MS,
                         HomeModulesMetricsUtils.HOME_MODULES_SHOW_ALL_MODULES,
                         HomeModulesMetricsUtils.TAB_RESUMPTION_COMBINE_TABS,
+                        TabGroupModelFilter.SHOW_TAB_GROUP_CREATION_DIALOG_SETTING,
                         TabGroupModelFilter.SKIP_TAB_GROUP_CREATION_DIALOG,
                         TabResumptionModuleUtils.TAB_RESUMPTION_DISABLE_BLEND,
                         TabResumptionModuleUtils.TAB_RESUMPTION_FETCH_HISTORY_BACKEND,

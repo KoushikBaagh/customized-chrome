@@ -2115,7 +2115,7 @@
           "--out-dir",
           "${ISOLATED_OUTDIR}",
           "--xcode-build-version",
-          "15f31d",
+          "16a5211f",
           "--xctest"
         ],
         "merge": {
@@ -2131,7 +2131,7 @@
             {
               "cipd_package": "infra/tools/mac_toolchain/${platform}",
               "location": ".",
-              "revision": "git_revision:b28cf90d462a7bbd45c28f2d931960c2b9404cb0"
+              "revision": "git_revision:81653990788282be32e97d2e15ff585dd9f068f6"
             }
           ],
           "dimensions": {
@@ -2144,7 +2144,7 @@
               "path": "Runtime-ios-16.4"
             },
             {
-              "name": "xcode_ios_15f31d",
+              "name": "xcode_ios_16a5211f",
               "path": "Xcode.app"
             }
           ],
@@ -2183,7 +2183,7 @@
           "--out-dir",
           "${ISOLATED_OUTDIR}",
           "--xcode-build-version",
-          "15f31d",
+          "16a5211f",
           "--xctest"
         ],
         "merge": {
@@ -2199,7 +2199,7 @@
             {
               "cipd_package": "infra/tools/mac_toolchain/${platform}",
               "location": ".",
-              "revision": "git_revision:b28cf90d462a7bbd45c28f2d931960c2b9404cb0"
+              "revision": "git_revision:81653990788282be32e97d2e15ff585dd9f068f6"
             }
           ],
           "dimensions": {
@@ -2210,7 +2210,7 @@
           "expiration": 21600,
           "named_caches": [
             {
-              "name": "xcode_ios_15f31d",
+              "name": "xcode_ios_16a5211f",
               "path": "Xcode.app"
             }
           ],

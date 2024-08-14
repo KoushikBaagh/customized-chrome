@@ -323,6 +323,10 @@ class BrowserWindow : public ui::BaseWindow {
   // Updates the toolbar with the state for the specified |contents|.
   virtual void UpdateToolbar(content::WebContents* contents) = 0;
 
+  // Updates the toolbar's visible security state. Returns true if the toolbar
+  // was redrawn.
+  virtual bool UpdateToolbarSecurityState() = 0;
+
   // Updates whether or not the custom tab bar is visible. Animates the
   // transition if |animate| is true.
   virtual void UpdateCustomTabBarVisibility(bool visible, bool animate) = 0;
@@ -539,6 +543,8 @@ class BrowserWindow : public ui::BaseWindow {
                                             bool in_tab_dragging);
 
   virtual void ShowAvatarBubbleFromAvatarButton(bool is_source_accelerator) = 0;
+
+  virtual void ShowBubbleFromManagementToolbarButton() = 0;
 
   // Attempts showing the In-Produce-Help for profile Switching. This is called
   // after creating a new profile or opening an existing profile. If the profile

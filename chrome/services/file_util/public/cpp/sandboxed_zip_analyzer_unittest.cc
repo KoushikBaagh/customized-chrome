@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "chrome/services/file_util/public/cpp/sandboxed_zip_analyzer.h"
 
 #include <stdint.h>
@@ -430,6 +435,7 @@ TEST_F(SandboxedZipAnalyzerTest, EncryptedZip) {
   ExpectBinary(kSignedExe, results.archived_binary.Get(0));
 
   EXPECT_TRUE(results.encryption_info.is_encrypted);
+  EXPECT_TRUE(results.encryption_info.is_top_level_encrypted);
   EXPECT_EQ(results.encryption_info.password_status,
             safe_browsing::EncryptionInfo::kKnownCorrect);
 }
@@ -452,6 +458,7 @@ TEST_F(SandboxedZipAnalyzerTest, EncryptedZipWrongPassword) {
   EXPECT_FALSE(binary.has_length());
 
   EXPECT_TRUE(results.encryption_info.is_encrypted);
+  EXPECT_TRUE(results.encryption_info.is_top_level_encrypted);
   EXPECT_EQ(results.encryption_info.password_status,
             safe_browsing::EncryptionInfo::kKnownIncorrect);
 }
@@ -475,6 +482,7 @@ TEST_F(SandboxedZipAnalyzerTest, EncryptedZipAes) {
   EXPECT_FALSE(binary.has_length());
 
   EXPECT_TRUE(results.encryption_info.is_encrypted);
+  EXPECT_TRUE(results.encryption_info.is_top_level_encrypted);
   EXPECT_EQ(results.encryption_info.password_status,
             safe_browsing::EncryptionInfo::kUnknown);
 }
@@ -498,6 +506,7 @@ TEST_F(SandboxedZipAnalyzerTest, EncryptedZipAesNoPassword) {
   EXPECT_FALSE(binary.has_length());
 
   EXPECT_TRUE(results.encryption_info.is_encrypted);
+  EXPECT_TRUE(results.encryption_info.is_top_level_encrypted);
   EXPECT_EQ(results.encryption_info.password_status,
             safe_browsing::EncryptionInfo::kKnownIncorrect);
 }
@@ -590,6 +599,7 @@ TEST_F(SandboxedZipAnalyzerTest, NestedEncryptedZip) {
               &results);
   EXPECT_TRUE(results.success);
   EXPECT_TRUE(results.encryption_info.is_encrypted);
+  EXPECT_FALSE(results.encryption_info.is_top_level_encrypted);
 }
 
 TEST_F(SandboxedZipAnalyzerTest, NestedEncryptedRar) {
@@ -599,4 +609,5 @@ TEST_F(SandboxedZipAnalyzerTest, NestedEncryptedRar) {
               &results);
   EXPECT_TRUE(results.success);
   EXPECT_TRUE(results.encryption_info.is_encrypted);
+  EXPECT_FALSE(results.encryption_info.is_top_level_encrypted);
 }

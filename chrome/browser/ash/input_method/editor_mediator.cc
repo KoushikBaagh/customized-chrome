@@ -16,7 +16,6 @@
 #include "chrome/browser/ash/crosapi/crosapi_manager.h"
 #include "chrome/browser/ash/input_method/editor_consent_enums.h"
 #include "chrome/browser/ash/input_method/editor_geolocation_provider.h"
-#include "chrome/browser/ash/input_method/editor_helpers.h"
 #include "chrome/browser/ash/input_method/editor_metrics_enums.h"
 #include "chrome/browser/ash/input_method/editor_metrics_recorder.h"
 #include "chrome/browser/ash/input_method/editor_query_context.h"
@@ -26,12 +25,18 @@
 #include "chrome/browser/ash/magic_boost/magic_boost_controller_ash.h"
 #include "chrome/browser/ash/profiles/profile_helper.h"
 #include "chrome/browser/ui/webui/ash/mako/mako_bubble_coordinator.h"
+#include "chromeos/components/editor_menu/public/cpp/editor_helpers.h"
 #include "chromeos/constants/chromeos_features.h"
 #include "ui/base/ime/ash/ime_bridge.h"
 #include "ui/display/screen.h"
 #include "ui/display/tablet_state.h"
 
 namespace ash::input_method {
+namespace {
+
+constexpr std::u16string_view kAnnouncementViewName = u"Orca";
+
+}
 
 EditorMediator::EditorMediator(
     Profile* profile,
@@ -47,7 +52,8 @@ EditorMediator::EditorMediator(
                                                   GetEditorOpportunityMode())),
       consent_store_(
           std::make_unique<EditorConsentStore>(profile->GetPrefs(),
-                                               metrics_recorder_.get())) {
+                                               metrics_recorder_.get())),
+      announcer_(kAnnouncementViewName) {
   editor_context_.OnTabletModeUpdated(
       display::Screen::GetScreen()->InTabletMode());
 }
@@ -119,10 +125,6 @@ void EditorMediator::OnFocus(int context_id) {
         std::make_unique<EditorServiceConnector>(&editor_context_);
     ResetEditorConnections();
   }
-
-  GetTextFieldContextualInfo(
-      base::BindOnce(&EditorMediator::OnTextFieldContextualInfoChanged,
-                     weak_ptr_factory_.GetWeakPtr()));
 
   if (IsServiceConnected()) {
     service_connection_->system_actuator()->OnFocus(context_id);
@@ -215,6 +217,7 @@ void EditorMediator::HandleTrigger(
     case EditorMode::kRewrite:
       mako_bubble_coordinator_.LoadEditorUI(
           profile_, MakoEditorMode::kRewrite,
+          /*can_fallback_to_center_position=*/true,
           active_query_context.preset_query_id,
           active_query_context.freeform_text);
       query_context_ = std::nullopt;
@@ -223,6 +226,7 @@ void EditorMediator::HandleTrigger(
     case EditorMode::kWrite:
       mako_bubble_coordinator_.LoadEditorUI(
           profile_, MakoEditorMode::kWrite,
+          /*can_fallback_to_center_position=*/true,
           active_query_context.preset_query_id,
           active_query_context.freeform_text);
       query_context_ = std::nullopt;
@@ -255,10 +259,15 @@ void EditorMediator::HandleTrigger(
 }
 
 void EditorMediator::CacheContext() {
+  GetTextFieldContextualInfo(
+      base::BindOnce(&EditorMediator::OnTextFieldContextualInfoChanged,
+                     weak_ptr_factory_.GetWeakPtr()));
+
   mako_bubble_coordinator_.CacheContextCaretBounds();
 
-  size_t selected_length = NonWhitespaceAndSymbolsLength(
-      surrounding_text_.text, surrounding_text_.selection_range);
+  size_t selected_length =
+      chromeos::editor_helpers::NonWhitespaceAndSymbolsLength(
+          surrounding_text_.text, surrounding_text_.selection_range);
   editor_context_.OnTextSelectionLengthChanged(selected_length);
 
   if (IsServiceConnected()) {

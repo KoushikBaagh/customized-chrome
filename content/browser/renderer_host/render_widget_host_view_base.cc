@@ -410,6 +410,7 @@ void RenderWidgetHostViewBase::WheelEventAck(
 
 void RenderWidgetHostViewBase::GestureEventAck(
     const blink::WebGestureEvent& event,
+    blink::mojom::InputEventResultSource ack_source,
     blink::mojom::InputEventResultState ack_result) {}
 
 void RenderWidgetHostViewBase::ChildDidAckGestureEvent(
@@ -878,11 +879,8 @@ bool RenderWidgetHostViewBase::CanSynchronizeVisualProperties() {
   return true;
 }
 
-// This function is called from host, so host and delegate should be set up.
-double RenderWidgetHostViewBase::GetZoomLevel() const {
-  CHECK(host());
-  CHECK(host()->delegate());
-  return host()->delegate()->GetPendingPageZoomLevel();
+double RenderWidgetHostViewBase::GetCSSZoomFactor() const {
+  return 1.0;
 }
 
 void RenderWidgetHostViewBase::TextInputStateChanged(

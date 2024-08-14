@@ -139,7 +139,7 @@ class SavedTabGroupInteractiveTest
   }
 
   StepBuilder CheckIfSavedGroupIsOpen(const base::Uuid* const saved_guid) {
-    return Do([=]() {
+    return Do([=, this]() {
       const SavedTabGroupKeyedService* const service =
           SavedTabGroupServiceFactory::GetForProfile(browser()->profile());
 
@@ -152,7 +152,7 @@ class SavedTabGroupInteractiveTest
   }
 
   StepBuilder CheckIfSavedGroupIsClosed(const base::Uuid* const saved_guid) {
-    return Do([=]() {
+    return Do([=, this]() {
       const SavedTabGroupKeyedService* const service =
           SavedTabGroupServiceFactory::GetForProfile(browser()->profile());
 
@@ -166,7 +166,7 @@ class SavedTabGroupInteractiveTest
 
   StepBuilder CheckIfSavedGroupIsPinned(tab_groups::TabGroupId group_id,
                                         bool is_pinned) {
-    return Do([=]() {
+    return Do([=, this]() {
       const SavedTabGroupKeyedService* const service =
           SavedTabGroupServiceFactory::GetForProfile(browser()->profile());
 
@@ -175,7 +175,7 @@ class SavedTabGroupInteractiveTest
   }
 
   StepBuilder SaveGroupViaModel(const tab_groups::TabGroupId local_group) {
-    return Do([=]() {
+    return Do([=, this]() {
       SavedTabGroupKeyedService* const service =
           SavedTabGroupServiceFactory::GetForProfile(browser()->profile());
 
@@ -185,7 +185,7 @@ class SavedTabGroupInteractiveTest
   }
 
   StepBuilder UnsaveGroupViaModel(const tab_groups::TabGroupId local_group) {
-    return Do([=]() {
+    return Do([=, this]() {
       SavedTabGroupKeyedService* const service =
           SavedTabGroupServiceFactory::GetForProfile(browser()->profile());
 
@@ -271,9 +271,10 @@ IN_PROC_BROWSER_TEST_P(SavedTabGroupInteractiveTest,
       WithElement(kSavedTabGroupButtonElementId,
                   [](ui::TrackedElement* el) {
                     const ui::KeyEvent event(
-                        ui::ET_KEY_PRESSED, ui::KeyboardCode::VKEY_RETURN,
-                        ui::DomCode::ENTER, ui::EF_NONE, ui::DomKey::ENTER,
-                        base::TimeTicks(), /*is_char=*/false);
+                        ui::EventType::kKeyPressed,
+                        ui::KeyboardCode::VKEY_RETURN, ui::DomCode::ENTER,
+                        ui::EF_NONE, ui::DomKey::ENTER, base::TimeTicks(),
+                        /*is_char=*/false);
 
                     AsView<SavedTabGroupButton>(el)->OnKeyPressed(event);
                   }),
@@ -314,9 +315,10 @@ IN_PROC_BROWSER_TEST_P(SavedTabGroupInteractiveTest, UnpinGroupFromButtonMenu) {
       WithElement(kSavedTabGroupButtonElementId,
                   [](ui::TrackedElement* el) {
                     const ui::KeyEvent event(
-                        ui::ET_KEY_PRESSED, ui::KeyboardCode::VKEY_RETURN,
-                        ui::DomCode::ENTER, ui::EF_NONE, ui::DomKey::ENTER,
-                        base::TimeTicks(), /*is_char=*/false);
+                        ui::EventType::kKeyPressed,
+                        ui::KeyboardCode::VKEY_RETURN, ui::DomCode::ENTER,
+                        ui::EF_NONE, ui::DomKey::ENTER, base::TimeTicks(),
+                        /*is_char=*/false);
 
                     AsView<SavedTabGroupButton>(el)->OnKeyPressed(event);
                   }),
@@ -645,9 +647,10 @@ IN_PROC_BROWSER_TEST_P(SavedTabGroupInteractiveTest,
       WithElement(kSavedTabGroupButtonElementId,
                   [](ui::TrackedElement* el) {
                     const ui::KeyEvent event(
-                        ui::ET_KEY_PRESSED, ui::KeyboardCode::VKEY_RETURN,
-                        ui::DomCode::ENTER, ui::EF_NONE, ui::DomKey::ENTER,
-                        base::TimeTicks(), /*is_char=*/false);
+                        ui::EventType::kKeyPressed,
+                        ui::KeyboardCode::VKEY_RETURN, ui::DomCode::ENTER,
+                        ui::EF_NONE, ui::DomKey::ENTER, base::TimeTicks(),
+                        /*is_char=*/false);
 
                     AsView<SavedTabGroupButton>(el)->OnKeyPressed(event);
                   }),
@@ -690,9 +693,10 @@ IN_PROC_BROWSER_TEST_P(
       WithElement(kSavedTabGroupButtonElementId,
                   [](ui::TrackedElement* el) {
                     const ui::KeyEvent event(
-                        ui::ET_KEY_PRESSED, ui::KeyboardCode::VKEY_RETURN,
-                        ui::DomCode::ENTER, ui::EF_NONE, ui::DomKey::ENTER,
-                        base::TimeTicks(), /*is_char=*/false);
+                        ui::EventType::kKeyPressed,
+                        ui::KeyboardCode::VKEY_RETURN, ui::DomCode::ENTER,
+                        ui::EF_NONE, ui::DomKey::ENTER, base::TimeTicks(),
+                        /*is_char=*/false);
 
                     AsView<SavedTabGroupButton>(el)->OnKeyPressed(event);
                   }),
@@ -975,9 +979,10 @@ IN_PROC_BROWSER_TEST_P(SavedTabGroupInteractiveTest,
       WithElement(kSavedTabGroupButtonElementId,
                   [](ui::TrackedElement* el) {
                     const ui::KeyEvent event(
-                        ui::ET_KEY_PRESSED, ui::KeyboardCode::VKEY_RETURN,
-                        ui::DomCode::ENTER, ui::EF_NONE, ui::DomKey::ENTER,
-                        base::TimeTicks(), /*is_char=*/false);
+                        ui::EventType::kKeyPressed,
+                        ui::KeyboardCode::VKEY_RETURN, ui::DomCode::ENTER,
+                        ui::EF_NONE, ui::DomKey::ENTER, base::TimeTicks(),
+                        /*is_char=*/false);
 
                     AsView<SavedTabGroupButton>(el)->OnKeyPressed(event);
                   }),
@@ -1147,7 +1152,7 @@ IN_PROC_BROWSER_TEST_P(SavedTabGroupInteractiveTest,
 
       // Show the overflow menu.
       PressButton(kSavedTabGroupOverflowButtonElementId),
-      WaitForShow(kSavedTabGroupOverflowMenuId, true), Do([=]() {
+      WaitForShow(kSavedTabGroupOverflowMenuId, true), Do([=, this]() {
         BrowserView::GetBrowserViewForBrowser(browser())
             ->GetWidget()
             ->LayoutRootViewIfNecessary();
@@ -1160,7 +1165,7 @@ IN_PROC_BROWSER_TEST_P(SavedTabGroupInteractiveTest,
                 }),
 
       // Verify the overflow menu expands if another group is added.
-      SaveGroupViaModel(group_6), Do([=]() {
+      SaveGroupViaModel(group_6), Do([=, this]() {
         BrowserView::GetBrowserViewForBrowser(browser())
             ->GetWidget()
             ->LayoutRootViewIfNecessary();
@@ -1174,7 +1179,7 @@ IN_PROC_BROWSER_TEST_P(SavedTabGroupInteractiveTest,
                 }),
 
       // Verify the overflow menu shrinks if a group is removed.
-      UnsaveGroupViaModel(group_6), Do([=]() {
+      UnsaveGroupViaModel(group_6), Do([=, this]() {
         BrowserView::GetBrowserViewForBrowser(browser())
             ->GetWidget()
             ->LayoutRootViewIfNecessary();
@@ -1239,7 +1244,7 @@ IN_PROC_BROWSER_TEST_P(SavedTabGroupInteractiveTest,
 
       // Show the overflow menu.
       PressButton(kSavedTabGroupOverflowButtonElementId),
-      WaitForShow(kSavedTabGroupOverflowMenuId, true), Do([=]() {
+      WaitForShow(kSavedTabGroupOverflowMenuId, true), Do([=, this]() {
         BrowserView::GetBrowserViewForBrowser(browser())
             ->GetWidget()
             ->LayoutRootViewIfNecessary();
@@ -1247,7 +1252,7 @@ IN_PROC_BROWSER_TEST_P(SavedTabGroupInteractiveTest,
       FlushEvents(),
 
       // Verify the overflow menu expands if another group is added.
-      UnsaveGroupViaModel(group_5), Do([=]() {
+      UnsaveGroupViaModel(group_5), Do([=, this]() {
         BrowserView::GetBrowserViewForBrowser(browser())
             ->GetWidget()
             ->LayoutRootViewIfNecessary();

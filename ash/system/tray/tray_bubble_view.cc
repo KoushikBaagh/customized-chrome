@@ -272,9 +272,9 @@ void TrayBubbleView::RerouteEventHandler::OnEvent(ui::Event* event) {
     return;
   }
 
-  if (event->type() == ui::ET_MOUSE_PRESSED ||
-      event->type() == ui::ET_TOUCH_PRESSED ||
-      event->type() == ui::ET_GESTURE_TAP) {
+  if (event->type() == ui::EventType::kMousePressed ||
+      event->type() == ui::EventType::kTouchPressed ||
+      event->type() == ui::EventType::kGestureTap) {
     tray_bubble_view_->SetCanActivate(true);
   }
 
@@ -622,10 +622,8 @@ void TrayBubbleView::OnThemeChanged() {
       chromeos::features::IsJellyrollEnabled()
           ? views::HighlightBorder::Type::kHighlightBorderOnShadow
           : views::HighlightBorder::Type::kHighlightBorder1));
-  set_color(GetColorProvider()->GetColor(
-      chromeos::features::IsJellyEnabled()
-          ? static_cast<ui::ColorId>(cros_tokens::kCrosSysSystemBaseElevated)
-          : kColorAshShieldAndBase80));
+  set_color(
+      GetColorProvider()->GetColor(cros_tokens::kCrosSysSystemBaseElevated));
 }
 
 void TrayBubbleView::MouseMovedOutOfHost() {

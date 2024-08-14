@@ -5,13 +5,19 @@
 'use strict';
 
 promise_test(async t => {
+  const builder = new MLGraphBuilder(context);
+
   // The input tensor which is at least 2-D.
   for (let dimensions of allWebNNDimensionsArray.slice(0, 2)) {
     for (let dataType of allWebNNOperandDataTypes) {
       const input = builder.input(`input${++inputIndex}`, {dataType, dimensions});
-      assert_throws_js(TypeError, () => builder.triangular(input));
+      const label = 'triangular_3';
+      const options = {label};
+      const regrexp = new RegExp('\\[' + label + '\\]');
+      assert_throws_with_label(
+          () => builder.triangular(input, options), regrexp);
     }
   }
-}, "[triangular] TypeError is expected if input's rank is less than 2");
+}, '[triangular] TypeError is expected if input\'s rank is less than 2');
 
 validateInputFromAnotherBuilder('triangular');

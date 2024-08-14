@@ -9,15 +9,14 @@
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/mock_callback.h"
 #include "base/test/scoped_feature_list.h"
-#include "chrome/browser/sharing/mock_sharing_service.h"
-#include "chrome/browser/sharing/sharing_constants.h"
-#include "chrome/browser/sharing/sharing_service.h"
 #include "chrome/browser/sharing/sharing_service_factory.h"
-#include "chrome/browser/sharing/sharing_target_device_info.h"
-#include "chrome/browser/sharing/sms/sms_flags.h"
 #include "chrome/browser/sharing/sms/sms_remote_fetcher_metrics.h"
 #include "chrome/test/base/testing_profile.h"
+#include "components/sharing_message/mock_sharing_service.h"
 #include "components/sharing_message/proto/sharing_message.pb.h"
+#include "components/sharing_message/sharing_constants.h"
+#include "components/sharing_message/sharing_service.h"
+#include "components/sharing_message/sharing_target_device_info.h"
 #include "content/public/browser/sms_fetcher.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_task_environment.h"
@@ -218,37 +217,6 @@ TEST(SmsRemoteFetcherTest, RequestCancelled) {
   std::move(cancel_callback).Run();
 
   loop.Run();
-}
-
-TEST(SmsRemoteFetcherTest, FeatureDisabled) {
-  // This needs to be done before any tasks running on other threads check if a
-  // feature is enabled.
-  base::test::ScopedFeatureList flags;
-  flags.InitAndDisableFeature(kWebOTPCrossDevice);
-
-  content::BrowserTaskEnvironment task_environment;
-  base::HistogramTester histogram_tester;
-  TestingProfile profile;
-  content::WebContents::CreateParams create_params(&profile);
-  auto web_contents = content::WebContents::Create(create_params);
-
-  base::RunLoop loop;
-
-  FetchRemoteSms(
-      web_contents.get(), std::vector<url::Origin>{GetOriginForURL("a.com")},
-      BindLambdaForTesting(
-          [&loop](std::optional<std::vector<url::Origin>>,
-                  std::optional<std::string> result,
-                  std::optional<content::SmsFetchFailureType> failure_type) {
-            ASSERT_EQ(failure_type,
-                      content::SmsFetchFailureType::kCrossDeviceFailure);
-            loop.Quit();
-          }));
-
-  loop.Run();
-  histogram_tester.ExpectUniqueSample(
-      "Blink.Sms.Receive.CrossDeviceFailure",
-      static_cast<int>(WebOTPCrossDeviceFailure::kFeatureDisabled), 1);
 }
 
 TEST(SmsRemoteFetcherTest, NoSharingService) {

@@ -36,6 +36,8 @@
 #include "chromeos/constants/chromeos_features.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/test/bookmark_test_helpers.h"
+#include "components/favicon/core/test/mock_favicon_service.h"
+#include "components/favicon_base/favicon_types.h"
 #include "components/history/core/browser/history_database_params.h"
 #include "components/history/core/browser/history_service.h"
 #include "components/history/core/test/test_history_database.h"
@@ -49,6 +51,8 @@
 #include "ui/base/ime/fake_text_input_client.h"
 #include "ui/display/screen.h"
 #include "ui/display/test/test_screen.h"
+#include "ui/views/accessibility/ax_event_manager.h"
+#include "ui/views/test/ax_event_counter.h"
 
 namespace {
 
@@ -70,6 +74,26 @@ using MockSearchResultsCallback =
     testing::MockFunction<PickerClientImpl::CrosSearchResultsCallback>;
 
 namespace fmp = extensions::api::file_manager_private;
+
+class TestFaviconService : public favicon::MockFaviconService {
+ public:
+  TestFaviconService() = default;
+  TestFaviconService(const TestFaviconService&) = delete;
+  TestFaviconService& operator=(const TestFaviconService&) = delete;
+  ~TestFaviconService() override = default;
+
+  // favicon::FaviconService:
+  base::CancelableTaskTracker::TaskId GetFaviconImageForPageURL(
+      const GURL& page_url,
+      favicon_base::FaviconImageCallback callback,
+      base::CancelableTaskTracker* tracker) override {
+    page_url_ = page_url;
+    std::move(callback).Run(favicon_base::FaviconImageResult());
+    return {};
+  }
+
+  GURL page_url_;
+};
 
 bool CreateTestFile(const base::FilePath& path) {
   base::ScopedAllowBlockingForTesting allow_blocking;
@@ -529,6 +553,9 @@ TEST_F(PickerClientImplTest, GetSuggestedLinkResultsReturnsLinks) {
   ash::PickerController controller;
   PickerClientImpl client(&controller, user_manager());
   AddSearchToHistory(profile(), GURL("http://foo.com/history"));
+  TestFaviconService favicon_service;
+  client.get_link_suggester_for_test()->set_favicon_service_for_test(
+      &favicon_service);
 
   base::test::TestFuture<std::vector<ash::PickerSearchResult>> future;
   client.GetSuggestedLinkResults(future.GetRepeatingCallback());
@@ -540,6 +567,7 @@ TEST_F(PickerClientImplTest, GetSuggestedLinkResultsReturnsLinks) {
           VariantWith<ash::PickerSearchResult::BrowsingHistoryData>(
               Field("url", &ash::PickerSearchResult::BrowsingHistoryData::url,
                     GURL("http://foo.com/history"))))}));
+  EXPECT_EQ(favicon_service.page_url_, GURL("http://foo.com/history"));
 }
 
 class PickerClientImplEditorTest : public PickerClientImplTest {
@@ -566,6 +594,38 @@ class PickerClientImplEditorTest : public PickerClientImplTest {
  private:
   ash::InputMethodAsh ime_{nullptr};
 };
+
+TEST_F(PickerClientImplEditorTest,
+       IsEligibleForEditorReturnsFalseIfEditorDisabled) {
+  ash::PickerController controller;
+  PickerClientImpl client(&controller, user_manager());
+  GetEditorMediator(profile()).OverrideEditorModeForTesting(
+      ash::input_method::EditorMode::kHardBlocked);
+
+  EXPECT_FALSE(client.IsEligibleForEditor());
+}
+
+TEST_F(PickerClientImplEditorTest,
+       IsEligibleForEditorReturnsFalseIfHardBlocked) {
+  base::test::ScopedFeatureList features(chromeos::features::kOrcaDogfood);
+  ash::PickerController controller;
+  PickerClientImpl client(&controller, user_manager());
+  GetEditorMediator(profile()).OverrideEditorModeForTesting(
+      ash::input_method::EditorMode::kHardBlocked);
+
+  EXPECT_FALSE(client.IsEligibleForEditor());
+}
+
+TEST_F(PickerClientImplEditorTest,
+       IsEligibleForEditorReturnsTrueIfSoftBlocked) {
+  base::test::ScopedFeatureList features(chromeos::features::kOrcaDogfood);
+  ash::PickerController controller;
+  PickerClientImpl client(&controller, user_manager());
+  GetEditorMediator(profile()).OverrideEditorModeForTesting(
+      ash::input_method::EditorMode::kSoftBlocked);
+
+  EXPECT_TRUE(client.IsEligibleForEditor());
+}
 
 TEST_F(PickerClientImplEditorTest,
        CacheEditorContextReturnsNullCallbackWhenEditorFlagDisabled) {
@@ -653,6 +713,17 @@ TEST_F(PickerClientImplEditorTest,
   client.GetSuggestedEditorResults(future.GetCallback());
 
   EXPECT_THAT(future.Get(), IsEmpty());
+}
+
+TEST_F(PickerClientImplEditorTest, AnnounceSendsLiveRegionChanges) {
+  base::test::ScopedFeatureList features(chromeos::features::kOrcaDogfood);
+  ash::PickerController controller;
+  PickerClientImpl client(&controller, user_manager());
+  views::test::AXEventCounter counter(views::AXEventManager::Get());
+
+  client.Announce(u"hello");
+
+  counter.WaitForEvent(ax::mojom::Event::kLiveRegionChanged);
 }
 
 // TODO: b/325540366 - Add PickerClientImpl tests.

@@ -45,7 +45,7 @@ import org.chromium.chrome.browser.init.ChromeBrowserInitializer;
 import org.chromium.chrome.browser.notifications.channels.SiteChannelsManager;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.profiles.ProfileManager;
-import org.chromium.chrome.browser.settings.SettingsLauncherImpl;
+import org.chromium.chrome.browser.settings.SettingsLauncherFactory;
 import org.chromium.chrome.browser.usage_stats.UsageStatsService;
 import org.chromium.chrome.browser.webapps.ChromeWebApkHost;
 import org.chromium.chrome.browser.webapps.WebApkServiceClient;
@@ -145,13 +145,37 @@ public class NotificationPlatformBridge {
             this.incognito = incognito;
             this.webApkPackage = webApkPackage;
         }
+
+        /** Extracts a notification's identifying attributes from `intent` extras. */
+        public static NotificationIdentifyingAttributes extractFromIntent(Intent intent) {
+            return new NotificationIdentifyingAttributes(
+                    /* notificationId= */ intent.getStringExtra(
+                            NotificationConstants.EXTRA_NOTIFICATION_ID),
+                    /* notificationType= */ intent.getIntExtra(
+                            NotificationConstants.EXTRA_NOTIFICATION_TYPE,
+                            NotificationType.WEB_PERSISTENT),
+                    /* origin= */ intent.getStringExtra(
+                            NotificationConstants.EXTRA_NOTIFICATION_INFO_ORIGIN),
+                    /* scopeUrl= */ Objects.requireNonNullElse(
+                            intent.getStringExtra(
+                                    NotificationConstants.EXTRA_NOTIFICATION_INFO_SCOPE),
+                            ""),
+                    /* profileId= */ intent.getStringExtra(
+                            NotificationConstants.EXTRA_NOTIFICATION_INFO_PROFILE_ID),
+                    /* incognito= */ intent.getBooleanExtra(
+                            NotificationConstants.EXTRA_NOTIFICATION_INFO_PROFILE_INCOGNITO, false),
+                    /* webApkPackage= */ Objects.requireNonNullElse(
+                            intent.getStringExtra(
+                                    NotificationConstants.EXTRA_NOTIFICATION_INFO_WEBAPK_PACKAGE),
+                            ""));
+        }
     }
 
     /**
      * Creates a new instance of the NotificationPlatformBridge.
      *
      * @param nativeNotificationPlatformBridge Instance of the NotificationPlatformBridgeAndroid
-     *        class.
+     *     class.
      */
     @CalledByNative
     private static NotificationPlatformBridge create(long nativeNotificationPlatformBridge) {
@@ -237,29 +261,7 @@ public class NotificationPlatformBridge {
         recordJobNativeStartupDuration(intent);
 
         NotificationIdentifyingAttributes attributes =
-                new NotificationIdentifyingAttributes(
-                        /* notificationId= */ intent.getStringExtra(
-                                NotificationConstants.EXTRA_NOTIFICATION_ID),
-                        /* notificationType= */ intent.getIntExtra(
-                                NotificationConstants.EXTRA_NOTIFICATION_TYPE,
-                                NotificationType.WEB_PERSISTENT),
-                        /* origin= */ intent.getStringExtra(
-                                NotificationConstants.EXTRA_NOTIFICATION_INFO_ORIGIN),
-                        /* scopeUrl= */ Objects.requireNonNullElse(
-                                intent.getStringExtra(
-                                        NotificationConstants.EXTRA_NOTIFICATION_INFO_SCOPE),
-                                ""),
-                        /* profileId= */ intent.getStringExtra(
-                                NotificationConstants.EXTRA_NOTIFICATION_INFO_PROFILE_ID),
-                        /* incognito= */ intent.getBooleanExtra(
-                                NotificationConstants.EXTRA_NOTIFICATION_INFO_PROFILE_INCOGNITO,
-                                false),
-                        /* webApkPackage= */ Objects.requireNonNullElse(
-                                intent.getStringExtra(
-                                        NotificationConstants
-                                                .EXTRA_NOTIFICATION_INFO_WEBAPK_PACKAGE),
-                                ""));
-
+                NotificationIdentifyingAttributes.extractFromIntent(intent);
         Log.i(
                 TAG,
                 String.format(
@@ -390,7 +392,7 @@ public class NotificationPlatformBridge {
                 launchSingleWebsitePreferences
                         ? SingleWebsiteSettings.class
                         : SingleCategorySettings.class;
-        SettingsLauncher settingsLauncher = new SettingsLauncherImpl();
+        SettingsLauncher settingsLauncher = SettingsLauncherFactory.createSettingsLauncher();
         settingsLauncher.launchSettingsActivity(applicationContext, fragment, fragmentArguments);
     }
 
@@ -1003,7 +1005,7 @@ public class NotificationPlatformBridge {
         // TODO(peter): Generalize the NotificationPlatformBridge sufficiently to not need
         // to care about the individual notification types.
         // Set up a pending intent for going to the settings screen for |origin|.
-        SettingsLauncher settingsLauncher = new SettingsLauncherImpl();
+        SettingsLauncher settingsLauncher = SettingsLauncherFactory.createSettingsLauncher();
         Intent settingsIntent =
                 settingsLauncher.createSettingsActivityIntent(
                         context,

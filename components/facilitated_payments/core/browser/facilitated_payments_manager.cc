@@ -49,6 +49,7 @@ void FacilitatedPaymentsManager::Reset() {
   }
   pix_code_detection_attempt_count_ = 0;
   ukm_source_id_ = 0;
+  trigger_source_ = TriggerSource::kUnknown;
   pix_code_detection_triggering_timer_.Stop();
   initiate_payment_request_details_ =
       std::make_unique<FacilitatedPaymentsInitiatePaymentRequestDetails>();
@@ -63,7 +64,8 @@ void FacilitatedPaymentsManager::
   switch (GetAllowlistCheckResult(url)) {
     case optimization_guide::OptimizationGuideDecision::kTrue: {
       ukm_source_id_ = ukm_source_id;
-      initiate_payment_request_details_->merchant_payment_page_url_ = url;
+      initiate_payment_request_details_->merchant_payment_page_hostname_ =
+          url.host();
       // The PIX code detection should be triggered after `kPageLoadWaitTime`.
       // Time spent waiting for the allowlist checking infra should be accounted
       // for.
@@ -93,7 +95,10 @@ void FacilitatedPaymentsManager::
 
 void FacilitatedPaymentsManager::OnPixCodeCopiedToClipboard(
     const GURL& render_frame_host_url,
-    const std::string& pix_code) {
+    const std::string& pix_code,
+    ukm::SourceId ukm_source_id) {
+  ukm_source_id_ = ukm_source_id;
+  trigger_source_ = TriggerSource::kCopyEvent;
   // Check whether the domain for the render_frame_host_url is allowlisted.
   auto decision = optimization_guide_decider_->CanApplyOptimization(
       render_frame_host_url,
@@ -108,8 +113,8 @@ void FacilitatedPaymentsManager::OnPixCodeCopiedToClipboard(
     // because a Pix code would've already been found via DOM search.
     return;
   }
-  initiate_payment_request_details_->merchant_payment_page_url_ =
-      render_frame_host_url;
+  initiate_payment_request_details_->merchant_payment_page_hostname_ =
+      render_frame_host_url.host();
   // Trigger Pix code validation.
   utility_process_validator_.ValidatePixCode(
       pix_code, base::BindOnce(&FacilitatedPaymentsManager::OnPixCodeValidated,
@@ -177,7 +182,7 @@ void FacilitatedPaymentsManager::ProcessPixCodeDetectionResult(
     Reset();
     return;
   }
-
+  trigger_source_ = TriggerSource::kDOMSearch;
   utility_process_validator_.ValidatePixCode(
       pix_code, base::BindOnce(&FacilitatedPaymentsManager::OnPixCodeValidated,
                                weak_ptr_factory_.GetWeakPtr(), pix_code));
@@ -303,8 +308,9 @@ void FacilitatedPaymentsManager::OnPixPaymentPromptResult(
     bool is_prompt_accepted,
     int64_t selected_instrument_id) {
   if (!is_prompt_accepted) {
-    LogTransactionResult(TransactionResult::kAbandoned,
-                         base::TimeTicks::Now() - fop_selector_shown_time_);
+    LogTransactionResult(TransactionResult::kAbandoned, trigger_source_,
+                         base::TimeTicks::Now() - fop_selector_shown_time_,
+                         ukm_source_id_);
     Reset();
     return;
   }
@@ -325,8 +331,9 @@ void FacilitatedPaymentsManager::OnGetClientToken(
       (base::TimeTicks::Now() - get_client_token_loading_start_time_));
   if (client_token.empty()) {
     client_->ShowErrorScreen();
-    LogTransactionResult(TransactionResult::kFailed,
-                         base::TimeTicks::Now() - fop_selector_shown_time_);
+    LogTransactionResult(TransactionResult::kFailed, trigger_source_,
+                         base::TimeTicks::Now() - fop_selector_shown_time_,
+                         ukm_source_id_);
     Reset();
     return;
   }
@@ -360,8 +367,9 @@ void FacilitatedPaymentsManager::OnInitiatePaymentResponseReceived(
       autofill::payments::PaymentsAutofillClient::PaymentsRpcResult::kSuccess) {
     LogInitiatePaymentResult(/*result=*/false, latency);
     client_->ShowErrorScreen();
-    LogTransactionResult(TransactionResult::kFailed,
-                         base::TimeTicks::Now() - fop_selector_shown_time_);
+    LogTransactionResult(TransactionResult::kFailed, trigger_source_,
+                         base::TimeTicks::Now() - fop_selector_shown_time_,
+                         ukm_source_id_);
     Reset();
     return;
   }
@@ -369,8 +377,9 @@ void FacilitatedPaymentsManager::OnInitiatePaymentResponseReceived(
   DCHECK(response_details);
   if (response_details->action_token_.empty()) {
     client_->ShowErrorScreen();
-    LogTransactionResult(TransactionResult::kFailed,
-                         base::TimeTicks::Now() - fop_selector_shown_time_);
+    LogTransactionResult(TransactionResult::kFailed, trigger_source_,
+                         base::TimeTicks::Now() - fop_selector_shown_time_,
+                         ukm_source_id_);
     Reset();
     return;
   }
@@ -380,8 +389,9 @@ void FacilitatedPaymentsManager::OnInitiatePaymentResponseReceived(
   // abandon the payment flow.
   if (!account_info.has_value() || account_info.value().IsEmpty()) {
     client_->ShowErrorScreen();
-    LogTransactionResult(TransactionResult::kFailed,
-                         base::TimeTicks::Now() - fop_selector_shown_time_);
+    LogTransactionResult(TransactionResult::kFailed, trigger_source_,
+                         base::TimeTicks::Now() - fop_selector_shown_time_,
+                         ukm_source_id_);
     Reset();
     return;
   }
@@ -417,8 +427,9 @@ void FacilitatedPaymentsManager::OnPurchaseActionResult(
       transaction_result = TransactionResult::kAbandoned;
       break;
   }
-  LogTransactionResult(transaction_result,
-                       base::TimeTicks::Now() - fop_selector_shown_time_);
+  LogTransactionResult(transaction_result, trigger_source_,
+                       base::TimeTicks::Now() - fop_selector_shown_time_,
+                       ukm_source_id_);
 }
 
 void FacilitatedPaymentsManager::ResetForTesting() {

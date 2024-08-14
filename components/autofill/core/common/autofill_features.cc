@@ -69,9 +69,15 @@ BASE_FEATURE(kAutofillCreditCardUserPerceptionSurvey,
 // time passes between all submissions.
 BASE_FEATURE(kAutofillAssociateForms,
              "AutofillAssociateForms",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 const base::FeatureParam<base::TimeDelta> kAutofillAssociateFormsTTL{
     &kAutofillAssociateForms, "associate_forms_ttl", base::Minutes(5)};
+
+// Autofill offers improvements on how field types and filling values are
+// predicted.
+BASE_FEATURE(kAutofillPredictionImprovementsEnabled,
+             "AutofillPredictionImprovementsEnabled",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, Autofill always sets the phone number as parsed by
 // i18n::phonenumber.
@@ -249,12 +255,26 @@ BASE_FEATURE(kAutofillEnableEmailHeuristicOnlyAddressForms,
              "AutofillEnableEmailHeuristicOnlyAddressForms",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Controls if heuristic field parsing should be performed on email-only forms
+// without an enclosing form tag. This feature will only be launched once
+// `kAutofillEnableEmailHeuristicOnlyAddressForms` rolls out.
+// TODO(crbug.com/40285735): Remove when/if launched.
+BASE_FEATURE(kAutofillEnableEmailHeuristicOutsideForms,
+             "AutofillEnableEmailHeuristicOutsideForms",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // When true, use autocomplete=email as required signal for email fields on
 // email-only forms, else accept a wider range of autocomplete values except for
 // `off` and `false`.
 const base::FeatureParam<bool> kAutofillEnableEmailHeuristicAutocompleteEmail{
     &kAutofillEnableEmailHeuristicOnlyAddressForms, "autocomplete_email",
     false};
+
+// Control if Autofill supports German transliteration.
+// TODO(crbug.com/328968064): Remove when/if launched.
+BASE_FEATURE(kAutofillEnableGermanTransliteration,
+             "AutofillEnableGermanTransliteration",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Controls if Chrome support filling and importing apartment numbers.
 // TODO(crbug.com/40734406): Remove once launched.
@@ -292,6 +312,13 @@ BASE_FEATURE(kAutofillEnableLabelPrecedenceForTurkishAddresses,
              "AutofillEnableLabelPrecedenceForTurkishAddresses",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// When enabled, focusing on a credit card number field that was traditionally
+// autofilled will yield all credit card suggestions.
+// TODO(crbug.com/354175563): Remove when launched.
+BASE_FEATURE(kAutofillEnablePaymentsFieldSwapping,
+             "AutofillEnablePaymentsFieldSwapping",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, trunk prefix-related phone number types are added to the
 // supported and matching types of |PhoneNumber|. Local heuristics for these
 // types are enabled as well.
@@ -315,7 +342,7 @@ BASE_FEATURE(kAutofillExtractOnlyNonAdFrames,
 // on iOS.
 BASE_FEATURE(kAutofillEnableXHRSubmissionDetectionIOS,
              "AutofillEnableXHRSubmissionDetectionIOS",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 // LINT.ThenChange(//components/autofill/ios/form_util/resources/autofill_form_features.ts:autofill_xhr_submission_detection_ios)
 
 // When enabled, focusing on an autofilled field that was traditionally filled
@@ -336,22 +363,10 @@ BASE_FEATURE(kAutofillFixCachingOnJavaScriptChanges,
              "AutofillFixCachingOnJavaScriptChanges",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Changes the semantics of FocusOnFormField() and FocusOnNonFormField() so that
-// - FocusOnFormField() is called when the focus moves to another field,
-//   including fields owned by form, unowned fields, and contenteditables.
-// - FocusOnNonFormField() is called in all remaining cases.
-// See crbug.com/337690061 for details.
-// This is a kill switch.
-// TODO(crbug.com/337690061): Remove when cleaning up
-// `kAutofillNewFocusEvents`.
-BASE_FEATURE(kAutofillNewFocusEvents,
-             "AutofillNewFocusEvents",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Killswitch for not running logic in `AutofillAgent::ApplyFieldsAction` that
-// is responsible for updating `AutofillAgent::last_queried_element_`.
-BASE_FEATURE(kAutofillDontUpdateLastQueriedElementOnFill,
-             "AutofillDontUpdateLastQueriedElementOnFill",
+// Killswitch for not running logic in `form_util::ClearPreviewedElements` that
+// force-sets the selectionrange of the focused element.
+BASE_FEATURE(kAutofillDontUpdateSelectionRangeOnPreviewClearing,
+             "AutofillDontUpdateSelectionRangeOnPreviewClearing",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Killswitch for not trying to find a cached AutofillField from a FormFieldData
@@ -365,10 +380,10 @@ BASE_FEATURE(kAutofillFindCachedFieldsByIdOnly,
 // N depends on the parametrization of the feature.
 BASE_FEATURE(kAutofillSuggestionNStrikeModel,
              "AutofillSuggestionNStrikeModel",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 const base::FeatureParam<int> kSuggestionStrikeLimit{
-    &kAutofillSuggestionNStrikeModel, "strike-limit", 5};
+    &kAutofillSuggestionNStrikeModel, "strike-limit", 3};
 
 // Makes disused suggestion suppression logic ignore the first
 // `kNumberOfIgnoredSuggestions` suggestions (in frecency order), so that the
@@ -562,6 +577,13 @@ BASE_FEATURE(kAutofillPopupDisablePaintChecks,
              "AutofillPopupDisablePaintChecks",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// If the feature is enabled, before triggering suggestion acceptance, the row
+// view checks that a substantial portion of its content was visible for some
+// minimum required period.
+BASE_FEATURE(kAutofillPopupDontAcceptNonVisibleEnoughSuggestion,
+             "AutofillPopupDontAcceptNonVisibleEnoughSuggestion",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If the feature is enabled, the time measurement for when the popup was shown
 // is only made after the popup view has been painted once.
 // TODO: crbug.com/40279821 - Clean up when launched.
@@ -670,13 +692,12 @@ BASE_FEATURE(kAutofillSilentProfileUpdateForInsufficientImport,
 
 // Sends text change events for contenteditable elements. When this is off,
 // only input elements and maybe textarea elements send text change events.
-// Enabled by default for Mac and Windows platforms.
 BASE_FEATURE(kAutofillContentEditableChangeEvents,
              "AutofillContentEditableChangeEvents",
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-             base::FEATURE_ENABLED_BY_DEFAULT
-#else
+#if BUILDFLAG(IS_IOS)
              base::FEATURE_DISABLED_BY_DEFAULT
+#else
+             base::FEATURE_ENABLED_BY_DEFAULT
 #endif
 );
 
@@ -808,6 +829,28 @@ BASE_FEATURE(kAutofillUpdateLowQualityTokenOnImport,
              "AutofillUpdateLowQualityTokenOnImport",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kAutofillUKMExperimentalFields,
+             "AutofillUKMExperimentalFields",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+const base::FeatureParam<std::string> kAutofillUKMExperimentalFieldsBucket0{
+    &kAutofillUKMExperimentalFields, "autofill_experimental_regex_bucket0", ""};
+const base::FeatureParam<std::string> kAutofillUKMExperimentalFieldsBucket1{
+    &kAutofillUKMExperimentalFields, "autofill_experimental_regex_bucket1", ""};
+const base::FeatureParam<std::string> kAutofillUKMExperimentalFieldsBucket2{
+    &kAutofillUKMExperimentalFields, "autofill_experimental_regex_bucket2", ""};
+const base::FeatureParam<std::string> kAutofillUKMExperimentalFieldsBucket3{
+    &kAutofillUKMExperimentalFields, "autofill_experimental_regex_bucket3", ""};
+const base::FeatureParam<std::string> kAutofillUKMExperimentalFieldsBucket4{
+    &kAutofillUKMExperimentalFields, "autofill_experimental_regex_bucket4", ""};
+
+// When enabled, `AutofillProfile` tracks the second and third last use date of
+// each profile (instead of just the last use date).
+// TODO(crbug.com/354706653): Remove when launched.
+COMPONENT_EXPORT(AUTOFILL)
+BASE_FEATURE(kAutofillTrackMultipleUseDates,
+             "AutofillTrackMultipleUseDates",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 #if BUILDFLAG(IS_ANDROID)
 // Controls if Chrome Autofill UI surfaces ignore touch events if something is
 // fully or partially obscuring the Chrome window.
@@ -871,6 +914,12 @@ BASE_FEATURE(kAutofillDisableSilentProfileUpdates,
              "AutofillDisableSilentProfileUpdates",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Kill switch for disabling suppressing suggestions based on the strike
+// database.
+BASE_FEATURE(kAutofillDisableSuggestionStrikeDatabase,
+             "AutofillDisableSuggestionStrikeDatabase",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables logging the content of chrome://autofill-internals to the terminal.
 BASE_FEATURE(kAutofillLogToTerminal,
              "AutofillLogToTerminal",
@@ -916,6 +965,12 @@ BASE_FEATURE(kAutofillServerCommunication,
 BASE_FEATURE(kAutofillShowTypePredictions,
              "AutofillShowTypePredictions",
              base::FEATURE_DISABLED_BY_DEFAULT);
+// This variation controls whether the verbose version of the feature is used.
+// In this version more information is attached to the respective DOM element,
+// such as aria labels and descriptions and select element options values and
+// texts.
+const base::FeatureParam<bool> kAutofillShowTypePredictionsVerboseParam{
+    &kAutofillShowTypePredictions, "verbose", false};
 
 // Autofill upload throttling limits uploading a form to the Autofill server
 // more than once over a `kAutofillUploadThrottlingPeriodInDays` period.

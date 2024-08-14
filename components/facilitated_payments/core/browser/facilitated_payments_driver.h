@@ -30,10 +30,11 @@ class FacilitatedPaymentsDriver {
       delete;
   virtual ~FacilitatedPaymentsDriver();
 
-  // Informs `FacilitatedPaymentsManager` about a navigation that has committed.
-  // It is invoked only for the primary main frame by the platform-specific
-  // implementation.
-  void DidFinishNavigation() const;
+  // Informs `FacilitatedPaymentsManager` that a navigation related event has
+  // taken place. The navigation could be to the currently displayed page, or
+  // away from the currently displayed page. It is invoked only for the primary
+  // main frame by the platform-specific implementation.
+  void DidNavigateToOrAwayFromPage() const;
 
   // Informs `FacilitatedPaymentsManager` that the content has finished loading
   // in the primary main frame. It is invoked by the platform-specific
@@ -51,7 +52,8 @@ class FacilitatedPaymentsDriver {
   // Inform the `FacilitatedPaymentsManager` about `copied_text` being copied to
   // the clipboard. It is invoked only for the primary main frame.
   virtual void OnTextCopiedToClipboard(const GURL& render_frame_host_url,
-                                       const std::u16string& copied_text);
+                                       const std::u16string& copied_text,
+                                       ukm::SourceId ukm_source_id);
 
  private:
   std::unique_ptr<FacilitatedPaymentsManager> manager_;

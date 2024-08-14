@@ -49,25 +49,6 @@ class LayoutPanel : public View {
 BEGIN_METADATA(LayoutPanel)
 END_METADATA
 
-// This View holds two other views which consists of a view on the left onto
-// which the BoxLayout is attached for demonstrating its features. The view
-// on the right contains all the various controls which allow the user to
-// interactively control the various features/properties of BoxLayout.
-// Layout will ensure the left view takes 75% and the right view fills the
-// remaining 25%.
-class FullPanel : public View {
-  METADATA_HEADER(FullPanel, View)
-
- public:
-  FullPanel() = default;
-  FullPanel(const FullPanel&) = delete;
-  FullPanel& operator=(const FullPanel&) = delete;
-  ~FullPanel() override = default;
-};
-
-BEGIN_METADATA(FullPanel)
-END_METADATA
-
 std::unique_ptr<Textfield> CreateCommonTextfield(
     TextfieldController* container) {
   auto textfield = std::make_unique<Textfield>();
@@ -89,10 +70,18 @@ std::unique_ptr<Textfield> CreateCommonTextfieldWithAXName(
 }  // namespace
 
 void LayoutExampleBase::InsetTextfields::ResetControllers() {
-  left->set_controller(nullptr);
-  top->set_controller(nullptr);
-  right->set_controller(nullptr);
-  bottom->set_controller(nullptr);
+  if (left) {
+    left->set_controller(nullptr);
+  }
+  if (top) {
+    top->set_controller(nullptr);
+  }
+  if (right) {
+    right->set_controller(nullptr);
+  }
+  if (bottom) {
+    bottom->set_controller(nullptr);
+  }
 }
 
 LayoutExampleBase::ChildPanel::ChildPanel(LayoutExampleBase* example)
@@ -217,9 +206,15 @@ END_METADATA
 LayoutExampleBase::LayoutExampleBase(const char* title) : ExampleBase(title) {}
 
 LayoutExampleBase::~LayoutExampleBase() {
-  layout_panel_->RemoveAllChildViews();
-  preferred_width_view_->set_controller(nullptr);
-  preferred_height_view_->set_controller(nullptr);
+  if (layout_panel_) {
+    layout_panel_->RemoveAllChildViews();
+  }
+  if (preferred_width_view_) {
+    preferred_width_view_->set_controller(nullptr);
+  }
+  if (preferred_height_view_) {
+    preferred_height_view_->set_controller(nullptr);
+  }
 }
 
 void LayoutExampleBase::RefreshLayoutPanel(bool update_layout) {
@@ -314,19 +309,24 @@ Checkbox* LayoutExampleBase::CreateAndAddCheckbox(
 
 void LayoutExampleBase::CreateExampleView(View* container) {
   container->SetLayoutManager(std::make_unique<FillLayout>());
-  View* full_panel = container->AddChildView(std::make_unique<FullPanel>());
+  View* full_panel = container->AddChildView(std::make_unique<View>());
 
   auto* const manager = full_panel->SetLayoutManager(
       std::make_unique<BoxLayout>(views::BoxLayout::Orientation::kHorizontal));
   layout_panel_ = full_panel->AddChildView(std::make_unique<LayoutPanel>());
-  manager->SetFlexForView(layout_panel_, 3);
+  // Expand the layout panel as much as possible.
+  manager->SetFlexForView(layout_panel_, 1);
 
   control_panel_ = full_panel->AddChildView(std::make_unique<View>());
-  manager->SetFlexForView(control_panel_, 1);
-  control_panel_->SetLayoutManager(std::make_unique<BoxLayout>(
-      BoxLayout::Orientation::kVertical,
-      gfx::Insets::VH(kLayoutExampleVerticalSpacing, kLayoutExampleLeftPadding),
-      kLayoutExampleVerticalSpacing));
+  // Used the preferred width for control panel.
+  manager->SetFlexForView(control_panel_, 0);
+  control_panel_
+      ->SetLayoutManager(std::make_unique<BoxLayout>(
+          BoxLayout::Orientation::kVertical,
+          gfx::Insets::VH(kLayoutExampleVerticalSpacing,
+                          kLayoutExampleLeftPadding),
+          kLayoutExampleVerticalSpacing))
+      ->set_cross_axis_alignment(LayoutAlignment::kStart);
 
   auto* const row = control_panel_->AddChildView(std::make_unique<View>());
   row->SetLayoutManager(std::make_unique<BoxLayout>(

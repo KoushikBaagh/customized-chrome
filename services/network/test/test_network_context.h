@@ -78,6 +78,8 @@ class TestNetworkContext : public mojom::NetworkContext {
       const url::Origin& top_frame_origin) override {}
   void GetStoredTrustTokenCounts(
       GetStoredTrustTokenCountsCallback callback) override {}
+  void GetPrivateStateTokenRedemptionRecords(
+      GetPrivateStateTokenRedemptionRecordsCallback callback) override {}
   void DeleteStoredTrustTokens(
       const url::Origin& issuer,
       DeleteStoredTrustTokensCallback callback) override {}
@@ -129,6 +131,8 @@ class TestNetworkContext : public mojom::NetworkContext {
       const url::Origin& origin,
       const net::IsolationInfo& isolation_info,
       const base::flat_map<std::string, std::string>& endpoints) override {}
+  void SetEnterpriseReportingEndpoints(
+      const base::flat_map<std::string, GURL>& endpoints) override {}
   void SendReportsAndRemoveSource(
       const base::UnguessableToken& reporting_source) override {}
   void QueueReport(
@@ -137,16 +141,11 @@ class TestNetworkContext : public mojom::NetworkContext {
       const GURL& url,
       const std::optional<base::UnguessableToken>& reporting_source,
       const net::NetworkAnonymizationKey& network_anonymization_key,
-      const std::optional<std::string>& user_agent,
       base::Value::Dict body) override {}
-  void QueueEnterpriseReport(
-      const std::string& type,
-      const std::string& group,
-      const GURL& url,
-      const std::optional<base::UnguessableToken>& reporting_source,
-      const net::NetworkAnonymizationKey& network_anonymization_key,
-      const std::optional<std::string>& user_agent,
-      base::Value::Dict body) override {}
+  void QueueEnterpriseReport(const std::string& type,
+                             const std::string& group,
+                             const GURL& url,
+                             base::Value::Dict body) override {}
   void QueueSignedExchangeReport(
       mojom::SignedExchangeReportPtr report,
       const net::NetworkAnonymizationKey& network_anonymization_key) override {}

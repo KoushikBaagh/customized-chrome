@@ -16,25 +16,20 @@ found in the LICENSE file.
     </style>
 
     <!-- Omnibox suggestions -->
-    <style name="TextAppearance.OmniboxAnswerDescriptionNegativeSmall">
-        <item name="android:textSize">@dimen/text_size_small</item>
+    <style name="TextAppearance.OmniboxAnswerDescriptionNegative">
         <item name="android:textColor">@color/answers_description_text_negative</item>
     </style>
 
-    <style name="TextAppearance.OmniboxAnswerDescriptionPositiveSmall">
-        <item name="android:textSize">@dimen/text_size_small</item>
+    <style name="TextAppearance.OmniboxAnswerDescriptionPositive">
         <item name="android:textColor">@color/answers_description_text_positive</item>
     </style>
 
-    <style name="TextAppearance.OmniboxAnswerCardPrimaryMedium" parent="TextAppearance.AccentMediumStyle">
-        <!-- textFontWeight isn't supported pre-P, and there are no good
-        workarounds that work well with TextAppearanceSpan, which has buggy
-        support for font weights when not explicitly using textFontWeight.
-         Pre-P users (<10% at time of writing) will see weight 400 text.-->
-        <item name="android:textFontWeight" tools:targetApi="p">500</item>
-        <item name="android:textSize">@dimen/rich_answer_card_headline_size</item>
-        <item name="leading">@dimen/rich_answer_card_headline_leading</item>
-        <item name="android:textColor">@macro/default_text_color</item>
+    <style name="TextAppearance.OmniboxAnswerDescriptionNegativeSmall" parent="TextAppearance.OmniboxAnswerDescriptionNegative">
+        <item name="android:textSize">@dimen/text_size_small</item>
+    </style>
+
+    <style name="TextAppearance.OmniboxAnswerDescriptionPositiveSmall" parent="TextAppearance.OmniboxAnswerDescriptionPositive">
+        <item name="android:textSize">@dimen/text_size_small</item>
     </style>
 
     <style name="OmniboxIcon" parent="LocationBarButton">

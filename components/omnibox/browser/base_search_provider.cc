@@ -98,12 +98,16 @@ BaseSearchProvider::BaseSearchProvider(AutocompleteProvider::Type type,
 
 // static
 bool BaseSearchProvider::ShouldPrefetch(const AutocompleteMatch& match) {
-  return match.GetAdditionalInfo(kShouldPrefetchKey) == kTrue;
+  // TODO (manukh): `GetAdditionalInfoForDebugging()` shouldn't be used for
+  //   non-debugging purposes.
+  return match.GetAdditionalInfoForDebugging(kShouldPrefetchKey) == kTrue;
 }
 
 // static
 bool BaseSearchProvider::ShouldPrerender(const AutocompleteMatch& match) {
-  return match.GetAdditionalInfo(kShouldPrerenderKey) == kTrue;
+  // TODO (manukh): `GetAdditionalInfoForDebugging()` shouldn't be used for
+  //   non-debugging purposes.
+  return match.GetAdditionalInfoForDebugging(kShouldPrerenderKey) == kTrue;
 }
 
 // static
@@ -422,12 +426,16 @@ bool BaseSearchProvider::CanSendSuggestRequestWithPageURL(
 
 void BaseSearchProvider::DeleteMatch(const AutocompleteMatch& match) {
   DCHECK(match.deletable);
-  if (!match.GetAdditionalInfo(BaseSearchProvider::kDeletionUrlKey).empty()) {
+  // TODO (manukh): `GetAdditionalInfoForDebugging()` shouldn't be used for
+  //   non-debugging purposes.
+  if (!match.GetAdditionalInfoForDebugging(BaseSearchProvider::kDeletionUrlKey)
+           .empty()) {
     deletion_loaders_.push_back(
         client()
             ->GetRemoteSuggestionsService(/*create_if_necessary=*/true)
             ->StartDeletionRequest(
-                match.GetAdditionalInfo(BaseSearchProvider::kDeletionUrlKey),
+                match.GetAdditionalInfoForDebugging(
+                    BaseSearchProvider::kDeletionUrlKey),
                 base::BindOnce(&BaseSearchProvider::OnDeletionComplete,
                                base::Unretained(this))));
   }
@@ -458,7 +466,6 @@ const char BaseSearchProvider::kRelevanceFromServerKey[] =
     "relevance_from_server";
 const char BaseSearchProvider::kShouldPrefetchKey[] = "should_prefetch";
 const char BaseSearchProvider::kShouldPrerenderKey[] = "should_prerender";
-const char BaseSearchProvider::kSuggestMetadataKey[] = "suggest_metadata";
 const char BaseSearchProvider::kDeletionUrlKey[] = "deletion_url";
 const char BaseSearchProvider::kTrue[] = "true";
 const char BaseSearchProvider::kFalse[] = "false";
@@ -501,7 +508,6 @@ void BaseSearchProvider::SetDeletionURL(const std::string& deletion_url,
 
 void BaseSearchProvider::AddMatchToMap(
     const SearchSuggestionParser::SuggestResult& result,
-    const std::string& metadata,
     const AutocompleteInput& input,
     const TemplateURL* template_url,
     const SearchTermsData& search_terms_data,
@@ -523,19 +529,20 @@ void BaseSearchProvider::AddMatchToMap(
   SetDeletionURL(result.deletion_url(), &match);
   if (mark_as_deletable)
     match.deletable = true;
-  // Metadata is needed only for prefetching queries.
-  if (result.should_prefetch())
-    match.RecordAdditionalInfo(kSuggestMetadataKey, metadata);
 
-  // Initialize the ML scoring signals for this suggestion if needed.
-  if (!match.scoring_signals) {
-    match.scoring_signals = std::make_optional<ScoringSignals>();
-  }
+  // Only set scoring signals for eligible matches.
+  if (match.IsMlSignalLoggingEligible()) {
+    // Initialize the ML scoring signals for this suggestion if needed.
+    if (!match.scoring_signals) {
+      match.scoring_signals = std::make_optional<ScoringSignals>();
+    }
 
-  if (result.relevance_from_server()) {
-    match.scoring_signals->set_search_suggest_relevance(result.relevance());
+    if (result.relevance_from_server()) {
+      match.scoring_signals->set_search_suggest_relevance(result.relevance());
+    }
+    SearchScoringSignalsAnnotator::UpdateMatchTypeScoringSignals(match,
+                                                                 input.text());
   }
-  SearchScoringSignalsAnnotator::UpdateIsSearchSuggestEntity(match);
 
   // Try to add `match` to `map`.
   // NOTE: Keep this ToLower() call in sync with url_database.cc.
@@ -609,9 +616,6 @@ void BaseSearchProvider::AddMatchToMap(
             result.should_prefetch() || ShouldPrefetch(existing_match);
         existing_match.RecordAdditionalInfo(kShouldPrefetchKey,
                                             should_prefetch ? kTrue : kFalse);
-        if (should_prefetch) {
-          existing_match.RecordAdditionalInfo(kSuggestMetadataKey, metadata);
-        }
         const bool should_prerender =
             result.should_prerender() || ShouldPrerender(existing_match);
         existing_match.RecordAdditionalInfo(kShouldPrerenderKey,

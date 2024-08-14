@@ -81,6 +81,16 @@ class ContextRecyclerTest : public testing::Test {
   }
   ~ContextRecyclerTest() override = default;
 
+  auction_worklet::mojom::EventTypePtr Reserved(
+      auction_worklet::mojom::ReservedEventType reserved_event_type) {
+    return auction_worklet::mojom::EventType::NewReserved(reserved_event_type);
+  }
+
+  auction_worklet::mojom::EventTypePtr NonReserved(
+      const std::string& event_type) {
+    return auction_worklet::mojom::EventType::NewNonReserved(event_type);
+  }
+
   v8::Local<v8::UnboundScript> Compile(const std::string& code) {
     v8::Local<v8::UnboundScript> script;
     v8::Context::Scope ctx(helper_->scratch_context());
@@ -104,15 +114,18 @@ class ContextRecyclerTest : public testing::Test {
     if (!maybe_arg.IsEmpty()) {
       args.push_back(maybe_arg);
     }
-    if (!helper_->RunScript(scope.GetContext(), script,
-                            /*debug_id=*/nullptr, time_limit_.get(),
-                            error_msgs)) {
+    if (helper_->RunScript(scope.GetContext(), script,
+                           /*debug_id=*/nullptr, time_limit_.get(),
+                           error_msgs) != AuctionV8Helper::Result::kSuccess) {
       return {};
     }
-    return helper_->CallFunction(
-        scope.GetContext(),
-        /*debug_id=*/nullptr, helper_->FormatScriptName(script), function_name,
-        args, time_limit_.get(), error_msgs);
+
+    v8::MaybeLocal<v8::Value> result;
+    helper_->CallFunction(scope.GetContext(),
+                          /*debug_id=*/nullptr,
+                          helper_->FormatScriptName(script), function_name,
+                          args, time_limit_.get(), result, error_msgs);
+    return result;
   }
 
   // Runs a function with a list of arguments.
@@ -121,15 +134,17 @@ class ContextRecyclerTest : public testing::Test {
                                 const std::string& function_name,
                                 std::vector<std::string>& error_msgs,
                                 v8::LocalVector<v8::Value> args) {
-    if (!helper_->RunScript(scope.GetContext(), script,
-                            /*debug_id=*/nullptr, time_limit_.get(),
-                            error_msgs)) {
+    if (helper_->RunScript(scope.GetContext(), script,
+                           /*debug_id=*/nullptr, time_limit_.get(),
+                           error_msgs) != AuctionV8Helper::Result::kSuccess) {
       return {};
     }
-    return helper_->CallFunction(
-        scope.GetContext(),
-        /*debug_id=*/nullptr, helper_->FormatScriptName(script), function_name,
-        args, time_limit_.get(), error_msgs);
+    v8::MaybeLocal<v8::Value> result;
+    helper_->CallFunction(scope.GetContext(),
+                          /*debug_id=*/nullptr,
+                          helper_->FormatScriptName(script), function_name,
+                          args, time_limit_.get(), result, error_msgs);
+    return result;
   }
 
   std::string RunExpectString(
@@ -1724,6 +1739,7 @@ TEST_F(ContextRecyclerTest, SharedStorageMethods) {
     ContextRecyclerScope scope(context_recycler);  // Initialize context
     context_recycler.AddSharedStorageBindings(
         &test_shared_storage_host,
+        mojom::AuctionWorkletFunction::kBidderGenerateBid,
         /*shared_storage_permissions_policy_allowed=*/true);
   }
 
@@ -1740,10 +1756,13 @@ TEST_F(ContextRecyclerTest, SharedStorageMethods) {
     EXPECT_THAT(error_msgs, ElementsAre());
 
     EXPECT_THAT(test_shared_storage_host.observed_requests(),
-                ElementsAre(Request{.type = RequestType::kSet,
-                                    .key = u"a",
-                                    .value = u"b",
-                                    .ignore_if_present = false}));
+                ElementsAre(Request{
+                    .type = RequestType::kSet,
+                    .key = u"a",
+                    .value = u"b",
+                    .ignore_if_present = false,
+                    .source_auction_worklet_function =
+                        mojom::AuctionWorkletFunction::kBidderGenerateBid}));
 
     test_shared_storage_host.ClearObservedRequests();
   }
@@ -1766,10 +1785,13 @@ TEST_F(ContextRecyclerTest, SharedStorageMethods) {
     EXPECT_THAT(error_msgs, ElementsAre());
 
     EXPECT_THAT(test_shared_storage_host.observed_requests(),
-                ElementsAre(Request{.type = RequestType::kSet,
-                                    .key = u"a",
-                                    .value = u"b",
-                                    .ignore_if_present = true}));
+                ElementsAre(Request{
+                    .type = RequestType::kSet,
+                    .key = u"a",
+                    .value = u"b",
+                    .ignore_if_present = true,
+                    .source_auction_worklet_function =
+                        mojom::AuctionWorkletFunction::kBidderGenerateBid}));
 
     test_shared_storage_host.ClearObservedRequests();
   }
@@ -1787,10 +1809,13 @@ TEST_F(ContextRecyclerTest, SharedStorageMethods) {
     EXPECT_THAT(error_msgs, ElementsAre());
 
     EXPECT_THAT(test_shared_storage_host.observed_requests(),
-                ElementsAre(Request{.type = RequestType::kAppend,
-                                    .key = u"a",
-                                    .value = u"b",
-                                    .ignore_if_present = false}));
+                ElementsAre(Request{
+                    .type = RequestType::kAppend,
+                    .key = u"a",
+                    .value = u"b",
+                    .ignore_if_present = false,
+                    .source_auction_worklet_function =
+                        mojom::AuctionWorkletFunction::kBidderGenerateBid}));
 
     test_shared_storage_host.ClearObservedRequests();
   }
@@ -1807,10 +1832,13 @@ TEST_F(ContextRecyclerTest, SharedStorageMethods) {
     EXPECT_THAT(error_msgs, ElementsAre());
 
     EXPECT_THAT(test_shared_storage_host.observed_requests(),
-                ElementsAre(Request{.type = RequestType::kDelete,
-                                    .key = u"a",
-                                    .value = std::u16string(),
-                                    .ignore_if_present = false}));
+                ElementsAre(Request{
+                    .type = RequestType::kDelete,
+                    .key = u"a",
+                    .value = std::u16string(),
+                    .ignore_if_present = false,
+                    .source_auction_worklet_function =
+                        mojom::AuctionWorkletFunction::kBidderGenerateBid}));
 
     test_shared_storage_host.ClearObservedRequests();
   }
@@ -1827,10 +1855,13 @@ TEST_F(ContextRecyclerTest, SharedStorageMethods) {
     EXPECT_THAT(error_msgs, ElementsAre());
 
     EXPECT_THAT(test_shared_storage_host.observed_requests(),
-                ElementsAre(Request{.type = RequestType::kClear,
-                                    .key = std::u16string(),
-                                    .value = std::u16string(),
-                                    .ignore_if_present = false}));
+                ElementsAre(Request{
+                    .type = RequestType::kClear,
+                    .key = std::u16string(),
+                    .value = std::u16string(),
+                    .ignore_if_present = false,
+                    .source_auction_worklet_function =
+                        mojom::AuctionWorkletFunction::kBidderGenerateBid}));
 
     test_shared_storage_host.ClearObservedRequests();
   }
@@ -2043,7 +2074,7 @@ TEST_F(ContextRecyclerTest, SharedStorageMethodsPermissionsPolicyDisabled) {
   {
     ContextRecyclerScope scope(context_recycler);  // Initialize context
     context_recycler.AddSharedStorageBindings(
-        nullptr,
+        nullptr, mojom::AuctionWorkletFunction::kBidderGenerateBid,
         /*shared_storage_permissions_policy_allowed=*/false);
   }
 
@@ -3280,7 +3311,7 @@ class ContextRecyclerPrivateAggregationExtensionsEnabledTest
   auction_worklet::mojom::PrivateAggregationRequestPtr CreateForEventRequest(
       absl::uint128 bucket,
       int value,
-      const std::string& event_type,
+      auction_worklet::mojom::EventTypePtr event_type,
       std::optional<uint64_t> filtering_id = std::nullopt) {
     auction_worklet::mojom::AggregatableReportForEventContribution contribution(
         auction_worklet::mojom::ForEventSignalBucket::NewIdBucket(bucket),
@@ -3414,18 +3445,29 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
                            ->TakePrivateAggregationRequests();
 
     ASSERT_EQ(pa_requests.size(), 4u);
-    EXPECT_EQ(pa_requests[0],
-              CreateForEventRequest(/*bucket=*/123, /*value=*/45,
-                                    /*event_type=*/kReservedWin));
-    EXPECT_EQ(pa_requests[1],
-              CreateForEventRequest(/*bucket=*/123, /*value=*/46,
-                                    /*event_type=*/kReservedLoss));
-    EXPECT_EQ(pa_requests[2],
-              CreateForEventRequest(/*bucket=*/123, /*value=*/47,
-                                    /*event_type=*/kReservedAlways));
+    EXPECT_EQ(
+        pa_requests[0],
+        CreateForEventRequest(
+            /*bucket=*/123, /*value=*/45,
+            /*event_type=*/
+            Reserved(auction_worklet::mojom::ReservedEventType::kReservedWin)));
+    EXPECT_EQ(
+        pa_requests[1],
+        CreateForEventRequest(
+            /*bucket=*/123, /*value=*/46,
+            /*event_type=*/
+            Reserved(
+                auction_worklet::mojom::ReservedEventType::kReservedLoss)));
+    EXPECT_EQ(
+        pa_requests[2],
+        CreateForEventRequest(
+            /*bucket=*/123, /*value=*/47,
+            /*event_type=*/
+            Reserved(
+                auction_worklet::mojom::ReservedEventType::kReservedAlways)));
     EXPECT_EQ(pa_requests[3],
               CreateForEventRequest(/*bucket=*/123, /*value=*/48,
-                                    /*event_type=*/"click"));
+                                    /*event_type=*/NonReserved("click")));
 
     EXPECT_TRUE(context_recycler.private_aggregation_bindings()
                     ->TakePrivateAggregationRequests()
@@ -3539,7 +3581,8 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(45),
             /*filtering_id=*/std::nullopt,
-            /*event_type=*/kReservedWin);
+            /*event_type=*/
+            Reserved(auction_worklet::mojom::ReservedEventType::kReservedWin));
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -3567,7 +3610,8 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(45),
             /*filtering_id=*/std::nullopt,
-            /*event_type=*/kReservedWin);
+            /*event_type=*/
+            Reserved(auction_worklet::mojom::ReservedEventType::kReservedWin));
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -3595,7 +3639,8 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(45),
             /*filtering_id=*/std::nullopt,
-            /*event_type=*/kReservedWin);
+            /*event_type=*/
+            Reserved(auction_worklet::mojom::ReservedEventType::kReservedWin));
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -3623,7 +3668,8 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(0),
             /*filtering_id=*/std::nullopt,
-            /*event_type=*/kReservedWin);
+            /*event_type=*/
+            Reserved(auction_worklet::mojom::ReservedEventType::kReservedWin));
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -3659,12 +3705,18 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
         context_recycler.private_aggregation_bindings()
             ->TakePrivateAggregationRequests();
     ASSERT_EQ(pa_requests.size(), 2u);
-    EXPECT_EQ(pa_requests[0],
-              CreateForEventRequest(/*bucket=*/123, /*value=*/45,
-                                    /*event_type=*/kReservedWin));
-    EXPECT_EQ(pa_requests[1],
-              CreateForEventRequest(/*bucket=*/678, /*value=*/90,
-                                    /*event_type=*/kReservedWin));
+    EXPECT_EQ(
+        pa_requests[0],
+        CreateForEventRequest(
+            /*bucket=*/123, /*value=*/45,
+            /*event_type=*/
+            Reserved(auction_worklet::mojom::ReservedEventType::kReservedWin)));
+    EXPECT_EQ(
+        pa_requests[1],
+        CreateForEventRequest(
+            /*bucket=*/678, /*value=*/90,
+            /*event_type=*/
+            Reserved(auction_worklet::mojom::ReservedEventType::kReservedWin)));
   }
 
   // Too large bucket
@@ -3721,7 +3773,8 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(1),
             /*filtering_id=*/std::nullopt,
-            /*event_type=*/kReservedWin);
+            /*event_type=*/
+            Reserved(auction_worklet::mojom::ReservedEventType::kReservedWin));
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -3758,7 +3811,8 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(1),
             /*filtering_id=*/std::nullopt,
-            /*event_type=*/kReservedWin);
+            /*event_type=*/
+            Reserved(auction_worklet::mojom::ReservedEventType::kReservedWin));
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -3786,7 +3840,8 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
             /*value=*/
             auction_worklet::mojom::ForEventSignalValue::NewIntValue(4),
             /*filtering_id=*/std::nullopt,
-            /*event_type=*/kReservedWin);
+            /*event_type=*/
+            Reserved(auction_worklet::mojom::ReservedEventType::kReservedWin));
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -4010,7 +4065,8 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
             auction_worklet::mojom::ForEventSignalValue::NewSignalValue(
                 std::move(signal_value)),
             /*filtering_id=*/std::nullopt,
-            /*event_type=*/kReservedWin);
+            /*event_type=*/
+            Reserved(auction_worklet::mojom::ReservedEventType::kReservedWin));
 
     ExpectOneForEventRequestEqualTo(
         context_recycler.private_aggregation_bindings()
@@ -4298,11 +4354,14 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
                            ->TakePrivateAggregationRequests();
 
     ASSERT_EQ(pa_requests.size(), 1u);
-    EXPECT_EQ(pa_requests[0],
-              CreateForEventRequest(/*bucket=*/123, /*value=*/45,
-                                    /*event_type=*/kReservedWin,
-                                    /*filtering_id=*/
-                                    0));
+    EXPECT_EQ(
+        pa_requests[0],
+        CreateForEventRequest(
+            /*bucket=*/123, /*value=*/45,
+            /*event_type=*/
+            Reserved(auction_worklet::mojom::ReservedEventType::kReservedWin),
+            /*filtering_id=*/
+            0));
     EXPECT_TRUE(context_recycler.private_aggregation_bindings()
                     ->TakePrivateAggregationRequests()
                     .empty());
@@ -4326,10 +4385,13 @@ TEST_F(ContextRecyclerPrivateAggregationExtensionsEnabledTest,
                            ->TakePrivateAggregationRequests();
 
     ASSERT_EQ(pa_requests.size(), 1u);
-    EXPECT_EQ(pa_requests[0], CreateForEventRequest(
-                                  /*bucket=*/123, /*value=*/45,
-                                  /*event_type=*/kReservedWin, /*filtering_id=*/
-                                  255));
+    EXPECT_EQ(pa_requests[0],
+              CreateForEventRequest(
+                  /*bucket=*/123, /*value=*/45,
+                  /*event_type=*/
+                  Reserved(auction_worklet::mojom::ReservedEventType::
+                               kReservedWin), /*filtering_id=*/
+                  255));
     EXPECT_TRUE(context_recycler.private_aggregation_bindings()
                     ->TakePrivateAggregationRequests()
                     .empty());
@@ -4643,7 +4705,8 @@ TEST_F(ContextRecyclerPrivateAggregationOnlyFilteringIdsDisabledTest,
                               auction_worklet::mojom::ForEventSignalValue::
                                   NewIntValue(45),
                               /*filtering_id=*/std::nullopt,
-                              std::move(kReservedWin))),
+                              Reserved(auction_worklet::mojom::
+                                           ReservedEventType::kReservedWin))),
               blink::mojom::AggregationServiceMode::kDefault,
               blink::mojom::DebugModeDetails::New());
 

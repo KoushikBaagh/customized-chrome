@@ -1,3 +1,17 @@
+const testSession = async (session) => {
+  const result = await session.prompt("What is the result of 0*2?");
+  if (typeof result !== "string" || result.length === 0) {
+    return {
+      success: false,
+      error: "the prompt API doesn't receive any response"
+    };
+  }
+
+  return {
+    success: true
+  };
+};
+
 const testPromptAPI = async () => {
   if (!ai) {
     return {
@@ -15,22 +29,16 @@ const testPromptAPI = async () => {
       };
     }
 
-    const session = await ai.createTextSession();
-    const result = await session.prompt("What is the result of 0*2?");
-    if (typeof result !== "string" || result.length === 0) {
-      return {
-        success: false,
-        error: "the prompt API doesn't receive any response"
-      };
-    }
-
-    return {
-      success: true
-    };
+    const session = await ai.createTextSession({
+      topK: 3,
+      temperature: 0.8,
+      systemPrompt: "Let's talk about Mauritius."
+    });
+    return testSession(session);
   } catch (e) {
     return {
       success: false,
       error: e
     };
   }
-}
+};

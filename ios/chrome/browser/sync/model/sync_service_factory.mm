@@ -26,7 +26,7 @@
 #import "components/sync_device_info/device_info_tracker.h"
 #import "components/sync_device_info/local_device_info_provider.h"
 #import "components/sync_preferences/pref_service_syncable.h"
-#import "components/variations/service/google_groups_updater_service.h"
+#import "components/variations/service/google_groups_manager.h"
 #import "ios/chrome/browser/bookmarks/model/account_bookmark_sync_service_factory.h"
 #import "ios/chrome/browser/bookmarks/model/bookmark_model_factory.h"
 #import "ios/chrome/browser/bookmarks/model/bookmark_undo_service_factory.h"
@@ -36,7 +36,7 @@
 #import "ios/chrome/browser/favicon/model/favicon_service_factory.h"
 #import "ios/chrome/browser/gcm/model/ios_chrome_gcm_profile_service_factory.h"
 #import "ios/chrome/browser/history/model/history_service_factory.h"
-#import "ios/chrome/browser/metrics/model/google_groups_updater_service_factory.h"
+#import "ios/chrome/browser/metrics/model/google_groups_manager_factory.h"
 #import "ios/chrome/browser/passwords/model/ios_chrome_account_password_store_factory.h"
 #import "ios/chrome/browser/passwords/model/ios_chrome_password_receiver_service_factory.h"
 #import "ios/chrome/browser/passwords/model/ios_chrome_password_sender_service_factory.h"
@@ -52,10 +52,10 @@
 #import "ios/chrome/browser/signin/model/chrome_account_manager_service_factory.h"
 #import "ios/chrome/browser/signin/model/identity_manager_factory.h"
 #import "ios/chrome/browser/supervised_user/model/supervised_user_settings_service_factory.h"
+#import "ios/chrome/browser/sync/model/data_type_store_service_factory.h"
 #import "ios/chrome/browser/sync/model/device_info_sync_service_factory.h"
 #import "ios/chrome/browser/sync/model/ios_chrome_sync_client.h"
 #import "ios/chrome/browser/sync/model/ios_user_event_service_factory.h"
-#import "ios/chrome/browser/sync/model/model_type_store_service_factory.h"
 #import "ios/chrome/browser/sync/model/send_tab_to_self_sync_service_factory.h"
 #import "ios/chrome/browser/sync/model/session_sync_service_factory.h"
 #import "ios/chrome/browser/sync/model/sync_invalidations_service_factory.h"
@@ -92,9 +92,13 @@ std::unique_ptr<KeyedService> BuildSyncService(web::BrowserState* context) {
   init_params.channel = ::GetChannel();
   init_params.debug_identifier = browser_state->GetBrowserStateName();
 
+  IOSChromeSyncClient* client_ptr =
+      static_cast<IOSChromeSyncClient*>(init_params.sync_client.get());
+
   auto sync_service =
       std::make_unique<syncer::SyncServiceImpl>(std::move(init_params));
-  sync_service->Initialize();
+  sync_service->Initialize(
+      client_ptr->CreateDataTypeControllers(sync_service.get()));
 
   // TODO(crbug.com/40250371): Remove the workaround below once
   // PrivacySandboxSettingsFactory correctly declares its KeyedServices
@@ -139,9 +143,8 @@ std::unique_ptr<KeyedService> BuildSyncService(web::BrowserState* context) {
   SendTabToSelfSyncServiceFactory::GetForBrowserState(browser_state)
       ->OnSyncServiceInitialized(sync_service.get());
 
-  if (GoogleGroupsUpdaterService* groups_updater_service =
-          GoogleGroupsUpdaterServiceFactory::GetForBrowserState(
-              browser_state)) {
+  if (GoogleGroupsManager* groups_updater_service =
+          GoogleGroupsManagerFactory::GetForBrowserState(browser_state)) {
     groups_updater_service->OnSyncServiceInitialized(sync_service.get());
   }
 
@@ -201,8 +204,10 @@ SyncServiceFactory::SyncServiceFactory()
   // actually plumbed in IOSChromeSyncClient, which this factory constructs.
   DependsOn(ChromeAccountManagerServiceFactory::GetInstance());
   DependsOn(ConsentAuditorFactory::GetInstance());
+  DependsOn(DataTypeStoreServiceFactory::GetInstance());
   DependsOn(data_sharing::DataSharingServiceFactory::GetInstance());
   DependsOn(DeviceInfoSyncServiceFactory::GetInstance());
+  DependsOn(GoogleGroupsManagerFactory::GetInstance());
   DependsOn(SendTabToSelfSyncServiceFactory::GetInstance());
   DependsOn(ios::AboutSigninInternalsFactory::GetInstance());
   DependsOn(ios::AccountBookmarkSyncServiceFactory::GetInstance());
@@ -221,7 +226,6 @@ SyncServiceFactory::SyncServiceFactory()
   DependsOn(IOSChromeAccountPasswordStoreFactory::GetInstance());
   DependsOn(IOSTrustedVaultServiceFactory::GetInstance());
   DependsOn(IOSUserEventServiceFactory::GetInstance());
-  DependsOn(ModelTypeStoreServiceFactory::GetInstance());
   DependsOn(PlusAddressSettingServiceFactory::GetInstance());
   DependsOn(ReadingListModelFactory::GetInstance());
   DependsOn(SessionSyncServiceFactory::GetInstance());

@@ -167,19 +167,13 @@ bool PersistIndexedRuleset(const base::FilePath& path,
     return false;
 
   // Write the version header.
-  std::string version_header = GetVersionHeader();
-  int version_header_size = static_cast<int>(version_header.size());
-  if (ruleset_file.WriteAtCurrentPos(
-          version_header.data(), version_header_size) != version_header_size) {
+  if (!ruleset_file.WriteAtCurrentPosAndCheck(
+          base::as_byte_span(GetVersionHeader()))) {
     return false;
   }
 
   // Write the flatbuffer ruleset.
-  if (!base::IsValueInRangeForNumericType<int>(data.size()))
-    return false;
-  int data_size = static_cast<int>(data.size());
-  if (ruleset_file.WriteAtCurrentPos(reinterpret_cast<const char*>(data.data()),
-                                     data_size) != data_size) {
+  if (!ruleset_file.WriteAtCurrentPosAndCheck(data)) {
     return false;
   }
 
@@ -893,12 +887,11 @@ bool IsRuleSafe(const flat::UrlRuleMetadata& url_rule_metadata) {
 }
 
 bool IsResponseHeaderMatchingEnabled() {
-  // Response header matching is enabled if the feature flag is enabled and the
-  // browser is on trunk, canary or dev..
-  return GetCurrentChannel() != version_info::Channel::STABLE &&
-         GetCurrentChannel() != version_info::Channel::BETA &&
-         base::FeatureList::IsEnabled(
-             extensions_features::kDeclarativeNetRequestResponseHeaderMatching);
+  // Response header matching is enabled if the feature flag is enabled.
+  // Note: This function still remains in case additional checks may need to be
+  // added back such as channel restrictions.
+  return base::FeatureList::IsEnabled(
+      extensions_features::kDeclarativeNetRequestResponseHeaderMatching);
 }
 
 }  // namespace extensions::declarative_net_request

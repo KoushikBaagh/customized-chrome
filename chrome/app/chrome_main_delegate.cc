@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "chrome/app/chrome_main_delegate.h"
 
 #include <stddef.h>
@@ -153,10 +158,10 @@
 #include "ash/constants/ash_paths.h"
 #include "ash/constants/ash_switches.h"
 #include "base/system/sys_info.h"
-#include "chrome/browser/ash/boot_times_recorder.h"
+#include "chrome/browser/ash/boot_times_recorder/boot_times_recorder.h"
 #include "chrome/browser/ash/dbus/ash_dbus_helper.h"
-#include "chrome/browser/ash/dbus_schedqos_state_handler.h"
-#include "chrome/browser/ash/startup_settings_cache.h"
+#include "chrome/browser/ash/locale/startup_settings_cache.h"
+#include "chrome/browser/ash/schedqos/dbus_schedqos_state_handler.h"
 #include "chromeos/ash/components/memory/memory.h"
 #include "chromeos/ash/components/memory/mglru.h"
 #include "content/public/common/content_features.h"
@@ -745,23 +750,26 @@ void InitLogging(const std::string& process_type) {
 }
 #endif  // !BUILDFLAG(IS_ANDROID)
 
-void RecordMainStartupMetrics(base::TimeTicks application_start_time) {
+void RecordMainStartupMetrics(const StartupTimestamps& timestamps) {
   const base::TimeTicks now = base::TimeTicks::Now();
 
 #if BUILDFLAG(IS_WIN)
-  DUMP_WILL_BE_CHECK(!application_start_time.is_null());
-  startup_metric_utils::GetCommon().RecordApplicationStartTime(
-      application_start_time);
-#elif BUILDFLAG(IS_ANDROID)
+  startup_metric_utils::GetCommon().RecordPreReadTime(
+      timestamps.preread_begin_ticks, timestamps.preread_end_ticks);
+#endif
+
   // On Android the main entry point time is the time when the Java code starts.
   // This happens before the shared library containing this code is even loaded.
   // The Java startup code has recorded that time, but the C++ code can't fetch
   // it from the Java side until it has initialized the JNI. See
   // ChromeMainDelegateAndroid.
-#else
-  // On other platforms, |application_start_time| == |now| since the application
-  // starts with ChromeMain().
-  startup_metric_utils::GetCommon().RecordApplicationStartTime(now);
+#if !BUILDFLAG(IS_ANDROID)
+  // On all other platforms, `timestamps.exe_entry_point_ticks` contains the exe
+  // entry point time (on some platforms this is ChromeMain, on some it is
+  // before).
+  CHECK(!timestamps.exe_entry_point_ticks.is_null());
+  startup_metric_utils::GetCommon().RecordApplicationStartTime(
+      timestamps.exe_entry_point_ticks);
 #endif
 
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || \
@@ -821,15 +829,17 @@ bool IsCanaryDev() {
 
 }  // namespace
 
+#if BUILDFLAG(IS_ANDROID)
 ChromeMainDelegate::ChromeMainDelegate()
-    : ChromeMainDelegate(base::TimeTicks()) {}
+    : ChromeMainDelegate(StartupTimestamps{}) {}
+#endif
 
-ChromeMainDelegate::ChromeMainDelegate(base::TimeTicks exe_entry_point_ticks) {
+ChromeMainDelegate::ChromeMainDelegate(const StartupTimestamps& timestamps) {
   // Record startup metrics in the browser process. For component builds, there
   // is no way to know the type of process (process command line is not yet
   // initialized), so the function below will also be called in renderers.
   // This doesn't matter as it simply sets global variables.
-  RecordMainStartupMetrics(exe_entry_point_ticks);
+  RecordMainStartupMetrics(timestamps);
 }
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -2013,7 +2023,7 @@ void ChromeMainDelegate::InitializeMemorySystem() {
   memory_system::Initializer()
       .SetGwpAsanParameters(gwp_asan_boost_sampling, process_type)
       .SetProfilingClientParameters(chrome::GetChannel(),
-                                    GetProfileParamsProcess(*command_line))
+                                    GetProfilerProcessType(*command_line))
       .SetDispatcherParameters(memory_system::DispatcherParameters::
                                    PoissonAllocationSamplerInclusion::kEnforce,
                                allocation_recorder_inclusion, process_type)

@@ -14,11 +14,13 @@
 #include "chrome/app/vector_icons/vector_icons.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_properties.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/find_bar/find_bar_controller.h"
 #include "chrome/browser/ui/find_bar/find_bar_state.h"
 #include "chrome/browser/ui/find_bar/find_bar_state_factory.h"
 #include "chrome/browser/ui/lens/lens_overlay_controller.h"
+#include "chrome/browser/ui/lens/lens_overlay_entry_point_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_invocation_source.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/chrome_layout_provider.h"
@@ -282,12 +284,16 @@ FindBarView::FindBarView(FindBarHost* host) {
   AddChildView(std::move(main_container));
 
   if (lens::features::IsFindInPageEntryPointEnabled() &&
-      LensOverlayController::IsEnabled(host->browser_view()->browser())) {
+      host->browser_view()
+          ->browser()
+          ->GetFeatures()
+          .lens_overlay_entry_point_controller()
+          ->IsEnabled()) {
     const gfx::VectorIcon& icon =
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
         vector_icons::kGoogleLensMonochromeLogoIcon;
 #else
-        vector_icons::kSearchIcon;
+        vector_icons::kSearchChromeRefreshIcon;
 #endif
     views::Label* hint_text;
     auto lens_container =
@@ -300,7 +306,7 @@ FindBarView::FindBarView(FindBarHost* host) {
                 views::Builder<views::Label>()
                     .CopyAddressTo(&hint_text)
                     .SetText(l10n_util::GetStringUTF16(
-                        IDS_LENS_OVERLAY_FIND_IN_PAGE_ENTRYPOINT_MESSAGE))
+                        GetLensOverlayFindBarMessageIds()))
                     .SetTextContext(views::style::CONTEXT_BUBBLE_FOOTER)
                     .SetHorizontalAlignment(gfx::ALIGN_LEFT)
                     .SetTextStyle(views::style::STYLE_HINT),
@@ -308,7 +314,7 @@ FindBarView::FindBarView(FindBarHost* host) {
                     .SetImageModel(views::Button::STATE_NORMAL,
                                    ui::ImageModel::FromVectorIcon(icon))
                     .SetText(l10n_util::GetStringUTF16(
-                        IDS_LENS_OVERLAY_FIND_IN_PAGE_ENTRYPOINT_LABEL))
+                        GetLensOverlayFindBarButtonLabelIds()))
                     .SetBgColorIdOverride(ui::kColorSysNeutralContainer)
                     .SetCallback(base::BindRepeating(
                         [](FindBarView* find_bar) {
@@ -483,7 +489,7 @@ bool FindBarView::HandleKeyEvent(views::Textfield* sender,
     return true;  // Handled, we are done!
 
   if (key_event.key_code() == ui::VKEY_RETURN &&
-      key_event.type() == ui::ET_KEY_PRESSED) {
+      key_event.type() == ui::EventType::kKeyPressed) {
     // Pressing Return/Enter starts the search (unless text box is empty).
     std::u16string find_string = find_text_->GetText();
     if (!find_string.empty()) {
@@ -630,6 +636,28 @@ void FindBarView::UpdateLensButtonVisibility(
 
   // Notify the parent to re-layout with out new size.
   find_bar_host_->MoveWindowIfNecessary();
+}
+
+int FindBarView::GetLensOverlayFindBarMessageIds() {
+  switch (lens::features::GetLensOverlayFindBarStringsVariant()) {
+    case 1:
+      return IDS_LENS_OVERLAY_FIND_IN_PAGE_ENTRYPOINT_MESSAGE_1;
+    case 2:
+      return IDS_LENS_OVERLAY_FIND_IN_PAGE_ENTRYPOINT_MESSAGE_2;
+    default:
+      return IDS_LENS_OVERLAY_FIND_IN_PAGE_ENTRYPOINT_MESSAGE;
+  }
+}
+
+int FindBarView::GetLensOverlayFindBarButtonLabelIds() {
+  switch (lens::features::GetLensOverlayFindBarStringsVariant()) {
+    case 1:
+      return IDS_LENS_OVERLAY_FIND_IN_PAGE_ENTRYPOINT_LABEL_1;
+    case 2:
+      return IDS_LENS_OVERLAY_FIND_IN_PAGE_ENTRYPOINT_LABEL_2;
+    default:
+      return IDS_LENS_OVERLAY_FIND_IN_PAGE_ENTRYPOINT_LABEL;
+  }
 }
 
 BEGIN_METADATA(FindBarView)

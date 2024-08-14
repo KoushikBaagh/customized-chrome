@@ -37,11 +37,6 @@ import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.Feature;
-import org.chromium.base.test.util.Features.DisableFeatures;
-import org.chromium.base.test.util.Features.EnableFeatures;
-import org.chromium.chrome.browser.flags.ChromeFeatureList;
-import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
-import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabCreationState;
 import org.chromium.chrome.browser.tab.TabLaunchType;
@@ -130,6 +125,7 @@ public class TabPersistentStoreUnitTest {
 
         mPersistentStore =
                 new TabPersistentStore(
+                        TabPersistentStore.CLIENT_TAG_REGULAR,
                         mPersistencePolicy,
                         mTabModelSelector,
                         mTabCreatorManager,
@@ -158,6 +154,7 @@ public class TabPersistentStoreUnitTest {
     public void testNotActiveEmptyNtpNotIgnoredDuringRestore() {
         mPersistentStore =
                 new TabPersistentStore(
+                        TabPersistentStore.CLIENT_TAG_REGULAR,
                         mPersistencePolicy,
                         mTabModelSelector,
                         mTabCreatorManager,
@@ -185,6 +182,7 @@ public class TabPersistentStoreUnitTest {
 
         mPersistentStore =
                 new TabPersistentStore(
+                        TabPersistentStore.CLIENT_TAG_REGULAR,
                         mPersistencePolicy,
                         mTabModelSelector,
                         mTabCreatorManager,
@@ -218,6 +216,7 @@ public class TabPersistentStoreUnitTest {
 
         mPersistentStore =
                 new TabPersistentStore(
+                        TabPersistentStore.CLIENT_TAG_REGULAR,
                         mPersistencePolicy,
                         mTabModelSelector,
                         mTabCreatorManager,
@@ -257,6 +256,7 @@ public class TabPersistentStoreUnitTest {
     public void testNtpWithStateNotIgnoredDuringRestore() {
         mPersistentStore =
                 new TabPersistentStore(
+                        TabPersistentStore.CLIENT_TAG_REGULAR,
                         mPersistencePolicy,
                         mTabModelSelector,
                         mTabCreatorManager,
@@ -280,6 +280,7 @@ public class TabPersistentStoreUnitTest {
 
         mPersistentStore =
                 new TabPersistentStore(
+                        TabPersistentStore.CLIENT_TAG_REGULAR,
                         mPersistencePolicy,
                         mTabModelSelector,
                         mTabCreatorManager,
@@ -310,6 +311,7 @@ public class TabPersistentStoreUnitTest {
     public void testNotActiveIncognitoNtpIgnoredDuringRestore() {
         mPersistentStore =
                 new TabPersistentStore(
+                        TabPersistentStore.CLIENT_TAG_REGULAR,
                         mPersistencePolicy,
                         mTabModelSelector,
                         mTabCreatorManager,
@@ -329,6 +331,7 @@ public class TabPersistentStoreUnitTest {
     public void testActiveEmptyIncognitoNtpIgnoredDuringRestoreIfIncognitoLoadingIsDisabled() {
         mPersistentStore =
                 new TabPersistentStore(
+                        TabPersistentStore.CLIENT_TAG_REGULAR,
                         mPersistencePolicy,
                         mTabModelSelector,
                         mTabCreatorManager,
@@ -372,17 +375,6 @@ public class TabPersistentStoreUnitTest {
                 "Incorrect URL for second incognito tab.",
                 INCOGNITO_TAB_STRING_2,
                 metadata.incognitoModelMetadata.urls.get(1));
-
-        assertEquals(
-                "Incorrect number of cached normal tab count.",
-                1,
-                ChromeSharedPreferences.getInstance()
-                        .readInt(ChromePreferenceKeys.REGULAR_TAB_COUNT));
-        assertEquals(
-                "Incorrect number of cached incognito tab count.",
-                2,
-                ChromeSharedPreferences.getInstance()
-                        .readInt(ChromePreferenceKeys.INCOGNITO_TAB_COUNT));
     }
 
     @Test
@@ -400,12 +392,6 @@ public class TabPersistentStoreUnitTest {
                 "Incorrect URL for regular tab.",
                 REGULAR_TAB_STRING_1,
                 metadata.normalModelMetadata.urls.get(0));
-
-        assertEquals(
-                "Incorrect number of cached normal tab count.",
-                1,
-                ChromeSharedPreferences.getInstance()
-                        .readInt(ChromePreferenceKeys.REGULAR_TAB_COUNT));
     }
 
     @Test
@@ -423,43 +409,11 @@ public class TabPersistentStoreUnitTest {
                 "Incorrect URL for regular tab.",
                 REGULAR_TAB_STRING_1,
                 metadata.normalModelMetadata.urls.get(0));
-
-        assertEquals(
-                "Incorrect number of cached normal tab count.",
-                1,
-                ChromeSharedPreferences.getInstance()
-                        .readInt(ChromePreferenceKeys.REGULAR_TAB_COUNT));
     }
 
     @Test
     @SmallTest
     @Feature("TabPersistentStore")
-    @DisableFeatures(ChromeFeatureList.ANDROID_TAB_GROUP_STABLE_IDS)
-    public void testSkipNonActiveNtpsWithGroupedAndNavigableNtps_TabGroupStableIdsDisabled()
-            throws IOException {
-        setupSerializationTestMocksWithGroupedAndNavigableNtps();
-        TabModelSelectorMetadata metadata =
-                TabPersistentStore.saveTabModelSelectorMetadata(mTabModelSelector, null);
-
-        assertEquals("Incorrect index for regular", 0, metadata.normalModelMetadata.index);
-        assertEquals(
-                "Incorrect number of tabs in regular", 1, metadata.normalModelMetadata.ids.size());
-        assertEquals(
-                "Incorrect URL for regular tab.",
-                REGULAR_TAB_STRING_1,
-                metadata.normalModelMetadata.urls.get(0));
-
-        assertEquals(
-                "Incorrect number of cached normal tab count.",
-                1,
-                ChromeSharedPreferences.getInstance()
-                        .readInt(ChromePreferenceKeys.REGULAR_TAB_COUNT));
-    }
-
-    @Test
-    @SmallTest
-    @Feature("TabPersistentStore")
-    @EnableFeatures(ChromeFeatureList.ANDROID_TAB_GROUP_STABLE_IDS)
     public void testSkipNonActiveNtpsWithGroupedAndNavigableNtps_TabGroupStableIdsEnabled()
             throws IOException {
         setupSerializationTestMocksWithGroupedAndNavigableNtps();
@@ -481,12 +435,6 @@ public class TabPersistentStoreUnitTest {
                 "Incorrect URL for regular tab.",
                 REGULAR_TAB_STRING_1,
                 metadata.normalModelMetadata.urls.get(1));
-
-        assertEquals(
-                "Incorrect number of cached normal tab count.",
-                2,
-                ChromeSharedPreferences.getInstance()
-                        .readInt(ChromePreferenceKeys.REGULAR_TAB_COUNT));
     }
 
     @Test

@@ -146,6 +146,22 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Accessibility.Android.KeyboardShortcut.{ScreenReaderState}"
+    enum="KeyboardShortcutsSemanticMeaning" expires_after="2025-08-30">
+  <owner>mschillaci@google.com</owner>
+  <owner>katie@chromium.org</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    When a keyboard shortcut is used on Android, tracks the action of the
+    shortcut, and splits based on whether or not a screen reader is running.
+  </summary>
+  <token key="ScreenReaderState">
+    <variant name="NoScreenReader" summary="User is not using a screen reader"/>
+    <variant name="ScreenReaderRunning"
+        summary="User is using a screen reader"/>
+  </token>
+</histogram>
+
 <histogram name="Accessibility.Android.OnDemand.EventsDropped" units="count"
     expires_after="2025-02-28">
   <owner>mschillaci@google.com</owner>
@@ -452,7 +468,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Accessibility.ATK-APIs" enum="AccessibilityATKAPIEnum"
-    expires_after="2024-11-17">
+    expires_after="2025-01-26">
   <owner>jdiggs@chromium.org</owner>
   <owner>jkim@igalia.com</owner>
   <owner>chrome-a11y-core@google.com</owner>
@@ -506,7 +522,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Accessibility.AXTreeSnapshotter.Snapshot.Error"
-    enum="AXTreeSnapshotErrorReason" expires_after="2024-12-01">
+    enum="AXTreeSnapshotErrorReason" expires_after="2025-02-02">
   <owner>mschillaci@google.com</owner>
   <owner>chrome-a11y-core@google.com</owner>
   <summary>
@@ -577,6 +593,13 @@ chromium-metrics-reviews@google.com.
     Whether custom caption settings were loaded from the system preferences.
     Recorded when WebKit preferences are overridden.
   </summary>
+</histogram>
+
+<histogram name="Accessibility.ChromeVox.PerformCommand"
+    enum="ChromeVoxCommand" expires_after="2025-08-08">
+  <owner>kyungjunlee@google.com</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>Records when a user performs a ChromeVox command.</summary>
 </histogram>
 
 <histogram name="Accessibility.ChromeVox.PerformGestureType"
@@ -734,7 +757,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Accessibility.CrosDictation.UsedOnDeviceSpeech"
-    enum="BooleanUsage" expires_after="2024-11-17">
+    enum="BooleanUsage" expires_after="2025-01-26">
   <owner>katie@chromium.org</owner>
   <owner>chrome-a11y-core@google.com</owner>
   <summary>
@@ -1094,6 +1117,7 @@ chromium-metrics-reviews@google.com.
   <token key="FeatureName" variants="BaseCrosAccessibilityFeatures">
     <variant name="Autoclick"/>
     <variant name="CursorColor"/>
+    <variant name="FlashNotifications"/>
     <variant name="LiveCaption"/>
     <variant name="MonoAudio"/>
     <variant name="MouseKeys"/>
@@ -1125,6 +1149,8 @@ even if they fit the naming pattern. -->
                  2022-07-07, and 2023-11-30 to 2024-02-29, data might be
                  missing."/>
     <variant name="CursorColor" summary="colorize the cursor"/>
+    <variant name="FlashNotifications"
+        summary="flash the screen for notifications"/>
     <variant name="MonoAudio.Enabled" summary="MonoAudio"/>
     <variant name="SpokenFeedback.BrailleDisplayConnected"
         summary="braille display. An enabled (true) value means that a
@@ -1820,6 +1846,16 @@ even if they fit the naming pattern. -->
   </summary>
 </histogram>
 
+<histogram name="Accessibility.PdfOcr.CrosSelectToSpeak.PagesOcred"
+    units="count" expires_after="2025-07-31">
+  <owner>kyungjunlee@google.com</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    Records the number of OCRed pages in the PDF file opened by Select-to-Speak
+    users on ChromeOS.
+  </summary>
+</histogram>
+
 <histogram name="Accessibility.PdfOcr.InaccessiblePdfPageCount" units="count"
     expires_after="2024-12-08">
   <owner>kyungjunlee@google.com</owner>
@@ -1936,7 +1972,7 @@ even if they fit the naming pattern. -->
 
 <histogram
     name="Accessibility.Performance.AXObjectCacheImpl.Incremental.{DataType}"
-    units="bytes" expires_after="2024-12-08">
+    units="bytes" expires_after="2025-02-09">
   <owner>kevers@chromium.org</owner>
   <owner>chrome-a11y-core@google.com</owner>
   <summary>
@@ -1960,7 +1996,7 @@ even if they fit the naming pattern. -->
 </histogram>
 
 <histogram name="Accessibility.Performance.AXObjectCacheImpl.Snapshot"
-    units="bytes" expires_after="2024-11-17">
+    units="bytes" expires_after="2025-01-26">
   <owner>kevers@chromium.org</owner>
   <owner>chrome-a11y-core@google.com</owner>
   <summary>
@@ -2277,72 +2313,6 @@ even if they fit the naming pattern. -->
         summary="navigates by one node in the given direction."/>
     <variant name="UMA_API_TEXT_RANGEFROMPOINT"
         summary="gets the text range under the given point."/>
-    <variant name="UMA_API_TEXTRANGE_COMPARE"
-        summary="compares two text ranges"/>
-    <variant name="UMA_API_TEXTRANGE_COMPAREENDPOINTS"
-        summary="compares two endpoints"/>
-    <variant name="UMA_API_TEXTRANGE_EXPANDTOENCLOSINGUNIT"
-        summary="expands or contracts the text range to given unit."/>
-    <variant name="UMA_API_TEXTRANGE_FINDATTRIBUTE"
-        summary="searches for an attribute within text range."/>
-    <variant name="UMA_API_TEXTRANGE_FINDTEXT"
-        summary="searches for given text within the text range."/>
-    <variant name="UMA_API_TEXTRANGE_GETATTRIBUTEVALUE"
-        summary="gets the value of the given attribute."/>
-    <variant name="UMA_API_TEXTRANGE_GETBOUNDINGRECTANGLES"
-        summary="gets the bounding rectanges of a text range."/>
-    <variant name="UMA_API_TEXTRANGE_GETCHILDREN"
-        summary="gets all children within a text range."/>
-    <variant name="UMA_API_TEXTRANGE_GETENCLOSINGELEMENT"
-        summary="gets the element that encloses the text range."/>
-    <variant name="UMA_API_TEXTRANGE_GETTEXT"
-        summary="gets the text within a text range."/>
-    <variant name="UMA_API_TEXTRANGE_MOVE"
-        summary="moves the text range by the given amount."/>
-    <variant name="UMA_API_TEXTRANGE_MOVEENDPOINTBYUNIT"
-        summary="moves endpoint by the given unit."/>
-    <variant name="UMA_API_TEXTRANGE_MOVEENPOINTBYRANGE"
-        summary="moves endpoint by the given range."/>
-  </token>
-</histogram>
-
-<histogram name="Accessibility.Performance.WinAPIs.{Source}.{API}"
-    units="microseconds" expires_after="2025-02-28">
-  <owner>aleventhal@chromium.org</owner>
-  <owner>javiercon@microsoft.com</owner>
-  <owner>janewman@microsoft.com</owner>
-  <owner>benjamin.beaudry@microsoft.com</owner>
-  <owner>chrome-a11y-core@google.com</owner>
-  <summary>
-    Tracks time taken to execute the public Windows API that {API}. This is
-    recorded for all Windows users that call into our public APIs.
-
-    It will also record the {Source} of the {API} call, which can be one of the
-    following: - WebContents: The API was called on web contents. - Views: The
-    API was called on a view.
-
-    Warning: This metric may include reports from clients with low-resolution
-    clocks (i.e. on Windows, ref. |TimeTicks::IsHighResolution()|). Such reports
-    will cause this metric to have an abnormal distribution. When considering
-    revising this histogram, see UMA_HISTOGRAM_CUSTOM_MICROSECONDS_TIMES for the
-    solution.
-  </summary>
-  <token key="Source">
-    <variant name="Views" summary="The API was called on a view."/>
-    <variant name="WebContents" summary="The API was called on web contents"/>
-  </token>
-  <token key="API">
-    <variant name="UMA_API_ELEMENT_PROVIDER_FROM_POINT"
-        summary="finds a node given a point."/>
-    <variant name="UMA_API_GET_BOUNDINGRECTANGLE"
-        summary="gets the bounding rectangle of a node."/>
-    <variant name="UMA_API_GET_PATTERN_PROVIDER"
-        summary="retrieves an object that provides support for the given
-                 control pattern."/>
-    <variant name="UMA_API_GET_PROPERTY_VALUE"
-        summary="gets the value of the specified property."/>
-    <variant name="UMA_API_NAVIGATE"
-        summary="navigates by one node in the given direction."/>
     <variant name="UMA_API_TEXTRANGE_COMPARE"
         summary="compares two text ranges"/>
     <variant name="UMA_API_TEXTRANGE_COMPAREENDPOINTS"
@@ -2730,7 +2700,7 @@ even if they fit the naming pattern. -->
 </histogram>
 
 <histogram name="Accessibility.ScreenAI.OCR.Latency.{ImageSize}" units="ms"
-    expires_after="2024-12-01">
+    expires_after="2025-02-02">
   <owner>rhalavati@chromium.org</owner>
   <owner>chrome-a11y-core@google.com</owner>
   <summary>
@@ -2810,6 +2780,35 @@ even if they fit the naming pattern. -->
   <token key="Result">
     <variant name="Failure" summary="fail initialization"/>
     <variant name="Success" summary="initialize successfully"/>
+  </token>
+</histogram>
+
+<histogram name="Accessibility.ScreenAI.{Feature}.Idle.Connected"
+    enum="BooleanConnected" expires_after="2025-02-28">
+  <owner>rhalavati@chromium.org</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    Records whether the {Feature} has been connected to a client or not while
+    being idle (initialized but not used for more than 10min). This metric is
+    collected only once during the life time of ScreenAI service.
+  </summary>
+  <token key="Feature">
+    <variant name="MainContentExtraction" summary="Main Content Extraction"/>
+    <variant name="OCR" summary="Optical Character Recognition"/>
+  </token>
+</histogram>
+
+<histogram name="Accessibility.ScreenAI.{feature}.InitializationLatency"
+    units="ms" expires_after="2025-02-28">
+  <owner>rhalavati@chromium.org</owner>
+  <owner>chrome-a11y-core@google.com</owner>
+  <summary>
+    Records how long it takes to initialize {feature} in Screen AI service.
+  </summary>
+  <token key="feature">
+    <variant name="MainContentExtraction"
+        summary="Main Content Extraction functionality"/>
+    <variant name="OCR" summary="OCR functionality"/>
   </token>
 </histogram>
 
@@ -2982,7 +2981,7 @@ even if they fit the naming pattern. -->
 </histogram>
 
 <histogram name="DomDistiller.ReaderShownForPageLoad" enum="Boolean"
-    expires_after="2024-11-17">
+    expires_after="2025-01-26">
   <owner>mdjones@chromium.org</owner>
   <summary>
     Records if the panel became visible at any point after a page was navigated.

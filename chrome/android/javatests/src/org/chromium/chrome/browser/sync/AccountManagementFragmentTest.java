@@ -45,12 +45,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import org.chromium.base.FeatureList;
 import org.chromium.base.ThreadUtils;
-import org.chromium.base.test.params.ParameterAnnotations;
-import org.chromium.base.test.params.ParameterProvider;
-import org.chromium.base.test.params.ParameterSet;
-import org.chromium.base.test.params.ParameterizedRunner;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DoNotBatch;
@@ -70,7 +65,7 @@ import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.sync.settings.AccountManagementFragment;
 import org.chromium.chrome.browser.sync.settings.SyncSettingsUtils;
 import org.chromium.chrome.browser.sync.ui.PassphraseDialogFragment;
-import org.chromium.chrome.test.ChromeJUnit4RunnerDelegate;
+import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
 import org.chromium.chrome.test.R;
 import org.chromium.chrome.test.util.ActivityTestUtils;
 import org.chromium.chrome.test.util.ChromeRenderTestRule;
@@ -84,20 +79,16 @@ import org.chromium.components.signin.base.GoogleServiceAuthError;
 import org.chromium.components.signin.identitymanager.ConsentLevel;
 import org.chromium.components.signin.test.util.AccountCapabilitiesBuilder;
 import org.chromium.components.signin.test.util.FakeAccountManagerFacade;
+import org.chromium.components.sync.DataType;
 import org.chromium.components.sync.SyncService;
 
-import java.util.Arrays;
-import java.util.List;
+import java.util.Set;
 
 /** Tests {@link AccountManagementFragment}. */
-@RunWith(ParameterizedRunner.class)
-@ParameterAnnotations.UseRunnerDelegate(ChromeJUnit4RunnerDelegate.class)
+@RunWith(ChromeJUnit4ClassRunner.class)
 @DoNotBatch(reason = "TODO(crbug.com/40743432): SyncTestRule doesn't support batching.")
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 public class AccountManagementFragmentTest {
-    private static final String CHILD_ACCOUNT_NAME =
-            AccountManagerTestRule.generateChildEmail("account@gmail.com");
-
     private final SyncTestRule mSyncTestRule = new SyncTestRule();
 
     private final SettingsActivityTestRule<AccountManagementFragment> mSettingsActivityTestRule =
@@ -119,24 +110,6 @@ public class AccountManagementFragmentTest {
 
     @Mock private PasswordManagerUtilBridge.Natives mPasswordManagerUtilBridgeJniMock;
 
-    public static class ReplaceProfileIsChildWithAccountCapabilitiesParams
-            implements ParameterProvider {
-
-        private static List<ParameterSet> sReplaceProfileIsChildWithAccountCapabilities =
-                Arrays.asList(
-                        new ParameterSet()
-                                .value(true)
-                                .name("MigrateProfileIsChildFlagParamsEnabled"),
-                        new ParameterSet()
-                                .value(false)
-                                .name("MigrateProfileIsChildFlagParamsDisabled"));
-
-        @Override
-        public List<ParameterSet> getParameters() {
-            return sReplaceProfileIsChildWithAccountCapabilities;
-        }
-    }
-
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
@@ -144,15 +117,6 @@ public class AccountManagementFragmentTest {
         mJniMocker.mock(PasswordManagerUtilBridgeJni.TEST_HOOKS, mPasswordManagerUtilBridgeJniMock);
         when(mPasswordManagerUtilBridgeJniMock.isGmsCoreUpdateRequired(any(), any()))
                 .thenReturn(false);
-    }
-
-    @ParameterAnnotations.UseMethodParameterBefore(
-            ReplaceProfileIsChildWithAccountCapabilitiesParams.class)
-    public void enableFlag(boolean isReplaceProfileIsChildWithAccountCapabilitiesFlagEnabled) {
-        FeatureList.TestValues testValuesOverride = new FeatureList.TestValues();
-        testValuesOverride.addFeatureFlagOverride(
-                ChromeFeatureList.REPLACE_PROFILE_IS_CHILD_WITH_ACCOUNT_CAPABILITIES_ON_ANDROID,
-                isReplaceProfileIsChildWithAccountCapabilitiesFlagEnabled);
     }
 
     @Test
@@ -242,19 +206,10 @@ public class AccountManagementFragmentTest {
     @Test
     @MediumTest
     @Feature("RenderTest")
-    @ParameterAnnotations.UseMethodParameter(
-            ReplaceProfileIsChildWithAccountCapabilitiesParams.class)
-    public void testAccountManagementViewForChildAccount(
-            boolean isMigrateAccountManagementSettingsToCapabilitiesFlagEnabled) throws Exception {
-        final AccountCapabilitiesBuilder accountCapabilitiesBuilder =
-                new AccountCapabilitiesBuilder();
+    public void testAccountManagementViewForChildAccount() throws Exception {
         final SigninTestRule signinTestRule = mSyncTestRule.getSigninTestRule();
         CoreAccountInfo primarySupervisedAccount =
-                signinTestRule.addAccount(
-                        CHILD_ACCOUNT_NAME,
-                        accountCapabilitiesBuilder.setIsSubjectToParentalControls(true).build());
-        signinTestRule.waitForSeeding();
-        signinTestRule.waitForSignin(primarySupervisedAccount);
+                signinTestRule.addChildTestAccountThenWaitForSignin();
 
         mSettingsActivityTestRule.startSettingsActivity();
         CriteriaHelper.pollUiThread(
@@ -262,29 +217,23 @@ public class AccountManagementFragmentTest {
                     return mSettingsActivityTestRule
                             .getFragment()
                             .getProfileDataCacheForTesting()
-                            .hasProfileDataForTesting(CHILD_ACCOUNT_NAME);
+                            .hasProfileDataForTesting(primarySupervisedAccount.getEmail());
                 });
         View view = mSettingsActivityTestRule.getFragment().getView();
         onViewWaiting(allOf(is(view), isDisplayed()));
         mRenderTestRule.render(
                 view,
-                "account_management_fragment_for_child_account_with_add_account_for_supervised_users");
+                "account_management_fragment_for_child_account_with_add_account_for_supervised_"
+                        + "users");
     }
 
     @Test
     @MediumTest
     @Feature("RenderTest")
-    @ParameterAnnotations.UseMethodParameter(
-            ReplaceProfileIsChildWithAccountCapabilitiesParams.class)
-    public void testAccountManagementViewForChildAccountWithSecondaryEduAccount(
-            boolean isMigrateAccountManagementSettingsToCapabilitiesFlagEnabled) throws Exception {
-        final AccountCapabilitiesBuilder accountCapabilitiesBuilder =
-                new AccountCapabilitiesBuilder();
+    public void testAccountManagementViewForChildAccountWithSecondaryEduAccount() throws Exception {
         final SigninTestRule signinTestRule = mSyncTestRule.getSigninTestRule();
         CoreAccountInfo primarySupervisedAccount =
-                signinTestRule.addAccount(
-                        CHILD_ACCOUNT_NAME,
-                        accountCapabilitiesBuilder.setIsSubjectToParentalControls(true).build());
+                signinTestRule.addChildTestAccountThenWaitForSignin();
         signinTestRule.addAccount("account@school.com");
         signinTestRule.waitForSeeding();
         signinTestRule.waitForSignin(primarySupervisedAccount);
@@ -295,18 +244,23 @@ public class AccountManagementFragmentTest {
                     return mSettingsActivityTestRule
                             .getFragment()
                             .getProfileDataCacheForTesting()
-                            .hasProfileDataForTesting(CHILD_ACCOUNT_NAME);
+                            .hasProfileDataForTesting(primarySupervisedAccount.getEmail());
                 });
         View view = mSettingsActivityTestRule.getFragment().getView();
         onViewWaiting(allOf(is(view), isDisplayed()));
         mRenderTestRule.render(
                 view,
-                "account_management_fragment_for_child_and_edu_accounts_with_add_account_for_supervised_users");
+                "account_management_fragment_for_child_and_edu_accounts_with_add_account_for_"
+                        + "supervised_users");
     }
 
     @Test
     @SmallTest
+    @DisableFeatures({ChromeFeatureList.REPLACE_SYNC_PROMOS_WITH_SIGN_IN_PROMOS})
     public void testSignOutUserWithoutShowingSignOutDialog() {
+        FakeSyncServiceImpl fakeSyncService = overrideSyncService();
+        fakeSyncService.setTypesWithUnsyncedData(Set.of(DataType.BOOKMARKS));
+
         mSyncTestRule.setUpAccountAndSignInForTesting();
         mSettingsActivityTestRule.startSettingsActivity();
 
@@ -319,6 +273,23 @@ public class AccountManagementFragmentTest {
                                         .getIdentityManager(
                                                 ProfileManager.getLastUsedRegularProfile())
                                         .hasPrimaryAccount(ConsentLevel.SIGNIN)));
+    }
+
+    @Test
+    @SmallTest
+    @EnableFeatures({ChromeFeatureList.REPLACE_SYNC_PROMOS_WITH_SIGN_IN_PROMOS})
+    public void testSignOutShowsUnsavedDataDialog() {
+        FakeSyncServiceImpl fakeSyncService = overrideSyncService();
+        fakeSyncService.setTypesWithUnsyncedData(Set.of(DataType.BOOKMARKS));
+
+        mSyncTestRule.setUpAccountAndSignInForTesting();
+        mSettingsActivityTestRule.startSettingsActivity();
+
+        onView(withText(R.string.sign_out)).perform(click());
+
+        onView(withText(R.string.sign_out_unsaved_data_title))
+                .inRoot(isDialog())
+                .check(matches(isDisplayed()));
     }
 
     @Test
@@ -350,7 +321,7 @@ public class AccountManagementFragmentTest {
         mSettingsActivityTestRule.startSettingsActivity();
 
         onViewWaiting(allOf(is(mSettingsActivityTestRule.getFragment().getView()), isDisplayed()));
-        onView(withId(R.id.identity_error_card)).check(matches(isDisplayed()));
+        onView(withId(R.id.signin_settings_card)).check(matches(isDisplayed()));
         watchIdentityErrorCardShownHistogram.assertExpected();
     }
 
@@ -363,7 +334,7 @@ public class AccountManagementFragmentTest {
         mSettingsActivityTestRule.startSettingsActivity();
 
         onViewWaiting(allOf(is(mSettingsActivityTestRule.getFragment().getView()), isDisplayed()));
-        onView(withId(R.id.identity_error_card)).check(doesNotExist());
+        onView(withId(R.id.signin_settings_card)).check(doesNotExist());
     }
 
     @Test
@@ -384,7 +355,7 @@ public class AccountManagementFragmentTest {
         mSettingsActivityTestRule.startSettingsActivity();
 
         onViewWaiting(allOf(is(mSettingsActivityTestRule.getFragment().getView()), isDisplayed()));
-        onView(withId(R.id.identity_error_card)).check(doesNotExist());
+        onView(withId(R.id.signin_settings_card)).check(doesNotExist());
         watchIdentityErrorCardShownHistogram.assertExpected();
     }
 
@@ -406,7 +377,7 @@ public class AccountManagementFragmentTest {
 
         onViewWaiting(allOf(is(mSettingsActivityTestRule.getFragment().getView()), isDisplayed()));
         // No error card exists right now.
-        onView(withId(R.id.identity_error_card)).check(doesNotExist());
+        onView(withId(R.id.signin_settings_card)).check(doesNotExist());
         watchIdentityErrorCardShownHistogram.assertExpected();
 
         watchIdentityErrorCardShownHistogram =
@@ -418,7 +389,7 @@ public class AccountManagementFragmentTest {
         fakeSyncService.setRequiresClientUpgrade(true);
 
         // Error card is showing now.
-        onViewWaiting(withId(R.id.identity_error_card)).check(matches(isDisplayed()));
+        onViewWaiting(withId(R.id.signin_settings_card)).check(matches(isDisplayed()));
         watchIdentityErrorCardShownHistogram.assertExpected();
     }
 
@@ -441,7 +412,7 @@ public class AccountManagementFragmentTest {
 
         onViewWaiting(allOf(is(mSettingsActivityTestRule.getFragment().getView()), isDisplayed()));
         // The error card exists right now.
-        onView(withId(R.id.identity_error_card)).check(matches(isDisplayed()));
+        onView(withId(R.id.signin_settings_card)).check(matches(isDisplayed()));
         watchIdentityErrorCardShownHistogram.assertExpected();
 
         // Expect no records now.
@@ -454,7 +425,7 @@ public class AccountManagementFragmentTest {
         fakeSyncService.setRequiresClientUpgrade(false);
 
         // No error card exists anymore.
-        onView(withId(R.id.identity_error_card)).check(doesNotExist());
+        onView(withId(R.id.signin_settings_card)).check(doesNotExist());
         watchIdentityErrorCardShownHistogram.assertExpected();
     }
 
@@ -476,7 +447,7 @@ public class AccountManagementFragmentTest {
         mSettingsActivityTestRule.startSettingsActivity();
 
         onViewWaiting(allOf(is(mSettingsActivityTestRule.getFragment().getView()), isDisplayed()));
-        onView(withId(R.id.identity_error_card)).check(doesNotExist());
+        onView(withId(R.id.signin_settings_card)).check(doesNotExist());
         watchIdentityErrorCardShownHistogram.assertExpected();
     }
 
@@ -493,7 +464,7 @@ public class AccountManagementFragmentTest {
         mSettingsActivityTestRule.startSettingsActivity();
         onViewWaiting(allOf(is(mSettingsActivityTestRule.getFragment().getView()), isDisplayed()));
         // The error card exists.
-        onView(withId(R.id.identity_error_card)).check(matches(isDisplayed()));
+        onView(withId(R.id.signin_settings_card)).check(matches(isDisplayed()));
 
         FakeAccountManagerFacade fakeAccountManagerFacade =
                 spy((FakeAccountManagerFacade) AccountManagerFacadeProvider.getInstance());
@@ -509,10 +480,10 @@ public class AccountManagementFragmentTest {
                 .updateCredentials(any(), any(), any());
 
         // Mimic the user tapping on the error card's button.
-        onView(withId(R.id.identity_error_card_button)).perform(click());
+        onView(withId(R.id.signin_settings_card_button)).perform(click());
 
         // No error card exists anymore.
-        onView(withId(R.id.identity_error_card)).check(doesNotExist());
+        onView(withId(R.id.signin_settings_card)).check(doesNotExist());
     }
 
     @Test
@@ -530,10 +501,10 @@ public class AccountManagementFragmentTest {
         SettingsActivity settingsActivity = mSettingsActivityTestRule.startSettingsActivity();
         onViewWaiting(allOf(is(mSettingsActivityTestRule.getFragment().getView()), isDisplayed()));
         // The error card exists.
-        onView(withId(R.id.identity_error_card)).check(matches(isDisplayed()));
+        onView(withId(R.id.signin_settings_card)).check(matches(isDisplayed()));
 
         // Mimic the user tapping on the error card's button.
-        onView(withId(R.id.identity_error_card_button)).perform(click());
+        onView(withId(R.id.signin_settings_card_button)).perform(click());
 
         final AccountManagementFragment fragment = mSettingsActivityTestRule.getFragment();
         // Passphrase dialog should open.
@@ -558,7 +529,7 @@ public class AccountManagementFragmentTest {
                 });
 
         // No error card exists anymore.
-        onView(withId(R.id.identity_error_card)).check(doesNotExist());
+        onView(withId(R.id.signin_settings_card)).check(doesNotExist());
     }
 
     @Test
@@ -573,7 +544,7 @@ public class AccountManagementFragmentTest {
         mSettingsActivityTestRule.startSettingsActivity();
         onViewWaiting(allOf(is(mSettingsActivityTestRule.getFragment().getView()), isDisplayed()));
         // The error card exists.
-        onView(withId(R.id.identity_error_card)).check(matches(isDisplayed()));
+        onView(withId(R.id.signin_settings_card)).check(matches(isDisplayed()));
 
         Intents.init();
         // Stub all external intents.
@@ -581,7 +552,7 @@ public class AccountManagementFragmentTest {
                 .respondWith(new ActivityResult(Activity.RESULT_OK, null));
 
         // Mimic the user tapping on the error card's button.
-        onView(withId(R.id.identity_error_card_button)).perform(click());
+        onView(withId(R.id.signin_settings_card_button)).perform(click());
 
         intended(IntentMatchers.hasDataString(startsWith("market")));
         Intents.release();

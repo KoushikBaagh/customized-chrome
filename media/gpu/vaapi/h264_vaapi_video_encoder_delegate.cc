@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "media/gpu/vaapi/h264_vaapi_video_encoder_delegate.h"
 
 #include <va/va.h>
@@ -38,13 +43,13 @@ constexpr uint32_t kIPeriod = 0;
 constexpr uint32_t kIPPeriod = 1;
 
 // The qp range is 0-51 in H264. Select 26 because of the center value.
-// WebRTC H264 encoder uses 1-51. We follow it and additionally sets the minimum
-// QP to 10 for screen content to mitigate the bitrate overshoot due to a scene
-// change.
+// WebRTC H264 encoder uses 1-51. We set the minimum QP to 1 for camera
+// and 10 for screen sharing to mitigate the bitrate overshoot due
+// to a scene, and maximum qp to 42 to pass the CTS test (b/354557852).
 constexpr uint8_t kDefaultQP = 26;
 constexpr uint8_t kMinQP = 1;
 constexpr uint8_t kScreenMinQP = 10;
-constexpr uint8_t kMaxQP = 51;
+constexpr uint8_t kMaxQP = 42;
 
 // Subjectively chosen bitrate window size for rate control, in ms.
 constexpr uint32_t kCPBWindowSizeMs = 1500;
@@ -155,7 +160,6 @@ void UpdatePictureForTemporalLayerEncoding(
           }};
 
   // Fill |pic.metadata_for_encoding| and |pic.ref|.
-  H264Metadata metadata;
   std::tie(pic.metadata_for_encoding.emplace(), pic.ref) =
       kFrameMetadata[num_layers - 2][num_encoded_frames % kTemporalLayerCycle];
 
@@ -168,10 +172,12 @@ void UpdatePictureForTemporalLayerEncoding(
   DCHECK_EQ(pic.ref_pic_list_modification_flag_l0, 0);
   DCHECK_EQ(pic.abs_diff_pic_num_minus1, 0);
   DCHECK(!ref_pic_list0.empty());
-  if (metadata.temporal_idx == 0)
+
+  if (pic.metadata_for_encoding->temporal_idx == 0) {
     ref_frame_idx = base::checked_cast<size_t>(ref_pic_list0.size() - 1);
-  else
+  } else {
     ref_frame_idx = 0;
+  }
 
   DCHECK_LT(*ref_frame_idx, ref_pic_list0.size());
   const H264Picture& ref_frame_pic = *ref_pic_list0[*ref_frame_idx];

@@ -25,9 +25,8 @@
 #include "chrome/browser/safe_browsing/test_safe_browsing_blocking_page_quiet.h"
 #include "chrome/browser/ssl/chrome_security_blocking_page_factory.h"
 #include "chrome/browser/ssl/https_only_mode_controller_client.h"
+#include "chrome/browser/ssl/https_upgrades_util.h"
 #include "chrome/browser/ssl/insecure_form/insecure_form_controller_client.h"
-#include "chrome/browser/supervised_user/supervised_user_verification_controller_client.h"
-#include "chrome/browser/supervised_user/supervised_user_verification_page.h"
 #include "chrome/common/buildflags.h"
 #include "chrome/common/url_constants.h"
 #include "components/captive_portal/core/buildflags.h"
@@ -72,6 +71,10 @@
 #include "components/security_interstitials/content/captive_portal_blocking_page.h"
 #endif
 
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+#include "chrome/browser/supervised_user/supervised_user_verification_controller_client.h"
+#include "chrome/browser/supervised_user/supervised_user_verification_page.h"
+#endif
 
 using security_interstitials::TestSafeBrowsingBlockingPageQuiet;
 
@@ -274,7 +277,8 @@ CreateHttpsOnlyModePage(content::WebContents* web_contents) {
       web_contents, request_url,
       std::make_unique<HttpsOnlyModeControllerClient>(web_contents,
                                                       request_url),
-      security_interstitials::https_only_mode::HttpInterstitialState{});
+      security_interstitials::https_only_mode::HttpInterstitialState{},
+      /*use_new_interstitial=*/IsNewHttpsFirstModeInterstitialEnabled());
 }
 
 std::unique_ptr<security_interstitials::SecurityInterstitialPage>
@@ -374,11 +378,12 @@ std::unique_ptr<EnterpriseWarnPage> CreateEnterpriseWarnPage(
                                                        kRequestUrl));
 }
 
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 std::unique_ptr<SupervisedUserVerificationPage>
 CreateSupervisedUserVerificationPage(content::WebContents* web_contents) {
   const GURL kRequestUrl("https://supervised-user-verification.example.net");
   return std::make_unique<SupervisedUserVerificationPage>(
-      web_contents, kRequestUrl,
+      web_contents, "first.last@gmail.com", kRequestUrl,
       std::make_unique<SupervisedUserVerificationControllerClient>(
           web_contents,
           Profile::FromBrowserContext(web_contents->GetBrowserContext())
@@ -386,6 +391,7 @@ CreateSupervisedUserVerificationPage(content::WebContents* web_contents) {
           g_browser_process->GetApplicationLocale(),
           GURL(chrome::kChromeUINewTabURL), kRequestUrl));
 }
+#endif
 
 std::unique_ptr<TestSafeBrowsingBlockingPageQuiet>
 CreateSafeBrowsingQuietBlockingPage(content::WebContents* web_contents) {
@@ -566,8 +572,10 @@ void InterstitialHTMLSource::StartDataRequest(
     interstitial_delegate = CreateInsecureFormPage(web_contents);
   } else if (path_without_query == "/https_only") {
     interstitial_delegate = CreateHttpsOnlyModePage(web_contents);
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
   } else if (path_without_query == "/supervised-user-verify") {
     interstitial_delegate = CreateSupervisedUserVerificationPage(web_contents);
+#endif
   }
 
   if (path_without_query == "/quietsafebrowsing") {

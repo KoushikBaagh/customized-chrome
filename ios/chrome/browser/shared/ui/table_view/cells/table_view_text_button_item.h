@@ -62,6 +62,9 @@
 // Checkmark image color. If nil, defaults to kBlue700Color.
 @property(nonatomic, strong) UIColor* checkmarkColor;
 
+// Accessibility label that will assigned to the button.
+@property(nonatomic, strong) NSString* buttonAccessibilityLabel;
+
 @end
 
 // TableViewTextButtonCell contains a textLabel and a UIbutton

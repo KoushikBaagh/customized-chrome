@@ -114,6 +114,10 @@ constexpr base::TimeDelta kClearNearbyProcessUnexpectedShutdownCountDelay =
 // nearby_share_prefs).
 constexpr base::TimeDelta kNearbyVisibilityReminderTimerDelay = base::Days(180);
 
+// Whether or not WifiLan is supported for advertising (mDNS). Support as
+// a bandwidth upgrade medium is behind a feature flag. Currently unsupported.
+constexpr bool kIsWifiLanAdvertisingSupported = false;
+
 std::string ReceiveSurfaceStateToString(
     NearbySharingService::ReceiveSurfaceState state) {
   switch (state) {
@@ -508,7 +512,7 @@ NearbySharingService::StatusCodes NearbySharingServiceImpl::RegisterSendSurface(
 
   if (state == SendSurfaceState::kForeground) {
     // Only check this error case for foreground senders
-    if (!HasAvailableConnectionMediums()) {
+    if (!HasAvailableDiscoveryMediums()) {
       RecordNearbyShareError(
           NearbyShareError::kRegisterSendSurfaceNoAvailableConnectionMedium);
       CD_LOG(VERBOSE, Feature::NS)
@@ -643,7 +647,7 @@ NearbySharingServiceImpl::RegisterReceiveSurface(
       return StatusCodes::kTransferAlreadyInProgress;
     }
 
-    if (!HasAvailableConnectionMediums()) {
+    if (!HasAvailableAdvertisingMediums()) {
       RecordNearbyShareError(
           NearbyShareError::kRegisterReceiveSurfaceNoAvailableConnectionMedium);
       CD_LOG(VERBOSE, Feature::NS)
@@ -1446,6 +1450,25 @@ void NearbySharingServiceImpl::OnEndpointLost(const std::string& endpoint_id) {
                      base::Unretained(this), endpoint_id));
 }
 
+void NearbySharingServiceImpl::OnInitialMedium(const std::string& endpoint_id,
+                                               const Medium medium) {
+  // Our |share_target_map_| is populated in CreateShareTarget. This
+  // is deterministically called *before* this method when sending,
+  // and *after* this method when receiving. In other words, we can
+  // expect to *not* record the initial medium when receiving.
+  // We determined this acceptable as the initial medium when receiving
+  // will always be Bluetooth, until other mediums are supported (Wifi LAN
+  // can be an initial medium when sending due to mDNS discovery.)
+  if (!share_target_map_.contains(endpoint_id)) {
+    return;
+  }
+  RecordNearbyShareInitialConnectionMedium(medium);
+  auto share_target = share_target_map_[endpoint_id];
+  for (auto& observer : observers_) {
+    observer.OnInitialMedium(share_target, medium);
+  }
+}
+
 void NearbySharingServiceImpl::OnBandwidthUpgrade(
     const std::string& endpoint_id,
     const Medium medium) {
@@ -1898,10 +1921,25 @@ bool NearbySharingServiceImpl::IsBluetoothPowered() const {
   return IsBluetoothPresent() && bluetooth_adapter_->IsPowered();
 }
 
-bool NearbySharingServiceImpl::HasAvailableConnectionMediums() {
-  // Check if Wifi or Ethernet LAN is off.  Advertisements won't work, so
-  // disable them, unless bluetooth is known to be enabled. Not all platforms
-  // have bluetooth, so wifi LAN is a platform-agnostic check.
+bool NearbySharingServiceImpl::HasAvailableAdvertisingMediums() {
+  // Advertising is currently unsupported unless bluetooth is known to be
+  // enabled. When Wifi LAN advertising (mDNS) is supported, we also need
+  // to check network conditions.
+  net::NetworkChangeNotifier::ConnectionType connection_type =
+      net::NetworkChangeNotifier::GetConnectionType();
+  bool hasNetworkConnection =
+      connection_type ==
+          net::NetworkChangeNotifier::ConnectionType::CONNECTION_WIFI ||
+      connection_type ==
+          net::NetworkChangeNotifier::ConnectionType::CONNECTION_ETHERNET;
+  return IsBluetoothPowered() ||
+         (hasNetworkConnection && kIsWifiLanAdvertisingSupported);
+}
+
+bool NearbySharingServiceImpl::HasAvailableDiscoveryMediums() {
+  // Discovery is supported over both Bluetooth and Wifi LAN (mDNS),
+  // so either of those mediums must be enabled. mDNS discovery
+  // additionally needs a network connection.
   net::NetworkChangeNotifier::ConnectionType connection_type =
       net::NetworkChangeNotifier::GetConnectionType();
   bool hasNetworkConnection =
@@ -2011,7 +2049,7 @@ void NearbySharingServiceImpl::InvalidateScanningState() {
     return;
   }
 
-  if (!HasAvailableConnectionMediums()) {
+  if (!HasAvailableDiscoveryMediums()) {
     StopScanning();
     CD_LOG(VERBOSE, Feature::NS)
         << __func__
@@ -2134,7 +2172,7 @@ void NearbySharingServiceImpl::InvalidateAdvertisingState() {
     return;
   }
 
-  if (!HasAvailableConnectionMediums()) {
+  if (!HasAvailableAdvertisingMediums()) {
     StopAdvertising();
     CD_LOG(VERBOSE, Feature::NS)
         << __func__
@@ -2302,7 +2340,7 @@ void NearbySharingServiceImpl::StartScanning() {
   DCHECK(!power_client_->IsSuspended());
   DCHECK(settings_.GetEnabled());
   DCHECK(!is_screen_locked_);
-  DCHECK(HasAvailableConnectionMediums());
+  DCHECK(HasAvailableDiscoveryMediums());
   DCHECK(!foreground_send_transfer_callbacks_.empty());
 
   if (is_scanning_) {

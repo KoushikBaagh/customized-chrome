@@ -4,6 +4,7 @@
 
 package org.chromium.content_public.browser;
 
+import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.os.Handler;
 import android.os.Parcelable;
@@ -11,6 +12,7 @@ import android.os.Parcelable;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.chromium.base.Callback;
 import org.chromium.blink_public.input.SelectionGranularity;
 import org.chromium.cc.input.BrowserControlsOffsetTagsInfo;
 import org.chromium.content_public.browser.back_forward_transition.AnimationStage;
@@ -614,6 +616,14 @@ public interface WebContents extends Parcelable {
     int getCurrentBackForwardTransitionStage();
 
     /**
+     * Let long press on links select the link text instead of triggering context menu. Disabled by
+     * default i.e. the context menu gets triggered.
+     *
+     * @param enabled {@code true} to enabled the behavior.
+     */
+    void setLongPressLinkSelectText(boolean enabled);
+
+    /**
      * Notify that the constraints of the browser controls have changed. This means that the the
      * browser controls went from being forced fully visible/hidden to not being forced (or
      * vice-versa).
@@ -621,4 +631,6 @@ public interface WebContents extends Parcelable {
     void notifyControlsConstraintsChanged(
             BrowserControlsOffsetTagsInfo oldOffsetTagsInfo,
             BrowserControlsOffsetTagsInfo offsetTagsInfo);
+
+    void captureContentAsBitmapForTesting(Callback<Bitmap> callback);
 }

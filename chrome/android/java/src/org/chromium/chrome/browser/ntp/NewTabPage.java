@@ -23,6 +23,7 @@ import androidx.annotation.VisibleForTesting;
 import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.chromium.base.CallbackController;
 import org.chromium.base.Log;
 import org.chromium.base.ObserverList;
 import org.chromium.base.TimeUtils;
@@ -49,7 +50,6 @@ import org.chromium.chrome.browser.feed.FeedSurfaceProvider;
 import org.chromium.chrome.browser.feed.FeedSwipeRefreshLayout;
 import org.chromium.chrome.browser.feed.NtpFeedSurfaceLifecycleManager;
 import org.chromium.chrome.browser.feed.componentinterfaces.SurfaceCoordinator;
-import org.chromium.chrome.browser.feedback.HelpAndFeedbackLauncherImpl;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.lifecycle.LifecycleObserver;
 import org.chromium.chrome.browser.lifecycle.PauseResumeWithNativeObserver;
@@ -67,7 +67,6 @@ import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.search_engines.TemplateUrlServiceFactory;
 import org.chromium.chrome.browser.search_resumption.SearchResumptionModuleCoordinator;
 import org.chromium.chrome.browser.search_resumption.SearchResumptionModuleUtils;
-import org.chromium.chrome.browser.settings.SettingsLauncherImpl;
 import org.chromium.chrome.browser.share.ShareDelegate;
 import org.chromium.chrome.browser.single_tab.SingleTabSwitcherCoordinator;
 import org.chromium.chrome.browser.suggestions.SuggestionsMetrics;
@@ -84,8 +83,8 @@ import org.chromium.chrome.browser.tab.TabObserver;
 import org.chromium.chrome.browser.tab.TabSelectionType;
 import org.chromium.chrome.browser.tab_ui.InvalidationAwareThumbnailProvider;
 import org.chromium.chrome.browser.tab_ui.TabContentManager;
+import org.chromium.chrome.browser.tabmodel.TabClosureParams;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
-import org.chromium.chrome.browser.tabmodel.TabModelSelectorObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
 import org.chromium.chrome.browser.tasks.HomeSurfaceTracker;
 import org.chromium.chrome.browser.tasks.ReturnToChromeUtil;
@@ -95,9 +94,6 @@ import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.browser.ui.native_page.BasicSmoothTransitionDelegate;
 import org.chromium.chrome.browser.ui.native_page.NativePage;
 import org.chromium.chrome.browser.ui.native_page.NativePageHost;
-import org.chromium.chrome.browser.util.BrowserUiUtils;
-import org.chromium.chrome.browser.util.BrowserUiUtils.HostSurface;
-import org.chromium.chrome.browser.xsurface.feed.FeedLaunchReliabilityLogger.SurfaceType;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.styles.ChromeColors;
 import org.chromium.components.browser_ui.styles.SemanticColorUtils;
@@ -190,6 +186,8 @@ public class NewTabPage
 
     @Nullable private SearchResumptionModuleCoordinator mSearchResumptionModuleCoordinator;
     private SmoothTransitionDelegate mSmoothTransitionDelegate;
+
+    private CallbackController mCallbackController = new CallbackController();
 
     @Override
     public void onControlsOffsetChanged(
@@ -317,12 +315,7 @@ public class NewTabPage
                 Profile profile,
                 SuggestionsNavigationDelegate navigationDelegate,
                 SnackbarManager snackbarManager) {
-            super(
-                    context,
-                    profile,
-                    navigationDelegate,
-                    snackbarManager,
-                    BrowserUiUtils.HostSurface.NEW_TAB_PAGE);
+            super(context, profile, navigationDelegate, snackbarManager);
         }
 
         @Override
@@ -505,18 +498,10 @@ public class NewTabPage
         // It is possible that the NewTabPage is created when the Tab model hasn't been initialized.
         // For example, the user changes theme when a NTP is showing, which leads to the recreation
         // of the ChromeTabbedActivity and showing the NTP as the last visited Tab.
-        if (mTabModelSelector.isTabStateInitialized()) {
-            mayCreateSearchResumptionModule(profile);
-        } else {
-            mTabModelSelector.addObserver(
-                    new TabModelSelectorObserver() {
-                        @Override
-                        public void onTabStateInitialized() {
-                            mayCreateSearchResumptionModule(profile);
-                            mTabModelSelector.removeObserver(this);
-                        }
-                    });
-        }
+        TabModelUtils.runOnTabStateInitialized(
+                mTabModelSelector,
+                mCallbackController.makeCancelable(
+                        unusedTabModelSelector -> mayCreateSearchResumptionModule(profile)));
 
         getView()
                 .addOnAttachStateChangeListener(
@@ -600,7 +585,6 @@ public class NewTabPage
                         snackbarManager,
                         mNewTabPageManager.getNavigationDelegate(),
                         BookmarkModel.getForProfile(profile),
-                        BrowserUiUtils.HostSurface.NEW_TAB_PAGE,
                         mTabModelSelector,
                         profile,
                         mBottomSheetController) {
@@ -629,13 +613,11 @@ public class NewTabPage
                         NewTabPageUtils.decodeOriginFromNtpUrl(url),
                         PrivacyPreferencesManagerImpl.getInstance(),
                         mToolbarSupplier,
-                        SurfaceType.NEW_TAB_PAGE,
                         mConstructedTimeNs,
                         FeedSwipeRefreshLayout.create(activity, R.id.toolbar_container),
                         /* overScrollDisabled= */ false,
                         /* viewportView= */ null,
                         actionDelegate,
-                        HelpAndFeedbackLauncherImpl.getForProfile(profile),
                         mTabStripHeightSupplier);
         mFeedSurfaceProvider = feedSurfaceCoordinator;
     }
@@ -979,6 +961,8 @@ public class NewTabPage
                 : "Destroy called before removed from window";
         if (mIsLoaded && !mTab.isHidden()) recordNtpHidden();
 
+        mCallbackController.destroy();
+
         mNewTabPageManager.onDestroy();
         mTileGroupDelegate.destroy();
         mTemplateUrlService.removeObserver(this);
@@ -1234,7 +1218,9 @@ public class NewTabPage
     private void onTabClicked(int tabId) {
         TabModelUtils.selectTabById(mTabModelSelector, tabId, TabSelectionType.FROM_USER);
 
-        mTabModelSelector.getModel(false).closeTab(mTab);
+        mTabModelSelector
+                .getModel(false)
+                .closeTabs(TabClosureParams.closeTab(mTab).allowUndo(false).build());
         if (mHomeSurfaceTracker != null) {
             // Updates the mHomeSurfaceTracker since the Tab of the NTP is closed.
             mHomeSurfaceTracker.updateHomeSurfaceAndTrackingTabs(null, null);
@@ -1267,11 +1253,6 @@ public class NewTabPage
     }
 
     @Override
-    public int getHostSurfaceType() {
-        return HostSurface.NEW_TAB_PAGE;
-    }
-
-    @Override
     public Point getContextMenuStartPoint() {
         return mContextMenuStartPosition;
     }
@@ -1298,7 +1279,7 @@ public class NewTabPage
 
     @Override
     public void customizeSettings() {
-        HomeModulesConfigManager.getInstance().onMenuClick(mContext, new SettingsLauncherImpl());
+        HomeModulesConfigManager.getInstance().onMenuClick(mContext);
     }
 
     @Override

@@ -257,7 +257,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Profile.KeyedService.Count.SystemProfile{ProfileType}"
-    units="services" expires_after="2024-11-27">
+    units="services" expires_after="2025-01-26">
   <owner>droger@chromium.org</owner>
   <owner>rsult@google.com</owner>
   <owner>chrome-signin-team@google.com</owner>
@@ -327,15 +327,21 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Profile.Menu.ClickedActionableItem"
+<histogram name="Profile.Menu.ClickedActionableItem{ProfileType}"
     enum="ProfileMenuActionableItem" expires_after="2024-11-27">
   <owner>droger@chromium.org</owner>
   <owner>msarda@chromium.org</owner>
   <owner>chrome-signin-team@google.com</owner>
   <summary>
-    Recorded when an actionable item(e.g. button, link) in the profile menu is
-    clicked.
+    Recorded when an actionable item (e.g. button, link) in the profile menu is
+    clicked. {ProfileType}.
   </summary>
+  <token key="ProfileType">
+    <variant name="" summary="Output for all profile types"/>
+    <variant name="_Supervised"
+        summary="Output only for profiles which are subject to parental
+                 controls"/>
+  </token>
 </histogram>
 
 <histogram name="Profile.NetUserCount" enum="ProfileNetUserCount"
@@ -385,9 +391,10 @@ chromium-metrics-reviews@google.com.
     used in the last 28 days. As such, it differs Profile.NumberOfProfiles.
 
     However, as of Feb 2024 intention is not reality. Chrome on Android assumes
-    the (sole) profile is active, even if it is not, and Chrome on iOS assumes
-    the (sole) profile is inactive, even if it is active. On desktop platforms
-    the activity detection is believed to work reliably.
+    the (sole) profile is active, even if it is not. Before M129, Chrome on iOS
+    assumed the (sole) profile is inactive, even if it is active. On desktop
+    platforms (all milestones) and on iOS M129+, the activity detection is
+    believed to work reliably.
 
     Also of note: ChromeOS has a notion of &quot;users&quot;. A ChromeOS device
     may have multiple users. Users are an entirely different concept than
@@ -424,7 +431,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Profile.NumberOfProfilesAtProfileSwitch" units="profiles"
-    expires_after="2024-12-01">
+    expires_after="2025-02-02">
   <owner>droger@chromium.org</owner>
   <owner>chrome-signin-team@google.com</owner>
   <summary>
@@ -496,17 +503,6 @@ chromium-metrics-reviews@google.com.
 
     Note: The guest profile has bucket 0. Regular profiles start at bucket 1.
     Incognito profiles count towards the original profile.
-  </summary>
-</histogram>
-
-<histogram base="true" name="Profile.State.Avatar" enum="ProfileAvatarState"
-    expires_after="2024-09-01">
-  <owner>droger@chromium.org</owner>
-  <owner>chrome-signin-team@google.com</owner>
-  <summary>
-    The state of profile avatars as would be displayed to the user in the
-    profile picker. Recorded on startup of Chrome and whenever Chrome is used
-    after at least 30 minutes of inactivity.
   </summary>
 </histogram>
 
@@ -622,7 +618,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Profile.{Database}Size" units="MB" expires_after="2024-11-17">
+<histogram name="Profile.{Database}Size" units="MB" expires_after="2025-01-26">
   <owner>etienneb@chromium.org</owner>
   <owner>gab@chromium.org</owner>
   <summary>
@@ -735,7 +731,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ProfilePicker.FirstRun.ExitStatus" enum="FirstRunExitStatus"
-    expires_after="2024-11-03">
+    expires_after="2025-02-02">
   <owner>dgn@chromium.org</owner>
   <owner>for-you-fre@google.com</owner>
   <summary>
@@ -758,7 +754,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ProfilePicker.FirstRun.OrganizationAvailableTiming" units="ms"
-    expires_after="2024-11-03">
+    expires_after="2025-02-02">
   <owner>dgn@chromium.org</owner>
   <owner>jyammine@google.com</owner>
   <owner>chrome-signin-team@google.com</owner>

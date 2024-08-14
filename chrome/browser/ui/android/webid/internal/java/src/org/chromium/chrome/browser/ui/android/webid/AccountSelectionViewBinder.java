@@ -303,6 +303,9 @@ class AccountSelectionViewBinder {
             TextView textView = view.findViewById(R.id.user_data_sharing_consent);
             textView.setText(span);
             textView.setMovementMethod(LinkMovementMethod.getInstance());
+            if (properties.mSetFocusViewCallback != null) {
+                properties.mSetFocusViewCallback.onResult(textView);
+            }
         } else {
             assert false : "Unhandled update to property:" + key;
         }
@@ -514,10 +517,14 @@ class AccountSelectionViewBinder {
                         String.format(
                                 context.getString(R.string.account_selection_continue),
                                 displayedName);
+                button.setContentDescription(btnText + ", " + account.getEmail());
             }
 
             assert btnText != null;
             button.setText(btnText);
+            if (properties.mSetFocusViewCallback != null) {
+                properties.mSetFocusViewCallback.onResult(button);
+            }
         } else {
             assert false : "Unhandled update to property:" + key;
         }
@@ -626,12 +633,28 @@ class AccountSelectionViewBinder {
      * @param key The key of the property to be bound.
      */
     static void bindHeaderView(PropertyModel model, View view, PropertyKey key) {
+        Resources resources = view.getResources();
+        View headerView = view.findViewById(R.id.header);
+
+        // Reuse the same header from previous dialog if button mode verify sheet.
+        if (model.get(HeaderProperties.RP_MODE) == RpMode.BUTTON
+                && (model.get(HeaderProperties.TYPE) == HeaderProperties.HeaderType.VERIFY
+                        || model.get(HeaderProperties.TYPE)
+                                == HeaderProperties.HeaderType.VERIFY_AUTO_REAUTHN)) {
+            headerView.setContentDescription(resources.getString(R.string.verify_sheet_title));
+            if (model.get(HeaderProperties.SET_FOCUS_VIEW_CALLBACK) != null) {
+                model.get(HeaderProperties.SET_FOCUS_VIEW_CALLBACK).onResult(headerView);
+            }
+            return;
+        }
+
         if (key == HeaderProperties.RP_FOR_DISPLAY
                 || key == HeaderProperties.IDP_FOR_DISPLAY
                 || key == HeaderProperties.TYPE
                 || key == HeaderProperties.RP_CONTEXT
-                || key == HeaderProperties.RP_MODE) {
-            Resources resources = view.getResources();
+                || key == HeaderProperties.RP_MODE
+                || key == HeaderProperties.IS_MULTIPLE_ACCOUNT_CHOOSER
+                || key == HeaderProperties.SET_FOCUS_VIEW_CALLBACK) {
             TextView headerTitleText = view.findViewById(R.id.header_title);
             TextView headerSubtitleText = view.findViewById(R.id.header_subtitle);
             HeaderProperties.HeaderType headerType = model.get(HeaderProperties.TYPE);
@@ -642,11 +665,17 @@ class AccountSelectionViewBinder {
                             headerType,
                             model.get(HeaderProperties.RP_FOR_DISPLAY),
                             model.get(HeaderProperties.IDP_FOR_DISPLAY),
-                            model.get(HeaderProperties.RP_MODE));
+                            model.get(HeaderProperties.RP_MODE),
+                            model.get(HeaderProperties.IS_MULTIPLE_ACCOUNT_CHOOSER));
             if (!subtitle.isEmpty()) {
                 headerTitleText.setPadding(
                         /* left= */ 0, /* top= */ 12, /* right= */ 0, /* bottom= */ 0);
+                if (headerSubtitleText.getText() != subtitle
+                        && model.get(HeaderProperties.SET_FOCUS_VIEW_CALLBACK) != null) {
+                    model.get(HeaderProperties.SET_FOCUS_VIEW_CALLBACK).onResult(headerView);
+                }
                 headerSubtitleText.setText(subtitle);
+                headerSubtitleText.setMovementMethod(LinkMovementMethod.getInstance());
             } else {
                 headerSubtitleText.setVisibility(View.GONE);
             }
@@ -659,6 +688,10 @@ class AccountSelectionViewBinder {
                             model.get(HeaderProperties.IDP_FOR_DISPLAY),
                             model.get(HeaderProperties.RP_CONTEXT),
                             model.get(HeaderProperties.RP_MODE));
+            if (headerTitleText.getText() != title
+                    && model.get(HeaderProperties.SET_FOCUS_VIEW_CALLBACK) != null) {
+                model.get(HeaderProperties.SET_FOCUS_VIEW_CALLBACK).onResult(headerView);
+            }
             headerTitleText.setText(title);
             headerTitleText.setMovementMethod(LinkMovementMethod.getInstance());
 
@@ -670,14 +703,16 @@ class AccountSelectionViewBinder {
             // closes itself automatically at the "Verifying..." stage.
             if (headerType != HeaderProperties.HeaderType.VERIFY
                     && headerType != HeaderProperties.HeaderType.VERIFY_AUTO_REAUTHN) {
-                headerTitleText.setContentDescription(
+                headerView.setContentDescription(
                         title
+                                + ". "
+                                + subtitle
                                 + ". "
                                 + resources.getString(
                                         R.string.bottom_sheet_accessibility_description));
             } else {
                 // Update the content description in case the view is recycled.
-                headerTitleText.setContentDescription(title);
+                headerView.setContentDescription(title);
             }
 
             if (key == HeaderProperties.TYPE) {
@@ -695,15 +730,39 @@ class AccountSelectionViewBinder {
         } else if (key == HeaderProperties.IDP_BRAND_ICON) {
             Bitmap brandIcon = model.get(HeaderProperties.IDP_BRAND_ICON);
             if (brandIcon != null) {
-                Resources resources = view.getResources();
                 int iconSize =
-                        resources.getDimensionPixelSize(R.dimen.account_selection_sheet_icon_size);
+                        resources.getDimensionPixelSize(
+                                model.get(HeaderProperties.RP_MODE) == RpMode.BUTTON
+                                        ? R.dimen.account_selection_button_mode_sheet_icon_size
+                                        : R.dimen.account_selection_sheet_icon_size);
                 Drawable croppedBrandIcon =
                         createBitmapWithMaskableIconSafeZone(resources, brandIcon, iconSize);
                 ImageView headerIconView = (ImageView) view.findViewById(R.id.header_idp_icon);
                 headerIconView.setImageDrawable(croppedBrandIcon);
                 headerIconView.setVisibility(View.VISIBLE);
             }
+        } else if (key == HeaderProperties.RP_BRAND_ICON) {
+            // RP icon is not shown in widget mode.
+            if (model.get(HeaderProperties.RP_MODE) == RpMode.WIDGET) return;
+
+            Bitmap brandIcon = model.get(HeaderProperties.RP_BRAND_ICON);
+            ImageView headerIconView = (ImageView) view.findViewById(R.id.header_rp_icon);
+            ImageView arrowRangeIcon = (ImageView) view.findViewById(R.id.arrow_range_icon);
+            if (brandIcon != null) {
+                int iconSize =
+                        resources.getDimensionPixelSize(
+                                R.dimen.account_selection_button_mode_sheet_icon_size);
+                Drawable croppedBrandIcon =
+                        createBitmapWithMaskableIconSafeZone(resources, brandIcon, iconSize);
+                headerIconView.setImageDrawable(croppedBrandIcon);
+            }
+            boolean isRpIconVisible =
+                    brandIcon != null
+                            && model.get(HeaderProperties.IDP_BRAND_ICON) != null
+                            && model.get(HeaderProperties.TYPE)
+                                    == HeaderProperties.HeaderType.REQUEST_PERMISSION;
+            headerIconView.setVisibility(isRpIconVisible ? View.VISIBLE : View.GONE);
+            arrowRangeIcon.setVisibility(isRpIconVisible ? View.VISIBLE : View.GONE);
         } else if (key == HeaderProperties.CLOSE_ON_CLICK_LISTENER) {
             // There is no explicit close button for button mode, user swipes to close instead.
             if (model.get(HeaderProperties.RP_MODE) == RpMode.BUTTON) return;
@@ -786,12 +845,17 @@ class AccountSelectionViewBinder {
             HeaderProperties.HeaderType type,
             String rpUrl,
             String idpUrl,
-            @RpMode.EnumType int rpMode) {
-        if (rpMode == RpMode.BUTTON) {
-            return rpUrl;
-        } else {
-            return "";
+            @RpMode.EnumType int rpMode,
+            Boolean isMultipleAccountChooser) {
+        if (rpMode == RpMode.WIDGET) return "";
+
+        if (isMultipleAccountChooser) {
+            return String.format(
+                    resources.getString(
+                            R.string.account_selection_button_mode_sheet_choose_an_account),
+                    rpUrl);
         }
+        return rpUrl;
     }
 
     private AccountSelectionViewBinder() {}

@@ -274,10 +274,14 @@ class TestOAuth2MintTokenFlow : public OAuth2MintTokenFlow {
         break;
       }
       case MINT_TOKEN_SUCCESS: {
-        if (granted_scopes_.empty())
-          delegate_->OnMintTokenSuccess(kAccessToken, *requested_scopes_, 3600);
-        else
-          delegate_->OnMintTokenSuccess(kAccessToken, granted_scopes_, 3600);
+        OAuth2MintTokenFlow::MintTokenResult result;
+        result.access_token = kAccessToken;
+        result.time_to_live = base::Seconds(3600);
+        // In these tests, empty `granted_scopes_` means that all requested
+        // scopes should be granted.
+        result.granted_scopes =
+            !granted_scopes_.empty() ? granted_scopes_ : *requested_scopes_;
+        delegate_->OnMintTokenSuccess(result);
         break;
       }
       case MINT_TOKEN_FAILURE: {
@@ -927,13 +931,14 @@ class GetAuthTokenFunctionTest
   const Extension* CreateExtension(int fields_to_set) {
     const Extension* ext = nullptr;
     base::FilePath manifest_path =
-        test_data_dir_.AppendASCII("platform_apps/oauth2");
+        test_data_dir_.AppendASCII("api_test/identity/oauth2");
     base::FilePath component_manifest_path =
-        test_data_dir_.AppendASCII("packaged_app/component_oauth2");
-    if ((fields_to_set & AS_COMPONENT) == 0)
+        test_data_dir_.AppendASCII("api_test/identity/component_oauth2");
+    if ((fields_to_set & AS_COMPONENT) == 0) {
       ext = LoadExtension(manifest_path);
-    else
+    } else {
       ext = LoadExtensionAsComponent(component_manifest_path);
+    }
 
     if (!ext) {
       ADD_FAILURE() << "Cannot create extension";
@@ -4097,8 +4102,16 @@ class ClearAllCachedAuthTokensFunctionTest : public AsyncExtensionBrowserTest {
   void SetUpOnMainThread() override {
     AsyncExtensionBrowserTest::SetUpOnMainThread();
     base::FilePath manifest_path =
-        test_data_dir_.AppendASCII("platform_apps/oauth2");
+        test_data_dir_.AppendASCII("api_test/identity/oauth2");
     extension_ = LoadExtension(manifest_path);
+  }
+
+  void TearDownOnMainThread() override {
+    // We must clear the extension_ raw_ptr before browser shutdown is
+    // initiated. Otherwise, it will become dangling after extensions are
+    // unloaded during shutdown.
+    extension_ = nullptr;
+    AsyncExtensionBrowserTest::TearDownOnMainThread();
   }
 
   const Extension* extension() { return extension_; }

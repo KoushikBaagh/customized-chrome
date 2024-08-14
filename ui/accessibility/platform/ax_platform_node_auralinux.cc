@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "ui/accessibility/platform/ax_platform_node_auralinux.h"
 
 #include <dlfcn.h>
@@ -2344,7 +2349,7 @@ bool AtkTableCellInterface::Exists() {
 void AXPlatformNodeAuraLinux::EnsureGTypeInit() {
 #if !GLIB_CHECK_VERSION(2, 36, 0)
   static bool first_time = true;
-  if (UNLIKELY(first_time)) {
+  if (first_time) [[unlikely]] {
     g_type_init();
     first_time = false;
   }

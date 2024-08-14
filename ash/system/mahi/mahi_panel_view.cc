@@ -50,6 +50,7 @@
 #include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/text_constants.h"
+#include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/animation_builder.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
@@ -553,6 +554,9 @@ MahiPanelView::MahiPanelView(MahiUiController* ui_controller)
           .SetID(mahi_constants::ViewId::kContentSourceButton)
           .Build());
 
+  views::View* feedback_buttons_container;
+  views::View* error_status_view;
+
   // Add a scrollable view of the panel's content, with a feedback section.
   main_container_->AddChildView(
       views::Builder<views::View>()
@@ -569,6 +573,7 @@ MahiPanelView::MahiPanelView(MahiUiController* ui_controller)
           .AddChildren(
               // Add buttons for the user to give feedback on the content.
               views::Builder<views::BoxLayoutView>()
+                  .CopyAddressTo(&feedback_buttons_container)
                   .SetOrientation(views::BoxLayout::Orientation::kHorizontal)
                   .SetInsideBorderInsets(gfx::Insets::TLBR(
                       0, 0, 0, kFeedbackButtonIconPaddingRight))
@@ -627,8 +632,14 @@ MahiPanelView::MahiPanelView(MahiUiController* ui_controller)
                                           views::MaximumFlexSizeRule::
                                               kUnbounded)))),
               views::Builder<MahiErrorStatusView>(
-                  std::make_unique<MahiErrorStatusView>(ui_controller_)))
+                  std::make_unique<MahiErrorStatusView>(ui_controller_))
+                  .CopyAddressTo(&error_status_view))
           .Build());
+
+  // Put feedback buttons container after the error status view in the focus
+  // list since the order of traversal should be scroll view -> error status
+  // view -> feedback buttons.
+  feedback_buttons_container->InsertAfterInFocusList(error_status_view);
 
   // Add a row for processing user input that includes a textfield, send button
   // and a back to Q&A button when in the summary section.
@@ -663,6 +674,8 @@ MahiPanelView::MahiPanelView(MahiUiController* ui_controller)
                           .SetBorder(
                               views::CreateEmptyBorder(kInputTextfieldPadding))
                           .SetPlaceholderText(l10n_util::GetStringUTF16(
+                              IDS_ASH_MAHI_PANEL_INPUT_PLACEHOLDER_TEXT))
+                          .SetAccessibleName(l10n_util::GetStringUTF16(
                               IDS_ASH_MAHI_PANEL_INPUT_PLACEHOLDER_TEXT))
                           .SetFontList(
                               TypographyProvider::Get()->ResolveTypographyToken(
@@ -708,10 +721,7 @@ MahiPanelView::MahiPanelView(MahiUiController* ui_controller)
                   .SetCallback(base::BindRepeating(
                       &MahiPanelView::OnLearnMoreLinkClicked,
                       weak_ptr_factory_.GetWeakPtr()))
-                  .SetID(mahi_constants::ViewId::kLearnMoreLink)
-                  // TODO(b/333111220): Re-enable the link when there's a
-                  // website available.
-                  .SetVisible(false))
+                  .SetID(mahi_constants::ViewId::kLearnMoreLink))
           .Build());
 
   // Refresh contents after all child views are built.
@@ -820,7 +830,7 @@ std::unique_ptr<views::View> MahiPanelView::CreateHeaderRow() {
 
 bool MahiPanelView::HandleKeyEvent(views::Textfield* textfield,
                                    const ui::KeyEvent& key_event) {
-  if (key_event.type() != ui::EventType::ET_KEY_PRESSED) {
+  if (key_event.type() != ui::EventType::kKeyPressed) {
     return false;
   }
 
@@ -882,6 +892,8 @@ void MahiPanelView::OnLearnMoreLinkClicked() {
       NewWindowDelegate::Disposition::kNewForegroundTab);
   base::UmaHistogramEnumeration(mahi_constants::kMahiButtonClickHistogramName,
                                 mahi_constants::PanelButton::kLearnMoreLink);
+  GetViewAccessibility().AnnounceText((l10n_util::GetStringUTF16(
+      IDS_ASH_MAHI_LEARN_MORE_CLICK_ACTIVATION_ACCESSIBLE_NAME)));
 }
 
 void MahiPanelView::OnSendButtonPressed() {

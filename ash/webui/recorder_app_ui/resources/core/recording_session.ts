@@ -9,7 +9,7 @@ import {
 } from './audio_constants.js';
 import {PlatformHandler} from './platform_handler.js';
 import {computed, effect, signal} from './reactive/signal.js';
-import {SodaEventTransformer, TextToken} from './soda/soda.js';
+import {SodaEventTransformer, Transcription} from './soda/soda.js';
 import {SodaSession} from './soda/types.js';
 import {
   assert,
@@ -41,38 +41,22 @@ interface RecordingProgress {
   powers: number[];
   // Transcription of the ongoing recording. null if transcription is never
   // enabled throughout the recording.
-  textTokens: TextToken[]|null;
+  transcription: Transcription|null;
 }
 
-/**
- * The source of the audio stream.
- */
-export enum AudioSource {
-  DISPLAY_MEDIA = 'DISPLAY_MEDIA',
-  USER_MEDIA = 'USER_MEDIA',
-}
-
-function getStreamFromAudioSource(source: AudioSource): Promise<MediaStream> {
-  switch (source) {
-    case AudioSource.USER_MEDIA:
-      return navigator.mediaDevices.getUserMedia({audio: true});
-    case AudioSource.DISPLAY_MEDIA: {
-      // TODO(shik): Handle the case that user cancelled the dialog, or stopped
-      // sharing while recording.
-      return navigator.mediaDevices.getDisplayMedia({
-        video: false,
-        audio: true,
-        systemAudio: 'include',
-      });
-    }
-    default:
-      assertExhaustive(source);
-  }
+function getMicrophoneStream(micId: string): Promise<MediaStream> {
+  return navigator.mediaDevices.getUserMedia({
+    audio: {
+      deviceId: {exact: micId},
+    },
+  });
 }
 
 interface RecordingSessionConfig {
-  source: AudioSource;
+  includeSystemAudio: boolean;
+  micId: string;
   platformHandler: PlatformHandler;
+  speakerLabelEnabled: boolean;
 }
 
 let audioCtxGlobal: AudioContext|null = null;
@@ -97,7 +81,7 @@ interface SodaSessionInfo {
 export class RecordingSession {
   private readonly dataChunks: Blob[] = [];
 
-  private readonly sodaEventTransformer = new SodaEventTransformer();
+  private readonly sodaEventTransformer: SodaEventTransformer;
 
   private currentSodaSession: SodaSessionInfo|null = null;
 
@@ -105,9 +89,15 @@ export class RecordingSession {
 
   private readonly powers = signal<number[]>([]);
 
-  private readonly textTokens = signal<TextToken[]|null>(null);
+  private readonly transcription = signal<Transcription|null>(null);
 
   private processedSamples = 0;
+
+  private readonly mediaRecorder: MediaRecorder;
+
+  private readonly audioProcessor: AudioWorkletNode;
+
+  private readonly combinedInputNode: MediaStreamAudioDestinationNode;
 
   readonly progress = computed<RecordingProgress>(() => {
     const powers = this.powers.value;
@@ -115,16 +105,23 @@ export class RecordingSession {
     return {
       length,
       powers,
-      textTokens: this.textTokens.value,
+      transcription: this.transcription.value,
     };
   });
 
   private constructor(
     private readonly platformHandler: PlatformHandler,
-    private readonly stream: MediaStream,
-    private readonly mediaRecorder: MediaRecorder,
-    private readonly audioProcessor: AudioWorkletNode,
+    private readonly audioCtx: AudioContext,
+    private readonly sourceStreams: MediaStream[],
+    speakerLabelEnabled: boolean,
   ) {
+    this.sodaEventTransformer = new SodaEventTransformer(speakerLabelEnabled);
+    this.combinedInputNode = audioCtx.createMediaStreamDestination();
+    this.audioProcessor = new AudioWorkletNode(audioCtx, 'audio-processor');
+    this.mediaRecorder = new MediaRecorder(this.combinedInputNode.stream, {
+      mimeType: AUDIO_MIME_TYPE,
+    });
+
     this.mediaRecorder.addEventListener('dataavailable', (e) => {
       this.onDataAvailable(e);
     });
@@ -204,8 +201,8 @@ export class RecordingSession {
       if (this.currentSodaSession !== null) {
         return;
       }
-      if (this.textTokens.value === null) {
-        this.textTokens.value = [];
+      if (this.transcription.value === null) {
+        this.transcription.value = new Transcription([]);
       }
       await this.ensureSodaInstalled();
       // Abort current running job if there's a new enable/disable request.
@@ -219,7 +216,7 @@ export class RecordingSession {
           ev,
           assertExists(this.currentSodaSession).startOffsetMs,
         );
-        this.textTokens.value = this.sodaEventTransformer.getTokens();
+        this.transcription.value = this.sodaEventTransformer.getTranscription();
       });
       this.currentSodaSession = {
         session,
@@ -257,6 +254,14 @@ export class RecordingSession {
     }
     this.audioProcessor.port.start();
     this.mediaRecorder.start(TIME_SLICE_MS);
+
+    // Connect the input to the MediaRecorder and processor, to make sure both
+    // only starts after soda is initialized.
+    for (const stream of this.sourceStreams) {
+      const source = this.audioCtx.createMediaStreamSource(stream);
+      source.connect(this.combinedInputNode);
+      source.connect(this.audioProcessor);
+    }
   }
 
   async finish(): Promise<Blob> {
@@ -268,8 +273,11 @@ export class RecordingSession {
     await this.stopSodaSession().result;
     await stopped;
 
-    for (const track of this.stream.getTracks()) {
-      track.stop();
+    const streams = [this.combinedInputNode.stream, ...this.sourceStreams];
+    for (const stream of streams) {
+      for (const track of stream.getTracks()) {
+        track.stop();
+      }
     }
 
     return new Blob(this.dataChunks, {type: AUDIO_MIME_TYPE});
@@ -278,20 +286,21 @@ export class RecordingSession {
   static async create(
     config: RecordingSessionConfig,
   ): Promise<RecordingSession> {
-    const stream = await getStreamFromAudioSource(config.source);
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: AUDIO_MIME_TYPE,
-    });
+    const requestingStreams = [getMicrophoneStream(config.micId)];
+    if (config.includeSystemAudio) {
+      requestingStreams.push(
+        config.platformHandler.getSystemAudioMediaStream(),
+      );
+    }
+    const streams = await Promise.all(requestingStreams);
+
     const audioCtx = await getAudioContext();
-    const source = audioCtx.createMediaStreamSource(stream);
-    const processor = new AudioWorkletNode(audioCtx, 'audio-processor');
-    source.connect(processor);
 
     return new RecordingSession(
       config.platformHandler,
-      stream,
-      mediaRecorder,
-      processor,
+      audioCtx,
+      streams,
+      config.speakerLabelEnabled,
     );
   }
 }

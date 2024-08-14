@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "gpu/command_buffer/client/raster_implementation.h"
 
 #include <GLES2/gl2.h>
@@ -428,7 +433,11 @@ struct RasterImplementation::AsyncARGBReadbackRequest {
         query(finished_query),
         done(false),
         readback_successful(false) {}
-  ~AsyncARGBReadbackRequest() { std::move(callback).Run(readback_successful); }
+  ~AsyncARGBReadbackRequest() {
+    // Sometimes `callback` owns `dst_pixels`, this prevents dangling raw ptr
+    dst_pixels = nullptr;
+    std::move(callback).Run(readback_successful);
+  }
 
   raw_ptr<void> dst_pixels;
   GLuint dst_size;
@@ -470,6 +479,10 @@ struct RasterImplementation::AsyncYUVReadbackRequest {
         release_mailbox(std::move(release_mailbox)),
         readback_done(std::move(readback_done)) {}
   ~AsyncYUVReadbackRequest() {
+    // Sometimes `callback` owns plane ptrs, this prevents dangling raw ptrs
+    y_plane_data = nullptr;
+    u_plane_data = nullptr;
+    v_plane_data = nullptr;
     std::move(release_mailbox).Run();
     std::move(readback_done).Run(readback_successful);
   }

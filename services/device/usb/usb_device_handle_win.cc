@@ -394,7 +394,7 @@ void UsbDeviceHandleWin::ClearHalt(mojom::UsbTransferDirection direction,
 
   auto interface_it =
       interfaces_.find(endpoint_it->second.interface->interface_number);
-  DCHECK(interface_it != interfaces_.end());
+  CHECK(interface_it != interfaces_.end(), base::NotFatalUntil::M130);
   Interface& interface = interface_it->second;
   if (!interface.claimed) {
     task_runner_->PostTask(FROM_HERE,
@@ -550,7 +550,7 @@ void UsbDeviceHandleWin::GenericTransfer(
 
   auto interface_it =
       interfaces_.find(endpoint_it->second.interface->interface_number);
-  DCHECK(interface_it != interfaces_.end());
+  CHECK(interface_it != interfaces_.end(), base::NotFatalUntil::M130);
   Interface* interface = &interface_it->second;
   if (!interface->claimed) {
     task_runner_->PostTask(
@@ -776,7 +776,7 @@ void UsbDeviceHandleWin::OnFirstInterfaceOpened(int interface_number,
                                                 OpenInterfaceCallback callback,
                                                 Interface* first_interface) {
   auto interface_it = interfaces_.find(interface_number);
-  DCHECK(interface_it != interfaces_.end());
+  CHECK(interface_it != interfaces_.end(), base::NotFatalUntil::M130);
   Interface* interface = &interface_it->second;
   if (device_->driver_type() == UsbDeviceWin::DriverType::kComposite) {
     DCHECK_NE(interface->first_interface, interface->interface_number);
@@ -1039,8 +1039,7 @@ void UsbDeviceHandleWin::GotNodeConnectionInformation(
   size_t bytes_transferred =
       std::min(sizeof(USB_DEVICE_DESCRIPTOR), buffer->size());
   base::span(buffer->as_vector())
-      .first(bytes_transferred)
-      .copy_from(
+      .copy_prefix_from(
           base::byte_span_from_ref(node_connection_info->DeviceDescriptor)
               .first(bytes_transferred));
   std::move(callback).Run(UsbTransferStatus::COMPLETED, buffer,
@@ -1074,8 +1073,7 @@ void UsbDeviceHandleWin::GotDescriptorFromNodeConnection(
   bytes_transferred = std::min(bytes_transferred, original_buffer->size());
 
   base::span(original_buffer->as_vector())
-      .first(bytes_transferred)
-      .copy_from(
+      .copy_prefix_from(
           base::span(*request_buffer)
               .subspan(sizeof(USB_DESCRIPTOR_REQUEST), bytes_transferred));
   std::move(callback).Run(UsbTransferStatus::COMPLETED, original_buffer,

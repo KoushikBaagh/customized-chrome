@@ -32,6 +32,7 @@
 #import "ios/chrome/browser/shared/model/browser/browser_list_factory.h"
 #import "ios/chrome/browser/shared/model/browser_state/chrome_browser_state.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_backed_boolean.h"
+#import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
 #import "ios/chrome/browser/shared/model/utils/observable_boolean.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
@@ -191,10 +192,19 @@ const char kGStatic[] = ".gstatic.com";
     _webStateList = _browser->GetWebStateList();
     _isOffTheRecord = _browser->GetBrowserState()->IsOffTheRecord();
 
-    _tabResumptionDisabled = [[PrefBackedBoolean alloc]
-        initWithPrefService:_localState
-                   prefName:tab_resumption_prefs::kTabResumptioDisabledPref];
-    [_tabResumptionDisabled setObserver:self];
+    if (IsHomeCustomizationEnabled()) {
+      _tabResumptionDisabled = [[PrefBackedBoolean alloc]
+          initWithPrefService:_browserStatePrefs
+                     prefName:
+                         prefs::
+                             kHomeCustomizationMagicStackTabResumptionEnabled];
+      [_tabResumptionDisabled setObserver:self];
+    } else {
+      _tabResumptionDisabled = [[PrefBackedBoolean alloc]
+          initWithPrefService:_localState
+                     prefName:tab_resumption_prefs::kTabResumptioDisabledPref];
+      [_tabResumptionDisabled setObserver:self];
+    }
 
     ChromeBrowserState* browserState = _browser->GetBrowserState();
     _sessionSyncService =
@@ -317,7 +327,8 @@ const char kGStatic[] = ".gstatic.com";
 }
 
 - (void)disableModule {
-  tab_resumption_prefs::DisableTabResumption(_localState);
+  tab_resumption_prefs::DisableTabResumption(
+      IsHomeCustomizationEnabled() ? _browserStatePrefs : _localState);
 }
 
 - (void)setDelegate:(id<TabResumptionHelperDelegate>)delegate {
@@ -351,8 +362,11 @@ const char kGStatic[] = ".gstatic.com";
 #pragma mark - Boolean Observer
 
 - (void)booleanDidChange:(id<ObservableBoolean>)observableBoolean {
-  if (observableBoolean == _tabResumptionDisabled && observableBoolean.value) {
-    [self.delegate removeTabResumptionModule];
+  if (observableBoolean == _tabResumptionDisabled) {
+    if ((IsHomeCustomizationEnabled() && !observableBoolean.value) ||
+        (!IsHomeCustomizationEnabled() && observableBoolean.value)) {
+      [self.delegate removeTabResumptionModule];
+    }
   }
 }
 
@@ -410,7 +424,8 @@ const char kGStatic[] = ".gstatic.com";
 
 // Fetches the item to display from the model.
 - (void)fetchLastTabResumptionItem {
-  if (tab_resumption_prefs::IsTabResumptionDisabled(_localState)) {
+  if (tab_resumption_prefs::IsTabResumptionDisabled(
+          IsHomeCustomizationEnabled() ? _browserStatePrefs : _localState)) {
     return;
   }
   if (_visitedURLRankingService && IsTabResumption2_0Enabled()) {
@@ -745,6 +760,11 @@ const char kGStatic[] = ".gstatic.com";
   item.requestID = URLAggregate->request_id;
   item.commandHandler = self;
   item.delegate = self;
+  if (IsTabResumption2BubbleEnabled()) {
+    // Dummy reason for now as TR2 does not return one.
+    // TODO(crbug.com/342389622): put the correct reason.
+    item.reason = @"TEST TR2 REASON.";
+  }
   if (tab.id > 0 && tab.session_tag && !isLocal) {
     item.sessionName = base::SysUTF8ToNSString(tab.session_name.value());
     _sessionTag = tab.session_tag.value();

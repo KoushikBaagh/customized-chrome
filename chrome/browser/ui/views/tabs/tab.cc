@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "chrome/browser/ui/views/tabs/tab.h"
 
 #include <stddef.h>
@@ -251,6 +256,11 @@ Tab::Tab(TabSlotController* controller)
                           base::Unretained(controller_))));
   close_button_->SetHasInkDropActionOnClick(true);
 
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+  showing_close_button_ = !controller_->IsLockedForOnTask();
+  close_button_->SetVisible(showing_close_button_);
+#endif
+
   tab_close_button_observer_ = std::make_unique<TabCloseButtonObserver>(
       this, close_button_, controller_);
 
@@ -318,16 +328,12 @@ void Tab::Layout(PassKey) {
     } else {
       MaybeAdjustLeftForPinnedTab(&favicon_bounds, gfx::kFaviconSize);
     }
-
-    if (base::FeatureList::IsEnabled(
-            performance_manager::features::kDiscardRingImprovements)) {
-      icon_->EnlargeDiscardIndicatorRadius(
-          controller()->GetInactiveTabWidth() -
-                      2 * tab_style()->GetBottomCornerRadius() >=
-                  gfx::kFaviconSize + 2 * kIncreasedDiscardIndicatorRadiusDp
-              ? kIncreasedDiscardIndicatorRadiusDp
-              : 0);
-    }
+    icon_->EnlargeDiscardIndicatorRadius(
+        controller()->GetInactiveTabWidth() -
+                    2 * tab_style()->GetBottomCornerRadius() >=
+                gfx::kFaviconSize + 2 * kIncreasedDiscardIndicatorRadiusDp
+            ? kIncreasedDiscardIndicatorRadiusDp
+            : 0);
 
     // Add space for insets outside the favicon bounds.
     favicon_bounds.Inset(-icon_->GetInsets());
@@ -457,7 +463,8 @@ bool Tab::OnKeyPressed(const ui::KeyEvent& event) {
       ui::EF_CONTROL_DOWN;
 #endif
 
-  if (event.type() == ui::ET_KEY_PRESSED && (event.flags() & kModifiedFlag)) {
+  if (event.type() == ui::EventType::kKeyPressed &&
+      (event.flags() & kModifiedFlag)) {
     const bool is_right = event.key_code() == ui::VKEY_RIGHT;
     const bool is_left = event.key_code() == ui::VKEY_LEFT;
     if (is_right || is_left) {
@@ -650,7 +657,7 @@ void Tab::OnGestureEvent(ui::GestureEvent* event) {
   controller_->UpdateHoverCard(nullptr,
                                TabSlotController::HoverCardUpdateType::kEvent);
   switch (event->type()) {
-    case ui::ET_GESTURE_TAP_DOWN: {
+    case ui::EventType::kGestureTapDown: {
       // TAP_DOWN is only dispatched for the first touch point.
       DCHECK_EQ(1, event->details().touch_points());
 
@@ -698,7 +705,6 @@ std::u16string Tab::GetTooltipText(const gfx::Point& p) const {
 
 void Tab::GetAccessibleNodeData(ui::AXNodeData* node_data) {
   node_data->role = ax::mojom::Role::kTab;
-  node_data->AddState(ax::mojom::State::kMultiselectable);
   node_data->AddBoolAttribute(ax::mojom::BoolAttribute::kSelected,
                               IsSelected());
 
@@ -1062,8 +1068,14 @@ void Tab::UpdateIconVisibility() {
                                    : kMinimumContentsWidthForCloseButtons);
 
   if (IsActive()) {
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+    // Hide tab close button for OnTask if locked. Only applicable for non-web
+    // browser scenarios.
+    showing_close_button_ = !controller_->IsLockedForOnTask();
+#else
     // Close button is shown on active tabs regardless of the size.
     showing_close_button_ = true;
+#endif  // BUILDFLAG(IS_CHROMEOS_ASH)
     available_width -= close_button_width;
 
     showing_alert_indicator_ =
@@ -1088,7 +1100,11 @@ void Tab::UpdateIconVisibility() {
       available_width -= favicon_width;
     }
 
-    showing_close_button_ = large_enough_for_close_button;
+    showing_close_button_ =
+#if BUILDFLAG(IS_CHROMEOS_ASH)
+        !controller_->IsLockedForOnTask() &&
+#endif
+        large_enough_for_close_button;
     if (showing_close_button_) {
       available_width -= close_button_width;
     }
@@ -1164,7 +1180,7 @@ void Tab::CloseButtonPressed(const ui::Event& event) {
     base::RecordAction(UserMetricsAction("CloseTab_RecordingIndicator"));
   }
 
-  const bool from_mouse = event.type() == ui::ET_MOUSE_RELEASED &&
+  const bool from_mouse = event.type() == ui::EventType::kMouseReleased &&
                           !(event.flags() & ui::EF_FROM_TOUCH);
   controller_->CloseTab(
       this, from_mouse ? CLOSE_TAB_FROM_MOUSE : CLOSE_TAB_FROM_TOUCH);

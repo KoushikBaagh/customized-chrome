@@ -29,6 +29,7 @@
 #include "chrome/browser/history/top_sites_factory.h"
 #include "chrome/browser/history_clusters/history_clusters_service_factory.h"
 #include "chrome/browser/history_embeddings/history_embeddings_service_factory.h"
+#include "chrome/browser/history_embeddings/history_embeddings_utils.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
 #include "chrome/browser/preloading/prefetch/search_prefetch/search_prefetch_service.h"
 #include "chrome/browser/preloading/prefetch/search_prefetch/search_prefetch_service_factory.h"
@@ -482,6 +483,15 @@ bool ChromeAutocompleteProviderClient::IsSharingHubAvailable() const {
 #else
   return false;
 #endif
+}
+
+bool ChromeAutocompleteProviderClient::IsHistoryEmbeddingsEnabled() const {
+  return history_embeddings::IsHistoryEmbeddingsEnabledForProfile(profile_);
+}
+
+bool ChromeAutocompleteProviderClient::IsHistoryEmbeddingsSettingVisible()
+    const {
+  return history_embeddings::IsHistoryEmbeddingsSettingVisible(profile_);
 }
 
 base::WeakPtr<AutocompleteProviderClient>

@@ -73,7 +73,6 @@
 #include "content/public/test/browser_task_environment.h"
 #include "content/public/test/test_browser_context.h"
 #include "services/data_decoder/public/cpp/test_support/in_process_data_decoder.h"
-#include "services/network/public/cpp/attribution_reporting_runtime_features.h"
 #include "services/network/public/cpp/features.h"
 #include "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
 #include "services/network/public/mojom/attribution.mojom.h"
@@ -324,8 +323,9 @@ class ControllableStorageDelegate : public AttributionResolverDelegateImpl {
 
   base::flat_map<base::Time, RandomizedResponse> randomized_responses_
       GUARDED_BY_CONTEXT(sequence_checker_);
+
   base::flat_map<base::Time, base::flat_set<int>>
-      null_aggregatable_reports_days_;
+      null_aggregatable_reports_days_ GUARDED_BY_CONTEXT(sequence_checker_);
 };
 
 void Handle(const AttributionSimulationEvent::StartRequest& event,
@@ -363,7 +363,7 @@ void Handle(const AttributionSimulationEvent::Response& event,
             AttributionDataHostManager& data_host_manager) {
   data_host_manager.NotifyBackgroundRegistrationData(
       BackgroundRegistrationsId(event.request_id), event.response_headers.get(),
-      event.url, {network::AttributionReportingRuntimeFeature::kCrossAppWeb});
+      event.url);
 }
 
 void Handle(const AttributionSimulationEvent::EndRequest& event,

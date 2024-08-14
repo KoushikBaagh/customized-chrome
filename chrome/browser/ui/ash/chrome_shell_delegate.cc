@@ -15,6 +15,7 @@
 #include "ash/public/cpp/assistant/assistant_state.h"
 #include "ash/public/cpp/new_window_delegate.h"
 #include "ash/public/cpp/system_sounds_delegate.h"
+#include "ash/public/cpp/tab_strip_delegate.h"
 #include "ash/shell_delegate.h"
 #include "ash/webui/settings/public/constants/routes.mojom.h"
 #include "ash/webui/settings/public/constants/setting.mojom-shared.h"
@@ -26,6 +27,7 @@
 #include "cc/input/touch_action.h"
 #include "chrome/browser/apps/app_service/app_service_proxy.h"
 #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
+#include "chrome/browser/ash/api/tasks/chrome_tasks_delegate.h"
 #include "chrome/browser/ash/arc/arc_util.h"
 #include "chrome/browser/ash/arc/session/arc_session_manager.h"
 #include "chrome/browser/ash/assistant/assistant_util.h"
@@ -43,8 +45,8 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/sessions/session_restore.h"
-#include "chrome/browser/ui/ash/api/tasks/chrome_tasks_delegate.h"
 #include "chrome/browser/ui/ash/back_gesture_contextual_nudge_delegate.h"
+#include "chrome/browser/ui/ash/boca/chrome_tab_strip_delegate.h"
 #include "chrome/browser/ui/ash/capture_mode/chrome_capture_mode_delegate.h"
 #include "chrome/browser/ui/ash/chrome_accelerator_prefs_delegate.h"
 #include "chrome/browser/ui/ash/chrome_accessibility_delegate.h"
@@ -126,8 +128,6 @@ feedback::FeedbackSource ToChromeFeedbackSource(
   switch (source) {
     case ash::ShellDelegate::FeedbackSource::kBirch:
       return feedback::FeedbackSource::kFeedbackSourceBirch;
-    case ash::ShellDelegate::FeedbackSource::kFocusMode:
-      return feedback::FeedbackSource::kFeedbackSourceFocusMode;
     case ash::ShellDelegate::FeedbackSource::kGameDashboard:
       return feedback::FeedbackSource::kFeedbackSourceGameDashboard;
     case ash::ShellDelegate::FeedbackSource::kOverview:
@@ -201,6 +201,11 @@ ChromeShellDelegate::CreateSavedDeskDelegate() const {
 std::unique_ptr<ash::SystemSoundsDelegate>
 ChromeShellDelegate::CreateSystemSoundsDelegate() const {
   return std::make_unique<SystemSoundsDelegateImpl>();
+}
+
+std::unique_ptr<ash::TabStripDelegate>
+ChromeShellDelegate::CreateTabStripDelegate() const {
+  return std::make_unique<ChromeTabStripDelegate>();
 }
 
 std::unique_ptr<ash::api::TasksDelegate>

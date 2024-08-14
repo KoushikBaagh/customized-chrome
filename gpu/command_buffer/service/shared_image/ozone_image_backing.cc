@@ -75,27 +75,6 @@ bool IsExoTexture(std::string_view label) {
 
 }  // namespace
 
-class OzoneImageBacking::VaapiOzoneImageRepresentation
-    : public VaapiImageRepresentation {
- public:
-  VaapiOzoneImageRepresentation(SharedImageManager* manager,
-                                SharedImageBacking* backing,
-                                MemoryTypeTracker* tracker,
-                                VaapiDependencies* vaapi_dependency)
-      : VaapiImageRepresentation(manager, backing, tracker, vaapi_dependency) {}
-
- private:
-  OzoneImageBacking* ozone_backing() {
-    return static_cast<OzoneImageBacking*>(backing());
-  }
-  void EndAccess() override { ozone_backing()->has_pending_va_writes_ = true; }
-  void BeginAccess() override {
-    // TODO(andrescj): DCHECK that there are no fences to wait on (because the
-    // compositor should be completely done with a VideoFrame before returning
-    // it).
-  }
-};
-
 class OzoneImageBacking::OverlayOzoneImageRepresentation
     : public OverlayImageRepresentation {
  public:
@@ -240,8 +219,8 @@ OzoneImageBacking::RetainGLTexturePerContextCache() {
 
   // Case 0: caching is not possible.
   if (!current_context->default_surface()) {
-    return OzoneImageGLTexturesHolder::CreateAndInitTexturesHolder(
-        this, pixmap_, plane_);
+    return OzoneImageGLTexturesHolder::CreateAndInitTexturesHolder(this,
+                                                                   pixmap_);
   }
 
   // Case 1: if entry is found, reuse it.
@@ -273,8 +252,8 @@ OzoneImageBacking::RetainGLTexturePerContextCache() {
     CHECK(!new_holder->WasContextLost());
   } else {
     // Case 3. No entries found. Create a new holder.
-    new_holder = OzoneImageGLTexturesHolder::CreateAndInitTexturesHolder(
-        this, pixmap_, plane_);
+    new_holder =
+        OzoneImageGLTexturesHolder::CreateAndInitTexturesHolder(this, pixmap_);
   }
 
   if (!new_holder) {
@@ -349,53 +328,23 @@ OzoneImageBacking::ProduceSkiaGanesh(
         context_state->vk_context_provider()->GetVulkanImplementation();
 
     std::vector<std::unique_ptr<VulkanImage>> vulkan_images;
-    // TODO(crbug.com/40239769): Eliminate these branches once we migrate
-    // completely to MultiplanarSharedImage.
-    if (format().is_single_plane()) {
-      DCHECK(!format().IsLegacyMultiplanar() ||
-             plane_ == gfx::BufferPlane::DEFAULT);
-
-      // For single-planar formats, we can usually import the entire GMB.
-      //
-      // However, there is a special case for
-      // RenderableGpuMemoryBufferVideoFramePool which creates a separate
-      // single-planar SharedImage for each plane of the NV12 image but uses a
-      // multi-planar buffer in the backing pixmap. This leads to issues when
-      // importing the buffer into Vulkan (e.g. we tell Vulkan it's a linear
-      // R8 image, but we try to bind 2 planes of data). As a workaround, we
-      // choose the correct plane to pass based off the buffer plane param.
-      gfx::GpuMemoryBufferHandle gmb_handle;
-      if (plane_ == gfx::BufferPlane::Y || plane_ == gfx::BufferPlane::UV) {
-        DCHECK(!format().IsLegacyMultiplanar());
-        gmb_handle = GetSinglePlaneGpuMemoryBufferHandle(
-            plane_ == gfx::BufferPlane::Y ? 0 : 1);
-      } else {
-        gmb_handle = GetGpuMemoryBufferHandle();
-      }
-
-      auto vulkan_image = vulkan_implementation->CreateImageFromGpuMemoryHandle(
-          device_queue, std::move(gmb_handle), size(),
-          ToVkFormatSinglePlanar(format()), gfx::ColorSpace());
-      if (!vulkan_image) {
-        return nullptr;
-      }
-      vulkan_images.push_back(std::move(vulkan_image));
-    } else if (format().PrefersExternalSampler()) {
+    if (format().is_single_plane() || format().PrefersExternalSampler()) {
       // For multi-planar formats that are externally sampled, we import the
       // entire GMB.
-      DCHECK(plane_ == gfx::BufferPlane::DEFAULT);
       gfx::GpuMemoryBufferHandle gmb_handle = GetGpuMemoryBufferHandle();
+      auto vk_format = format().is_single_plane()
+                           ? ToVkFormat(format(), /*plane_index=*/0)
+                           : ToVkFormatExternalSampler(format());
       auto vulkan_image = vulkan_implementation->CreateImageFromGpuMemoryHandle(
-          device_queue, std::move(gmb_handle), size(),
-          ToVkFormatExternalSampler(format()), gfx::ColorSpace());
+          device_queue, std::move(gmb_handle), size(), vk_format,
+          gfx::ColorSpace());
       if (!vulkan_image) {
         return nullptr;
       }
       vulkan_images.push_back(std::move(vulkan_image));
     } else {
-      // For multi-planar SharedImages, we create a VkImage per plane. We also
-      // need to pass the correct plane when creating the VulkanImage.
-      DCHECK_EQ(plane_, gfx::BufferPlane::DEFAULT);
+      // For multi-planar SharedImages, we create a VkImage per plane. We
+      // also need to pass the correct plane when creating the VulkanImage.
       for (int i = 0; i < format().NumberOfPlanes(); i++) {
         gfx::GpuMemoryBufferHandle gmb_handle =
             GetSinglePlaneGpuMemoryBufferHandle(i);
@@ -434,7 +383,6 @@ std::unique_ptr<OverlayImageRepresentation> OzoneImageBacking::ProduceOverlay(
 OzoneImageBacking::OzoneImageBacking(
     const Mailbox& mailbox,
     viz::SharedImageFormat format,
-    gfx::BufferPlane plane,
     const gfx::Size& size,
     const gfx::ColorSpace& color_space,
     GrSurfaceOrigin surface_origin,
@@ -456,7 +404,6 @@ OzoneImageBacking::OzoneImageBacking(
                                       GetPixmapSizeInBytes(*pixmap),
                                       false,
                                       std::move(buffer_usage)),
-      plane_(plane),
       pixmap_(std::move(pixmap)),
       context_state_(std::move(context_state)),
       workarounds_(workarounds),
@@ -499,23 +446,6 @@ OzoneImageBacking::~OzoneImageBacking() {
     }
     holder->OnRemovedFromCache();
   }
-}
-
-std::unique_ptr<VaapiImageRepresentation> OzoneImageBacking::ProduceVASurface(
-    SharedImageManager* manager,
-    MemoryTypeTracker* tracker,
-    VaapiDependenciesFactory* dep_factory) {
-  DCHECK(pixmap_);
-  if (!vaapi_deps_)
-    vaapi_deps_ = dep_factory->CreateVaapiDependencies(pixmap_);
-
-  if (!vaapi_deps_) {
-    LOG(ERROR) << "OzoneImageBacking::ProduceVASurface failed to create "
-                  "VaapiDependencies";
-    return nullptr;
-  }
-  return std::make_unique<OzoneImageBacking::VaapiOzoneImageRepresentation>(
-      manager, this, tracker, vaapi_deps_.get());
 }
 
 #if BUILDFLAG(ENABLE_VULKAN)
@@ -574,12 +504,6 @@ std::unique_ptr<VulkanImageRepresentation> OzoneImageBacking::ProduceVulkan(
       vulkan_impl);
 }
 #endif
-
-bool OzoneImageBacking::VaSync() {
-  if (has_pending_va_writes_)
-    has_pending_va_writes_ = !vaapi_deps_->SyncSurface();
-  return !has_pending_va_writes_;
-}
 
 bool OzoneImageBacking::UploadFromMemory(const std::vector<SkPixmap>& pixmaps) {
   if (context_state_->context_lost()) {

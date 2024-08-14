@@ -37,14 +37,7 @@ public class Journeys {
         int currentIncognitoTabCount = tabModelSelector.getModel(/* incognito= */ true).getCount();
         assert currentTabCount == 1;
         assert currentIncognitoTabCount == 0;
-        Tab currentTab = startingStation.getActivity().getActivityTab();
-        PageStation pageStation =
-                PageStation.newPageStationBuilder()
-                        .withIsOpeningTabs(0)
-                        .withTabAlreadySelected(currentTab)
-                        .withPath(url)
-                        .build();
-        PageStation station = startingStation.loadPageProgramatically(pageStation, url);
+        PageStation station = startingStation.loadPageProgrammatically(url);
         // One tab already exists.
         station = createTabs(station, numTabs - 1, url, /* isIncognito= */ false);
         if (numIncognitoTabs > 0) {
@@ -71,7 +64,7 @@ public class Journeys {
                             .withIsOpeningTabs(1)
                             .withIsSelectingTabs(1)
                             .withIncognito(isIncognito)
-                            .withPath(url)
+                            .withExpectedUrlSubstring(url)
                             .build();
             startingStation =
                     startingStation.travelToSync(

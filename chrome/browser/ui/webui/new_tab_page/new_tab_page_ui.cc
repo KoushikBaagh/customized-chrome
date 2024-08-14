@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.h"
 
 #include <memory>
@@ -18,7 +23,6 @@
 #include "base/values.h"
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/browser_features.h"
-#include "chrome/browser/browser_process.h"
 #include "chrome/browser/buildflags.h"
 #include "chrome/browser/new_tab_page/feature_promo_helper/new_tab_page_feature_promo_helper.h"
 #include "chrome/browser/new_tab_page/modules/file_suggestion/file_suggestion_handler.h"
@@ -64,7 +68,6 @@
 #include "components/commerce/core/commerce_feature_list.h"
 #include "components/content_settings/core/common/content_settings_pattern.h"
 #include "components/favicon_base/favicon_url_parser.h"
-#include "components/feed/feed_feature_list.h"
 #include "components/google/core/common/google_util.h"
 #include "components/grit/components_scaled_resources.h"
 #include "components/history_clusters/core/features.h"
@@ -100,10 +103,6 @@
 #if !defined(OFFICIAL_BUILD)
 #include "chrome/browser/ui/webui/new_tab_page/foo/foo_handler.h"
 #endif
-
-#if BUILDFLAG(ENABLE_FEED_V2)
-#include "chrome/browser/new_tab_page/modules/feed/feed_handler.h"
-#endif  // BUILDFLAG(ENABLE_FEED_V2)
 
 using content::BrowserContext;
 using content::WebContents;
@@ -164,9 +163,8 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(Profile* profile) {
       base::FeatureList::IsEnabled(ntp_features::kNtpOneGoogleBar));
   source->AddBoolean("shortcutsEnabled",
                      base::FeatureList::IsEnabled(ntp_features::kNtpShortcuts));
-  bool redesigned_modules_enabled = ntp_features::IsNtpModulesRedesignedEnabled(
-      g_browser_process->GetApplicationLocale(),
-      GetVariationsServiceCountryCode(g_browser_process->variations_service()));
+  bool redesigned_modules_enabled =
+      base::FeatureList::IsEnabled(ntp_features::kNtpModulesRedesigned);
   source->AddBoolean("singleRowShortcutsEnabled", redesigned_modules_enabled);
   source->AddBoolean("logoEnabled",
                      base::FeatureList::IsEnabled(ntp_features::kNtpLogo));
@@ -335,13 +333,13 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(Profile* profile) {
       {"modulesDriveTitleV2", IDS_NTP_MODULES_DRIVE_TITLE_V2},
       {"modulesDriveInfo", IDS_NTP_MODULES_DRIVE_INFO},
       {"modulesDummyTitle", IDS_NTP_MODULES_DUMMY_TITLE},
-      {"modulesFeedTitle", IDS_NTP_MODULES_FEED_TITLE},
       {"modulesGoogleCalendarDismissButtonText",
        IDS_NTP_MODULES_GOOGLE_CALENDAR_DISMISS_BUTTON_TEXT},
       {"modulesGoogleCalendarDismissToastMessage",
        IDS_NTP_MODULES_GOOGLE_CALENDAR_DISMISS_TOAST_MESSAGE},
       {"modulesGoogleCalendarDisableToastMessage",
        IDS_NTP_MODULES_GOOGLE_CALENDAR_DISABLE_TOAST_MESSAGE},
+      {"moduleGoogleCalendarInfo", IDS_NTP_MODULES_GOOGLE_CALENDAR_INFO},
       {"modulesGoogleCalendarMoreActions",
        IDS_NTP_MODULES_GOOGLE_CALENDAR_MORE_ACTIONS},
       {"modulesGoogleCalendarTitle", IDS_NTP_MODULES_GOOGLE_CALENDAR_TITLE},
@@ -350,8 +348,6 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(Profile* profile) {
       {"modulesOutlookCalendarTitle", IDS_NTP_MODULES_OUTLOOK_CALENDAR_TITLE},
       {"modulesOutlookCalendarDisableButtonText",
        IDS_NTP_MODULES_OUTLOOK_CALENDAR_DISABLE_BUTTON_TEXT},
-      {"modulesCalendarDoubleBooked",
-       IDS_NTP_MODULES_CALENDAR_DOUBLE_BOOKED},
       {"modulesCalendarJoinMeetingButtonText",
        IDS_NTP_MODULES_CALENDAR_JOIN_MEETING_BUTTON_TEXT},
       {"modulesCalendarInProgress", IDS_NTP_MODULES_CALENDAR_IN_PROGRESS},
@@ -471,10 +467,21 @@ NewTabPageUI::NewTabPageUI(content::WebUI* web_ui)
       customize_chrome::IsWallpaperSearchEnabledForProfile(profile_);
   source->AddBoolean("wallpaperSearchButtonEnabled",
                      wallpaper_search_button_enabled);
-  source->AddBoolean("wallpaperSearchButtonAnimationEnabled",
-                     wallpaper_search_button_enabled &&
-                         base::FeatureList::IsEnabled(
-                             ntp_features::kNtpWallpaperSearchButtonAnimation));
+  int wallpaper_search_animation_shown_threshold =
+      ntp_features::GetWallpaperSearchButtonAnimationShownThreshold();
+  // Animate the button if the threshold is negative (unconditional) or if the
+  // button has has been shown less times than the threshold.
+  bool should_animate_wallpaper_search_button =
+      wallpaper_search_animation_shown_threshold < 0 ||
+      wallpaper_search_animation_shown_threshold >=
+          profile_->GetPrefs()->GetInteger(
+              prefs::kNtpWallpaperSearchButtonShownCount);
+  source->AddBoolean(
+      "wallpaperSearchButtonAnimationEnabled",
+      wallpaper_search_button_enabled &&
+          base::FeatureList::IsEnabled(
+              ntp_features::kNtpWallpaperSearchButtonAnimation) &&
+          should_animate_wallpaper_search_button);
 
   content::URLDataSource::Add(profile_,
                               std::make_unique<SanitizedImageSource>(profile_));
@@ -641,14 +648,6 @@ void NewTabPageUI::BindInterface(
         pending_receiver) {
   file_handler_ = std::make_unique<FileSuggestionHandler>(
       std::move(pending_receiver), profile_);
-}
-
-void NewTabPageUI::BindInterface(
-    mojo::PendingReceiver<ntp::feed::mojom::FeedHandler> pending_receiver) {
-#if BUILDFLAG(ENABLE_FEED_V2)
-  feed_handler_ =
-      ntp::FeedHandler::Create(std::move(pending_receiver), profile_);
-#endif  // BUILDFLAG(ENABLE_FEED_V2)
 }
 
 #if !defined(OFFICIAL_BUILD)

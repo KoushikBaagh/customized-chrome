@@ -16,6 +16,7 @@
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
+#include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
@@ -63,6 +64,8 @@ DesktopMediaSourceView::DesktopMediaSourceView(
   views::FocusRing::Install(this);
   views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
                                                 kCornerRadius);
+
+  GetViewAccessibility().SetRole(ax::mojom::Role::kButton);
 }
 
 DesktopMediaSourceView::~DesktopMediaSourceView() {}
@@ -163,16 +166,15 @@ bool DesktopMediaSourceView::OnMousePressed(const ui::MouseEvent& event) {
 }
 
 void DesktopMediaSourceView::OnGestureEvent(ui::GestureEvent* event) {
-  // Detect tap gesture using ET_GESTURE_TAP_DOWN so the view also gets focused
-  // on the long tap (when the tap gesture starts).
-  if (event->type() == ui::ET_GESTURE_TAP_DOWN) {
+  // Detect tap gesture using EventType::kGestureTapDown so the view also gets
+  // focused on the long tap (when the tap gesture starts).
+  if (event->type() == ui::EventType::kGestureTapDown) {
     RequestFocus();
     event->SetHandled();
   }
 }
 
 void DesktopMediaSourceView::GetAccessibleNodeData(ui::AXNodeData* node_data) {
-  node_data->role = ax::mojom::Role::kButton;
   node_data->SetNameChecked(
       label_->GetText().empty()
           ? l10n_util::GetStringUTF16(

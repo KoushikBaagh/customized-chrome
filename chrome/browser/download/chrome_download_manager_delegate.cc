@@ -20,6 +20,7 @@
 #include "base/metrics/field_trial_params.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
+#include "base/not_fatal_until.h"
 #include "base/path_service.h"
 #include "base/rand_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -342,6 +343,11 @@ base::FilePath GetTempPdfDir() {
   base::FilePath cache_dir;
   base::android::GetCacheDirectory(&cache_dir);
   return cache_dir.Append(kPdfDirName);
+}
+
+bool ShouldOpenPdfInlineInternal(bool incognito) {
+  JNIEnv* env = base::android::AttachCurrentThread();
+  return Java_PdfUtils_shouldOpenPdfInline(env, incognito);
 }
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -931,7 +937,8 @@ bool ChromeDownloadManagerDelegate::InterceptDownloadIfApplicable(
     }
   }
 
-  if (ShouldOpenPdfInline() && mime_type == pdf::kPDFMimeType) {
+  if (ShouldOpenPdfInlineInternal(/*incognito=*/false) &&
+      mime_type == pdf::kPDFMimeType) {
     // If this is already a file, there is no need to download.
     if (url.SchemeIsFile() || url.SchemeIs("content")) {
       return true;
@@ -1113,8 +1120,20 @@ void ChromeDownloadManagerDelegate::GetInsecureDownloadStatus(
     const base::FilePath& virtual_path,
     GetInsecureDownloadStatusCallback callback) {
   DCHECK(download);
-  std::move(callback).Run(
-      GetInsecureDownloadStatusForDownload(profile_, virtual_path, download));
+  DownloadItem::InsecureDownloadStatus status =
+      GetInsecureDownloadStatusForDownload(profile_, virtual_path, download);
+#if BUILDFLAG(IS_ANDROID)
+  // Allow insecure PDF download to go through if it is displayed inline.
+  if (download->IsTransient() && download->GetMimeType() == pdf::kPDFMimeType &&
+      !download->IsMustDownload()) {
+    if (ShouldOpenPdfInline() &&
+        base::FeatureList::IsEnabled(
+            download::features::kAllowedMixedContentInlinePdf)) {
+      status = DownloadItem::InsecureDownloadStatus::SAFE;
+    }
+  }
+#endif  // BUILDFLAG(IS_ANDROID)
+  std::move(callback).Run(status);
 }
 
 void ChromeDownloadManagerDelegate::NotifyExtensions(
@@ -1219,6 +1238,10 @@ void ChromeDownloadManagerDelegate::RequestConfirmation(
         std::move(callback).Run(DownloadConfirmationResult::CANCELED,
                                 ui::SelectedFileInfo());
         return;
+      }
+
+      if (download->GetMimeType() == pdf::kPDFMimeType) {
+        download::RecordDuplicatePdfDownloadTriggered(/*open_inline=*/false);
       }
 
       if (!download_prefs_->PromptForDownload()) {
@@ -1671,7 +1694,7 @@ void ChromeDownloadManagerDelegate::OnInstallerDone(
 
   {
     auto iter = running_crx_installs_.find(token);
-    DCHECK(iter != running_crx_installs_.end());
+    CHECK(iter != running_crx_installs_.end(), base::NotFatalUntil::M130);
     installer = iter->second;
     running_crx_installs_.erase(iter);
   }
@@ -2045,8 +2068,7 @@ bool ChromeDownloadManagerDelegate::IsFromExternalApp(
 }
 
 bool ChromeDownloadManagerDelegate::ShouldOpenPdfInline() {
-  JNIEnv* env = base::android::AttachCurrentThread();
-  return Java_PdfUtils_shouldOpenPdfInline(env);
+  return ShouldOpenPdfInlineInternal(profile_->IsOffTheRecord());
 }
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -2078,7 +2100,7 @@ void ChromeDownloadManagerDelegate::ConnectToQuarantineService(
 
 void ChromeDownloadManagerDelegate::OnManagerInitialized() {
 #if BUILDFLAG(IS_ANDROID)
-  if (ShouldOpenPdfInline()) {
+  if (ShouldOpenPdfInlineInternal(/*incognito=*/false)) {
     download::GetDownloadTaskRunner()->PostTask(
         FROM_HERE, base::BindOnce([]() { base::DeleteFile(GetTempPdfDir()); }));
   }

@@ -6,6 +6,7 @@
 
 #include "base/base64.h"
 #include "base/containers/to_value_list.h"
+#include "base/containers/to_vector.h"
 #include "base/functional/overloaded.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/types/expected_macros.h"
@@ -104,6 +105,15 @@ bool IsolatedWebAppIntegrityBlockData::operator==(
     const IsolatedWebAppIntegrityBlockData& other) const = default;
 
 // static
+IsolatedWebAppIntegrityBlockData
+IsolatedWebAppIntegrityBlockData::FromIntegrityBlock(
+    const web_package::SignedWebBundleIntegrityBlock& integrity_block) {
+  return IsolatedWebAppIntegrityBlockData(base::ToVector(
+      integrity_block.signature_stack().entries(),
+      &web_package::SignedWebBundleSignatureStackEntry::signature_info));
+}
+
+// static
 base::expected<IsolatedWebAppIntegrityBlockData, std::string>
 IsolatedWebAppIntegrityBlockData::FromProto(
     const proto::IsolationData::IntegrityBlockData& proto) {
@@ -181,6 +191,22 @@ base::Value IsolatedWebAppIntegrityBlockData::AsDebugValue() const {
                 }},
             signature);
       })));
+}
+
+bool IsolatedWebAppIntegrityBlockData::HasPublicKey(
+    base::span<const uint8_t> public_key) const {
+  return base::ranges::any_of(signatures(), [&](const auto& signature_info) {
+    return absl::visit(
+        base::Overloaded{
+            [&](const auto& signature_info) {
+              return base::ranges::equal(signature_info.public_key().bytes(),
+                                         public_key);
+            },
+            [](const web_package::SignedWebBundleSignatureInfoUnknown&) {
+              return false;
+            }},
+        signature_info);
+  });
 }
 
 }  // namespace web_app

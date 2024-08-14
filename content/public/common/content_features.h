@@ -27,6 +27,20 @@ namespace features {
 // All features in alphabetical order. The features should be documented
 // alongside the definition of their values in the .cc file.
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kAdditionalOpaqueOriginEnforcements);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kAndroidWarmUpSpareRendererWithTimeout);
+CONTENT_EXPORT extern const base::FeatureParam<std::string>
+    kAndroidSpareRendererCreationTiming;
+inline constexpr const char kAndroidSpareRendererCreationAfterLoading[] =
+    "after-loading";
+inline constexpr const char kAndroidSpareRendererCreationAfterFirstPaint[] =
+    "after-first-paint";
+inline constexpr const char
+    kAndroidSpareRendererCreationDelayedDuringLoading[] =
+        "delayed-during-loading";
+CONTENT_EXPORT extern const base::FeatureParam<int>
+    kAndroidSpareRendererCreationDelayMs;
+CONTENT_EXPORT extern const base::FeatureParam<int>
+    kAndroidSpareRendererTimeoutSeconds;
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kAudioServiceLaunchOnStartup);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kAudioServiceOutOfProcess);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kAudioServiceSandbox);
@@ -35,7 +49,6 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kBackForwardCache);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kBackForwardCacheEntryTimeout);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kBackForwardCacheMemoryControls);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kBackForwardCacheMediaSessionService);
-CONTENT_EXPORT BASE_DECLARE_FEATURE(kBatterySaverModeRenderTuning);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kBatterySaverModeAlignWakeUps);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kBlockInsecurePrivateNetworkRequests);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(
@@ -67,6 +80,10 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kCrashReporting);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kDeferSpeculativeRFHCreation);
 CONTENT_EXPORT extern const base::FeatureParam<bool>
     kWarmupSpareProcessCreationWhenDeferRFH;
+CONTENT_EXPORT extern const base::FeatureParam<bool>
+    kCreateSpeculativeRFHFilterRestore;
+CONTENT_EXPORT extern const base::FeatureParam<int>
+    kCreateSpeculativeRFHDelayMs;
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kDigitalGoodsApi);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kDIPS);
 CONTENT_EXPORT extern const base::FeatureParam<bool>
@@ -103,7 +120,6 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kFencedFramesEnforceFocus);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebIdentityDigitalCredentials);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kFractionalScrollOffsets);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kGreaseUACH);
-CONTENT_EXPORT BASE_DECLARE_FEATURE(kIndexedDBShardBackingStores);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kInstalledApp);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kInstalledAppProvider);
 // LINT.IfChange
@@ -153,6 +169,7 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kNotificationTriggers);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kNoStatePrefetchHoldback);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kOriginIsolationHeader);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kOverscrollHistoryNavigation);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kPdfEnforcements);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPeriodicBackgroundSync);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kFeaturePolicyHeader);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPepperCrossOriginRedirectRestriction);
@@ -175,6 +192,7 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kReduceSubresourceResponseStartedIPC);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kRenderDocument);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kRenderDocumentCompositorReuse);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kRestrictThreadPoolInBackground);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kSetIsolatesPriority);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kRetryGetVideoCaptureDeviceInfos);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kProcessPerSiteUpToMainFrameThreshold);
 CONTENT_EXPORT extern const base::FeatureParam<int>
@@ -183,6 +201,10 @@ CONTENT_EXPORT extern const base::FeatureParam<bool>
     kProcessPerSiteMainFrameAllowIPAndLocalhost;
 CONTENT_EXPORT extern const base::FeatureParam<bool>
     kProcessPerSiteMainFrameAllowDevToolsAttached;
+CONTENT_EXPORT extern const base::FeatureParam<double>
+    kProcessPerSiteMainFrameSiteScalingFactor;
+CONTENT_EXPORT extern const base::FeatureParam<double>
+    kProcessPerSiteMainFrameTotalMemoryLimit;
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kRunVideoCaptureServiceInBrowserProcess);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kSchedQoSOnResourcedForChrome);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kSecurePaymentConfirmation);
@@ -192,7 +214,6 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kSharedArrayBuffer);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kSharedArrayBufferOnDesktop);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(
     kShouldAllowFirstPartyStorageKeyOverrideFromEmbedder);
-CONTENT_EXPORT BASE_DECLARE_FEATURE(kSignedHTTPExchange);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kSiteInstanceGroupsForDataUrls);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kSiteIsolationForCrossOriginOpenerPolicy);
 CONTENT_EXPORT extern const base::FeatureParam<bool>
@@ -209,6 +230,7 @@ enum class SkiaFontServiceTypefaceType {
 };
 extern const base::FeatureParam<SkiaFontServiceTypefaceType>
     kSkiaFontServiceTypefaceType;
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kUtilityWithUiPumpInitializesCom);
 #endif  // BUILDFLAG(IS_WIN)
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kDisableProcessReuse);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kServiceWorkerStaticRouter);
@@ -243,6 +265,7 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebBluetoothNewPermissionsBackend);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebOtpBackendAuto);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebPayments);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebUICodeCache);
+CONTENT_EXPORT extern const base::FeatureParam<bool> kRestrictedWebUICodeCache;
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebUsb);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebXr);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebPermissionsApi);

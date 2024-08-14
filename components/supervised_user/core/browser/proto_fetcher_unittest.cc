@@ -17,11 +17,13 @@
 #include "base/test/task_environment.h"
 #include "base/time/time.h"
 #include "base/types/expected.h"
+#include "base/version_info/channel.h"
 #include "components/signin/public/identity_manager/identity_test_environment.h"
 #include "components/signin/public/identity_manager/primary_account_access_token_fetcher.h"
 #include "components/supervised_user/core/browser/fetcher_config.h"
 #include "components/supervised_user/core/browser/proto/test.pb.h"
 #include "components/supervised_user/test_support/kids_management_api_server_mock.h"
+#include "google_apis/common/api_key_request_test_util.h"
 #include "google_apis/gaia/google_service_auth_error.h"
 #include "net/base/backoff_entry.h"
 #include "net/base/net_errors.h"
@@ -324,10 +326,9 @@ TEST_P(ProtoFetcherTest, AddsPayload) {
   TestURLLoaderFactory::PendingRequest* pending_request =
       test_url_loader_factory_.GetPendingRequest(0);
 
-  std::string header;
-  EXPECT_TRUE(pending_request->request.headers.GetHeader(
-      net::HttpRequestHeaders::kContentType, &header));
-  EXPECT_EQ(header, "application/x-protobuf");
+  EXPECT_EQ(pending_request->request.headers.GetHeader(
+                net::HttpRequestHeaders::kContentType),
+            "application/x-protobuf");
 }
 
 // Tests a default flow, where an empty (default) proto is received.
@@ -405,11 +406,10 @@ TEST_P(ProtoFetcherTest, CreatesToken) {
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 1);
 
   // Only check header format here.
-  std::string authorization_header;
-  ASSERT_TRUE(
+  EXPECT_EQ(
       test_url_loader_factory_.GetPendingRequest(0)->request.headers.GetHeader(
-          net::HttpRequestHeaders::kAuthorization, &authorization_header));
-  EXPECT_EQ(authorization_header, "Bearer access_token");
+          net::HttpRequestHeaders::kAuthorization),
+      "Bearer access_token");
 }
 
 // Tests a flow where the request couldn't be completed due to network
@@ -812,7 +812,7 @@ TEST_P(StatusFetcherTest, StatusFetcherReportsSuccess) {
   StatusFetcher fetcher(
       *identity_test_env_.identity_manager(),
       test_url_loader_factory_.GetSafeWeakWrapper(), /* payload= */ "",
-      GetConfig(), /* args= */ {},
+      GetConfig(), /* args= */ {}, version_info::Channel::UNKNOWN,
       base::BindOnce(
           &StatusFetcherTest_StatusFetcherReportsSuccess_Test::OnStatus,
           base::Unretained(this)));
@@ -834,7 +834,7 @@ TEST_P(StatusFetcherTest, StatusFetcherReportsFailure) {
   StatusFetcher fetcher(
       *identity_test_env_.identity_manager(),
       test_url_loader_factory_.GetSafeWeakWrapper(), /* payload= */ "",
-      GetConfig(), /* args= */ {},
+      GetConfig(), /* args= */ {}, version_info::Channel::UNKNOWN,
       base::BindOnce(
           &StatusFetcherTest_StatusFetcherReportsFailure_Test::OnStatus,
           base::Unretained(this)));
@@ -901,6 +901,9 @@ TEST_F(BestEffortProtoFetcherTest, NoAccessToken) {
           GoogleServiceAuthError::State::INVALID_GAIA_CREDENTIALS));
 
   ASSERT_EQ(test_url_loader_factory_.NumPending(), 1);
+  ASSERT_TRUE(google_apis::test_util::HasAPIKey(
+      test_url_loader_factory_.GetPendingRequest(0)->request));
+
   SimulateDefaultResponseForPendingRequest(0);
 
   EXPECT_TRUE(receiver->GetResult().has_value());

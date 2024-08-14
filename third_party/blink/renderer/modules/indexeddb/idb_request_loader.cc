@@ -11,8 +11,6 @@
 
 #include <algorithm>
 
-#include "base/debug/dump_without_crashing.h"
-#include "components/crash/core/common/crash_key.h"
 #include "third_party/blink/public/platform/task_type.h"
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/core/execution_context/execution_context.h"
@@ -111,9 +109,7 @@ FileErrorCode IDBRequestLoader::DidReceiveData(base::span<const uint8_t> data) {
   DCHECK_LE(wrapped_data_.size() + data.size(), wrapped_data_.capacity())
       << "The reader returned more data than we were prepared for";
 
-  auto char_data = base::as_chars(data);
-  wrapped_data_.Append(char_data.data(),
-                       base::checked_cast<wtf_size_t>(char_data.size()));
+  wrapped_data_.AppendSpan(base::as_chars(data));
   return FileErrorCode::kOK;
 }
 
@@ -144,9 +140,6 @@ void IDBRequestLoader::DidFail(FileErrorCode) {
   DCHECK(file_reader_loading_);
   file_reader_loading_ = false;
 #endif  // DCHECK_IS_ON()
-
-  // TODO(https://crbug.com/3342779913): fix bug and remove this debug code.
-  base::debug::DumpWithoutCrashing();
 
   OnLoadComplete(/*error=*/true);
 }

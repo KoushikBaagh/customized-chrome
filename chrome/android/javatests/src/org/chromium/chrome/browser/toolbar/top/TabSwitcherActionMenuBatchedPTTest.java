@@ -12,15 +12,14 @@ import static org.chromium.base.test.transit.TransitAsserts.assertFinalDestinati
 
 import androidx.test.filters.LargeTest;
 
+import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import org.chromium.base.ThreadUtils;
 import org.chromium.base.test.transit.BatchedPublicTransitRule;
 import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CommandLineFlags;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
@@ -47,11 +46,11 @@ public class TabSwitcherActionMenuBatchedPTTest {
     public BatchedPublicTransitRule<PageStation> mBatchedRule =
             new BatchedPublicTransitRule<>(PageStation.class, /* expectResetByTest= */ true);
 
-    @Rule
-    public ChromeTabbedActivityTestRule mActivityTestRule = new ChromeTabbedActivityTestRule();
+    @ClassRule
+    public static ChromeTabbedActivityTestRule sActivityTestRule = new ChromeTabbedActivityTestRule();
 
     ChromeTabbedActivityPublicTransitEntryPoints mTransitEntryPoints =
-            new ChromeTabbedActivityPublicTransitEntryPoints(mActivityTestRule);
+            new ChromeTabbedActivityPublicTransitEntryPoints(sActivityTestRule);
 
     @Test
     @LargeTest
@@ -60,13 +59,7 @@ public class TabSwitcherActionMenuBatchedPTTest {
 
         // Closing the only tab should lead to the Tab Switcher.
         TabSwitcherActionMenuFacility actionMenu = page.openTabSwitcherActionMenu();
-        RegularTabSwitcherStation tabSwitcher =
-                actionMenu.selectCloseTab(RegularTabSwitcherStation.class);
-
-        // TODO(crbug.com/347301237): The FAB and snackbar overlap. To avoid accidentally clicking
-        // undo dismiss the snackbar for now.
-        ThreadUtils.runOnUiThreadBlocking(
-                () -> mActivityTestRule.getActivity().getSnackbarManager().dismissAllSnackbars());
+        RegularTabSwitcherStation tabSwitcher = actionMenu.selectCloseTabAndDisplayTabSwitcher();
 
         assertEquals(0, getCurrentTabModel().getCount());
 
@@ -88,7 +81,7 @@ public class TabSwitcherActionMenuBatchedPTTest {
 
         // Return to one non-incognito blank tab
         actionMenu = page.openTabSwitcherActionMenu();
-        page = actionMenu.selectCloseTab(PageStation.class);
+        page = actionMenu.selectCloseTabAndDisplayAnotherTab();
         assertFinalDestination(page);
     }
 
@@ -106,14 +99,13 @@ public class TabSwitcherActionMenuBatchedPTTest {
 
         // Return to one non-incognito blank tab
         actionMenu = page.openTabSwitcherActionMenu();
-        page = actionMenu.selectCloseTab(PageStation.class);
+        page = actionMenu.selectCloseTabAndDisplayRegularTab();
         assertFinalDestination(page);
     }
 
     /** Regression test for crbug.com/1448791 */
     @Test
     @LargeTest
-    @DisabledTest(message = "crbug.com/348695491")
     public void testClosingAllRegularTabs_DoNotFinishActivity() {
         PageStation page = mTransitEntryPoints.startOnBlankPage(mBatchedRule);
 
@@ -130,12 +122,12 @@ public class TabSwitcherActionMenuBatchedPTTest {
 
         // Close second regular tab opened.
         TabSwitcherActionMenuFacility actionMenu = page.openTabSwitcherActionMenu();
-        page = actionMenu.selectCloseTab(PageStation.class);
+        page = actionMenu.selectCloseTabAndDisplayAnotherTab();
 
         // Close first regular tab opened.
         actionMenu = page.openTabSwitcherActionMenu();
         RegularTabSwitcherStation regularTabSwitcher =
-                actionMenu.selectCloseTab(RegularTabSwitcherStation.class);
+                actionMenu.selectCloseTabAndDisplayTabSwitcher();
 
         // Only the incognito tab should still remain.
         assertEquals(0, regularTabModel.getCount());
@@ -151,10 +143,10 @@ public class TabSwitcherActionMenuBatchedPTTest {
     }
 
     private TabModelSelector getTabModelSelector() {
-        return mActivityTestRule.getActivity().getTabModelSelector();
+        return sActivityTestRule.getActivity().getTabModelSelector();
     }
 
     private TabModel getCurrentTabModel() {
-        return mActivityTestRule.getActivity().getCurrentTabModel();
+        return sActivityTestRule.getActivity().getCurrentTabModel();
     }
 }

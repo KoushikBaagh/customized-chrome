@@ -183,6 +183,22 @@ IN_PROC_BROWSER_TEST_F(AppMenuModelInteractiveTest, ManageExtensions) {
                                MENU_ACTION_VISIT_CHROME_WEB_STORE, 0);
 }
 
+IN_PROC_BROWSER_TEST_F(AppMenuModelInteractiveTest,
+                       CastSaveShareSubMenuItemText) {
+  if (!media_router::MediaRouterEnabled(browser()->profile())) {
+    GTEST_SKIP() << "The cast item only exists if cast is enabled.";
+  }
+  RunTestSequence(
+      InstrumentTab(kPrimaryTabPageElementId),
+      PressButton(kToolbarAppMenuButtonElementId),
+      EnsurePresent(AppMenuModel::kSaveAndShareMenuItem),
+      CheckViewProperty(
+          AppMenuModel::kSaveAndShareMenuItem, &views::MenuItemView::title,
+          l10n_util::GetStringUTF16(IDS_CAST_SAVE_AND_SHARE_MENU)),
+      SelectMenuItem(AppMenuModel::kSaveAndShareMenuItem),
+      EnsurePresent(AppMenuModel::kCastTitleItem));
+}
+
 // TODO(crbug.com/40073814): Remove this test in favor of a unit test
 // extension_urls::GetWebstoreLaunchURL().
 class ExtensionsMenuVisitChromeWebstoreModelInteractiveTest
@@ -287,73 +303,6 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerMenuItemInteractiveTest,
       EnsureNotPresent(AppMenuModel::kPasswordManagerMenuItem));
 }
 
-class CastExperimentAppMenuModelInteractiveTest
-    : public AppMenuModelInteractiveTest {
- public:
-  CastExperimentAppMenuModelInteractiveTest() {
-    scoped_feature_list_.InitWithFeaturesAndParameters(
-        /*enabled_features=*/
-        {{features::kCastAppMenuExperiment,
-          {{features::kCastListedFirst.name, "false"}}}},
-        /*disabled_features=*/{});
-  }
-  CastExperimentAppMenuModelInteractiveTest(
-      const CastExperimentAppMenuModelInteractiveTest&) = delete;
-  void operator=(const CastExperimentAppMenuModelInteractiveTest&) = delete;
-
-  ~CastExperimentAppMenuModelInteractiveTest() override = default;
-};
-
-IN_PROC_BROWSER_TEST_F(CastExperimentAppMenuModelInteractiveTest,
-                       SaveShareCastSubMenuItemText) {
-  if (!media_router::MediaRouterEnabled(browser()->profile())) {
-    GTEST_SKIP()
-        << "The cast experiment tested here only exists if cast is enabled.";
-  }
-  RunTestSequence(
-      InstrumentTab(kPrimaryTabPageElementId),
-      PressButton(kToolbarAppMenuButtonElementId),
-      EnsurePresent(AppMenuModel::kSaveAndShareMenuItem),
-      CheckViewProperty(
-          AppMenuModel::kSaveAndShareMenuItem, &views::MenuItemView::title,
-          l10n_util::GetStringUTF16(IDS_SAVE_SHARE_AND_CAST_MENU)));
-}
-
-class CastListedFirstExperimentAppMenuModelInteractiveTest
-    : public AppMenuModelInteractiveTest {
- public:
-  CastListedFirstExperimentAppMenuModelInteractiveTest() {
-    scoped_feature_list_.InitWithFeaturesAndParameters(
-        /*enabled_features=*/
-        {{features::kCastAppMenuExperiment,
-          {{features::kCastListedFirst.name, "true"}}}},
-        /*disabled_features=*/{});
-  }
-  CastListedFirstExperimentAppMenuModelInteractiveTest(
-      const CastListedFirstExperimentAppMenuModelInteractiveTest&) = delete;
-  void operator=(const CastListedFirstExperimentAppMenuModelInteractiveTest&) =
-      delete;
-
-  ~CastListedFirstExperimentAppMenuModelInteractiveTest() override = default;
-};
-
-IN_PROC_BROWSER_TEST_F(CastListedFirstExperimentAppMenuModelInteractiveTest,
-                       CastSaveShareSubMenuItemText) {
-  if (!media_router::MediaRouterEnabled(browser()->profile())) {
-    GTEST_SKIP()
-        << "The cast experiment tested here only exists if cast is enabled.";
-  }
-  RunTestSequence(
-      InstrumentTab(kPrimaryTabPageElementId),
-      PressButton(kToolbarAppMenuButtonElementId),
-      EnsurePresent(AppMenuModel::kSaveAndShareMenuItem),
-      CheckViewProperty(
-          AppMenuModel::kSaveAndShareMenuItem, &views::MenuItemView::title,
-          l10n_util::GetStringUTF16(IDS_CAST_SAVE_AND_SHARE_MENU)),
-      SelectMenuItem(AppMenuModel::kSaveAndShareMenuItem),
-      EnsurePresent(AppMenuModel::kCastTitleItem));
-}
-
 using ui::test::ObservationStateObserver;
 using webapps::AppBannerManager;
 using webapps::InstallableWebAppCheckResult;
@@ -413,6 +362,11 @@ class UniversalInstallAppMenuModelInteractiveTest
 
   GURL GetInstallableAppUrl() {
     return embedded_test_server()->GetURL("/banners/manifest_test_page.html");
+  }
+
+  GURL GetInvalidManifestParsingAppUrl() {
+    return embedded_test_server()->GetURL(
+        "/banners/invalid_manifest_test_page.html");
   }
 
   // If universal install is enabled, non installable sites (DIY apps) will have
@@ -526,6 +480,26 @@ IN_PROC_BROWSER_TEST_P(UniversalInstallAppMenuModelInteractiveTest,
       EnsurePresent(AppMenuModel::kSaveAndShareMenuItem),
       SelectMenuItem(AppMenuModel::kSaveAndShareMenuItem),
       VerifyDiyAppMenuItemViews());
+}
+
+IN_PROC_BROWSER_TEST_P(UniversalInstallAppMenuModelInteractiveTest,
+                       DIYAppMenuWorksCorrectlyInvalidManifestParsingSites) {
+  RunTestSequence(InstrumentTab(kPrimaryTabPageElementId),
+                  ObserveState(kAppBannerManagerState, GetManager()),
+                  NavigateWebContents(kPrimaryTabPageElementId,
+                                      GetInvalidManifestParsingAppUrl()),
+                  WaitForWebContentsReady(kPrimaryTabPageElementId),
+                  // Invalid parsing currently leads the AppBannerManager to
+                  // early exit the pipeline without modifying the default value
+                  // of `InstallableWebAppCheckResult`, which is `kUnknown`.
+                  // This should almost never trigger a wait, but it's better to
+                  // be safe than introduce flakiness.
+                  WaitForState(kAppBannerManagerState,
+                               InstallableWebAppCheckResult::kUnknown),
+                  PressButton(kToolbarAppMenuButtonElementId),
+                  EnsurePresent(AppMenuModel::kSaveAndShareMenuItem),
+                  SelectMenuItem(AppMenuModel::kSaveAndShareMenuItem),
+                  VerifyDiyAppMenuItemViews());
 }
 
 IN_PROC_BROWSER_TEST_P(UniversalInstallAppMenuModelInteractiveTest,

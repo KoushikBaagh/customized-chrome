@@ -5,6 +5,7 @@
 #include "ash/wm/window_restore/informed_restore_context_menu_model.h"
 
 #include "ash/constants/ash_pref_names.h"
+#include "ash/session/session_controller_impl.h"
 #include "ash/shell.h"
 #include "ash/strings/grit/ash_strings.h"
 #include "ash/wm/window_restore/window_restore_util.h"
@@ -17,7 +18,7 @@ namespace ash {
 InformedRestoreContextMenuModel::InformedRestoreContextMenuModel()
     : ui::SimpleMenuModel(this) {
   const int group = 0;
-  AddTitleWithStringId(IDS_ASH_INFORMED_RESTORE_DIALOG_CONTEXT_MENU_TITLE);
+  AddTitleWithStringId(IDS_ASH_INFORMED_RESTORE_DIALOG_TITLE);
   AddRadioItemWithStringId(
       static_cast<int>(full_restore::RestoreOption::kAskEveryTime),
       IDS_ASH_INFORMED_RESTORE_DIALOG_CONTEXT_MENU_ASK_OPTION, group);

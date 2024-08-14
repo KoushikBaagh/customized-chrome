@@ -4,6 +4,8 @@
 
 source_set("model") {
   sources = [
+    "ios_tab_group_action_context.h",
+    "ios_tab_group_action_context.mm",
     "ios_tab_group_sync_delegate.h",
     "ios_tab_group_sync_delegate.mm",
     "ios_tab_group_sync_util.h",
@@ -33,8 +35,8 @@ source_set("model") {
     "//ios/chrome/browser/shared/model/web_state_list",
     "//ios/chrome/browser/shared/model/web_state_list:utils",
     "//ios/chrome/browser/shared/public/features",
+    "//ios/chrome/browser/sync/model:data_type_store_service_factory",
     "//ios/chrome/browser/sync/model:device_info_sync_service_factory",
-    "//ios/chrome/browser/sync/model:model_type_store_service_factory",
     "//ios/chrome/browser/tab_insertion/model",
     "//ios/chrome/common",
     "//ios/web/public",
@@ -45,6 +47,7 @@ source_set("unit_tests") {
   testonly = true
   sources = [
     "ios_tab_group_sync_delegate_unittest.mm",
+    "ios_tab_group_sync_util_unittest.mm",
     "tab_group_local_update_observer_unittest.mm",
     "tab_group_sync_service_factory_unittest.mm",
   ]
@@ -65,6 +68,7 @@ source_set("unit_tests") {
     "//ios/chrome/browser/shared/model/browser_state:test_support",
     "//ios/chrome/browser/shared/model/web_state_list/test:test_support",
     "//ios/chrome/browser/shared/public/features",
+    "//ios/chrome/browser/snapshots/model",
     "//ios/chrome/browser/tab_insertion/model",
     "//ios/web/public/test",
     "//testing/gmock",

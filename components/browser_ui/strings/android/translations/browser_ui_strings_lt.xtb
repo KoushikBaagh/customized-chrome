@@ -5,7 +5,6 @@
 <translation id="1036348656032585052">Išjungti</translation>
 <translation id="1044891598689252897">Svetainės veiks įprastai</translation>
 <translation id="1073417869336441572">Padėkite mums tobulinti „Chrome“ nurodydami, kodėl leidote trečiųjų šalių slapukus. <ph name="BEGIN_LINK" />Išsiųskite atsiliepimą<ph name="END_LINK" /></translation>
-<translation id="1113435009358629918">Slėpti sumažintos kainos kortelę</translation>
 <translation id="1178581264944972037">Pristabdyti</translation>
 <translation id="1181037720776840403">Pašalinti</translation>
 <translation id="1192844206376121885">Bus ištrinti visi domeno <ph name="ORIGIN" /> saugomi duomenys ir slapukai.</translation>
@@ -24,6 +23,7 @@
 <translation id="1415402041810619267">URL sutrumpintas</translation>
 <translation id="1448064542941920355">Sumažinti mastelį</translation>
 <translation id="146867109637325312">{COUNT,plural, =1{<ph name="SITE_COUNT" /> svetainė}one{<ph name="SITE_COUNT" /> svetainė}few{<ph name="SITE_COUNT" /> svetainės}many{<ph name="SITE_COUNT" /> svetainės}other{<ph name="SITE_COUNT" /> svetainių}}</translation>
+<translation id="1500473259453106018">Slėpti sumažintų kainų skirtukuose kortelę</translation>
 <translation id="1510341833810331442">Svetainėms neleidžiama išsaugoti duomenų įrenginyje</translation>
 <translation id="1547123415014299762">Trečiųjų šalių slapukai leidžiami</translation>
 <translation id="1568470248891039841">Svetainėse, kuriose lankotės, gali būti įterpta turinio iš kitų svetainių, pvz., vaizdų, skelbimų ir teksto. Šios kitos svetainės gali prašyti leidimo naudoti savo išsaugotą informaciją apie jus, kai naršote svetainę. <ph name="BEGIN_LINK" />Sužinokite daugiau apie įterptą turinį<ph name="END_LINK" /></translation>
@@ -91,7 +91,6 @@
 <translation id="2498359688066513246">Pagalba ir atsiliepimai</translation>
 <translation id="2501278716633472235">Grįžti</translation>
 <translation id="2546283357679194313">Slapukai ir svetainės duomenys</translation>
-<translation id="2550801787432930915">Sumažintos kainos kortelė</translation>
 <translation id="2570922361219980984">Vietos prieiga taip pat išjungta šiame įrenginyje. Įjunkite ją skiltyje <ph name="BEGIN_LINK" />„Android“ nustatymai“<ph name="END_LINK" />.</translation>
 <translation id="257931822824936280">Išskleista – spustelėkite, kad sutrauktumėte</translation>
 <translation id="2586657967955657006">Iškarpinė</translation>
@@ -113,6 +112,7 @@
 <translation id="2891975107962658722">Neleiskite svetainei išsaugoti duomenų įrenginyje</translation>
 <translation id="2903493209154104877">Adresai</translation>
 <translation id="2910701580606108292">Paklausti prieš leidžiant svetainėms leisti saugomą turinį</translation>
+<translation id="2918484639460781603">Eiti į nustatymus</translation>
 <translation id="2932883381142163287">Pranešti apie piktnaudžiavimą</translation>
 <translation id="2939338015096024043">Įjungus svetainėse gali būti prašoma stebėti fotoaparato padėtį ir sužinoti apie jūsų aplinką. Išjungus svetainės negali stebėti fotoaparato padėties ar sužinoti apie jūsų aplinką.</translation>
 <translation id="2968755619301702150">Sertifikato peržiūros priemonė</translation>
@@ -133,6 +133,7 @@
 <translation id="3227137524299004712">Mikrofonas</translation>
 <translation id="3232293466644486101">Ištrinti naršymo duomenis…</translation>
 <translation id="3242646949159196181">Įjungus svetainėse galima leisti garsą. Išjungus svetainėse negalima leisti garso.</translation>
+<translation id="3273479183583863618">Sumažintos kainos skirtukuose</translation>
 <translation id="3277252321222022663">Leidžiama svetainėms pasiekti jutiklius (rekomenduojama)</translation>
 <translation id="3285500645985761267">Leisti susijusioms svetainėms peržiūrėti jūsų veiklą grupėje</translation>
 <translation id="3295019059349372795">11 skyrius. Nuostabusis Smaragdo miestas</translation>
@@ -161,6 +162,7 @@
 <translation id="3721953990244350188">Atsisakyti ir rodyti kitą galimą veiksmą</translation>
 <translation id="3744111561329211289">Fono sinchronizavimas</translation>
 <translation id="3763247130972274048">Dukart palieskite vaizdo įrašą, kad praleistumėte 10 sek.</translation>
+<translation id="3779154269823594982">Keisti slaptažodžius</translation>
 <translation id="3797520601150691162">Netaikyti tamsiosios temos konkrečiai svetainei</translation>
 <translation id="3803367742635802571">Svetainės, kuriose lankotės, gali neveikti taip, kaip numatyta</translation>
 <translation id="3804247818991980532"><ph name="TYPE_1" />. <ph name="TYPE_2" />.</translation>
@@ -171,6 +173,7 @@
 <translation id="385051799172605136">Atgal</translation>
 <translation id="3859306556332390985">Eiti pirmyn</translation>
 <translation id="3895926599014793903">Priverstinai įgalinti mastelio keitimą</translation>
+<translation id="3905475044299942653">Daugybės pranešimų sustabdymas</translation>
 <translation id="3908288065506437185">Blokuoti trečiųjų šalių slapukus inkognito režimu</translation>
 <translation id="3913461097001554748"><ph name="DOMAIN_URL" /> <ph name="SEPARATOR1" /> <ph name="DEVICE_NAME" /></translation>
 <translation id="3918378745482005425">Gali neveikti kai kurios funkcijos. Susijusios svetainės vis tiek gali naudoti trečiųjų šalių slapukus.</translation>
@@ -218,6 +221,7 @@
 <translation id="4751476147751820511">Judesio arba šviesos jutikliai</translation>
 <translation id="4755971844837804407">Įjungus svetainėse gali būti rodomas jums bet koks skelbimas. Išjungus svetainėse negalima rodyti nepageidaujamų ar klaidinančių skelbimų.</translation>
 <translation id="4779083564647765204">Keisti mastelį</translation>
+<translation id="4807122856660838973">Įjunkite Saugų naršymą</translation>
 <translation id="4811450222531576619">Sužinokite apie jo šaltinį ir temą</translation>
 <translation id="4836046166855586901">Klausti, kai svetainė nori žinoti, kada aktyviai naudojate šį įrenginį</translation>
 <translation id="483914009762354899">Įtraukti visas šio domeno svetaines</translation>
@@ -231,6 +235,7 @@
 <translation id="4994033804516042629">Kontaktų nerasta</translation>
 <translation id="4996978546172906250">Bendrinti per</translation>
 <translation id="5001526427543320409">Trečiųjų šalių slapukai</translation>
+<translation id="5007392906805964215">Peržiūrėti</translation>
 <translation id="5039804452771397117">Leisti</translation>
 <translation id="5048398596102334565">Leidžiama svetainėms pasiekti judesio jutiklius (rekomenduojama)</translation>
 <translation id="5050380848339752099">Šioje svetainėje ketinama bendrinti informaciją su programa ne inkognito režimu.</translation>
@@ -346,7 +351,6 @@
 <translation id="6612358246767739896">Apsaugotas turinys</translation>
 <translation id="662080504995468778">Likti</translation>
 <translation id="6653342741369270081">Paspauskite mygtuką „Atgal“, kad išeitumėte iš viso ekrano režimo.</translation>
-<translation id="6670377348676659110">{TILE_COUNT,plural, =1{Slėpti parinktį „Tęsti naudojant šį skirtuką“}one{Slėpti parinktį „Tęsti naudojant šiuos skirtukus“}few{Slėpti parinktį „Tęsti naudojant šiuos skirtukus“}many{Slėpti parinktį „Tęsti naudojant šiuos skirtukus“}other{Slėpti parinktį „Tęsti naudojant šiuos skirtukus“}}</translation>
 <translation id="6689172468748959065">Profilio nuotraukos</translation>
 <translation id="6697925417670533197">Aktyvūs atsisiuntimai</translation>
 <translation id="6722828510648505498">Blokuoti raginimus prisijungti iš tapatybės nustatymo paslaugų.</translation>
@@ -356,7 +360,9 @@
 <translation id="6787751205395685251">Pasirinkite <ph name="SITE_NAME" /> parinktį</translation>
 <translation id="6790428901817661496">Žaisti</translation>
 <translation id="6818926723028410516">Pasirinkite elementus</translation>
+<translation id="6840760312327750441">Norėdami grupuoti skirtukus, palieskite ir palaikykite skirtuką. Tada nuvilkite jį į kitą skirtuką.</translation>
 <translation id="6864395892908308021">Šis įrenginys negali nuskaityti ALR</translation>
+<translation id="6870169401250095575">Slėpti saugos patikros kortelę</translation>
 <translation id="6912998170423641340">Neleisti svetainėms skaityti teksto ir vaizdų iš iškarpinės</translation>
 <translation id="6945221475159498467">Pasirinkti</translation>
 <translation id="6950072572526089586">Svetainė, kurioje lankotės, gali išsaugoti informaciją apie jūsų atliktus veiksmus, kad galėtų veikti taip, kaip numatyta, pvz., kad liktumėte prisijungę prie svetainės arba galėtumėte išsaugoti prekes pirkinių krepšelyje. Dažnai svetainės laikinai išsaugo šią informaciją įrenginyje.</translation>
@@ -389,6 +395,7 @@
 <translation id="7366415735885268578">Svetainės pridėjimas</translation>
 <translation id="7368695150573390554">Visi duomenys ne iš interneto bus ištrinti</translation>
 <translation id="7383715096023715447"><ph name="DOMAIN" /> nustatymai</translation>
+<translation id="7399802613464275309">Saugos patikra</translation>
 <translation id="7406113532070524618">Šis nustatymas veikia jūsų neidentifikuojant arba neleidžiant svetainėms matyti jūsų naršymo istorijos, bet svetainės gali bendrinti nedidelį kiekį informacijos vykdydamos patvirtinimą</translation>
 <translation id="7423098979219808738">Pirmiausia paklausti</translation>
 <translation id="7423538860840206698">Neleidžiama skaityti iškarpinės</translation>
@@ -423,6 +430,7 @@
 <translation id="7986741934819883144">Pasirinkite kontaktą</translation>
 <translation id="7990211076305263060">Įjungus svetainėse gali būti prašoma naudoti mikrofoną. Išjungus svetainės negali naudoti mikrofono.</translation>
 <translation id="8007176423574883786">Išjungta šiame įrenginyje</translation>
+<translation id="8010630645305864042">{TILE_COUNT,plural, =1{Slėpti kortelę „Tęsti naudojant šį skirtuką“}one{Slėpti kortelę „Tęsti naudojant šiuos skirtukus“}few{Slėpti kortelę „Tęsti naudojant šiuos skirtukus“}many{Slėpti kortelę „Tęsti naudojant šiuos skirtukus“}other{Slėpti kortelę „Tęsti naudojant šiuos skirtukus“}}</translation>
 <translation id="802154636333426148">Įvyko atsisiuntimo klaida</translation>
 <translation id="8042586301629853791">Rūšiuoti pagal:</translation>
 <translation id="8067883171444229417">Leisti vaizdo įrašą</translation>
@@ -511,5 +519,6 @@
 <translation id="9162462602695099906">Šis puslapis pavojingas</translation>
 <translation id="930525582205581608">Pamiršti šią svetainę?</translation>
 <translation id="947156494302904893">Svetainės, kuriose lankotės, gali patvirtinti, kad esate realus asmuo, o ne robotas</translation>
+<translation id="959682366969460160">Sutvarkykite</translation>
 <translation id="967624055006145463">Saugomi duomenys</translation>
 </translationbundle>

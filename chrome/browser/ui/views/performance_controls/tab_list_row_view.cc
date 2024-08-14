@@ -18,6 +18,7 @@
 #include "components/performance_manager/public/resource_attribution/page_context.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/url_formatter/url_formatter.h"
+#include "components/vector_icons/vector_icons.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/accessibility/ax_enums.mojom-shared.h"
 #include "ui/accessibility/ax_node_data.h"
@@ -26,7 +27,6 @@
 #include "ui/base/models/image_model.h"
 #include "ui/color/color_id.h"
 #include "ui/gfx/geometry/insets.h"
-#include "ui/strings/grit/ui_strings.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/animation/ink_drop_host.h"
@@ -40,6 +40,7 @@
 #include "ui/views/layout/flex_layout.h"
 #include "ui/views/layout/layout_provider.h"
 #include "ui/views/layout/layout_types.h"
+#include "ui/views/style/platform_style.h"
 #include "ui/views/style/typography.h"
 #include "ui/views/vector_icons.h"
 #include "ui/views/view.h"
@@ -51,9 +52,11 @@ namespace {
 // won't touch the edge of the TabListRowView.
 constexpr int kFaviconVerticalMargin = 4;
 // Corner radius for the favicon image view.
-constexpr int kFaviconCornerRadius = 8;
+constexpr int kFaviconCornerRadius = 4;
 // Border thickness surrounding the favicon.
-constexpr int kFaviconBorderThickness = 12;
+constexpr int kFaviconBorderThickness = 4;
+// Spacing between the favicon and tab title.
+constexpr int kFaviconTabTitleSpacing = 8;
 
 std::unique_ptr<views::Label> CreateLabel(std::u16string text, int text_style) {
   auto label = std::make_unique<views::Label>(text);
@@ -88,27 +91,18 @@ class TextContainer : public views::View {
 
     title_ =
         AddChildView(CreateLabel(title, views::style::STYLE_BODY_4_MEDIUM));
-    domain_ = AddChildView(
-        CreateLabel(url_formatter::FormatUrl(
-                        domain,
-                        url_formatter::kFormatUrlOmitDefaults |
-                            url_formatter::kFormatUrlOmitHTTPS |
-                            url_formatter::kFormatUrlOmitTrivialSubdomains |
-                            url_formatter::kFormatUrlTrimAfterHost,
-                        base::UnescapeRule::NORMAL, nullptr, nullptr, nullptr),
-                    views::style::STYLE_BODY_5));
 
-    SetFocusBehavior(FocusBehavior::ALWAYS);
+    SetFocusBehavior(views::PlatformStyle::kDefaultFocusBehavior);
+
+    GetViewAccessibility().SetRole(ax::mojom::Role::kListBoxOption);
   }
 
   void GetAccessibleNodeData(ui::AXNodeData* node_data) override {
-    node_data->role = ax::mojom::Role::kListBoxOption;
     if (tab_list_model_->count() > 1) {
-      node_data->SetNameChecked(
-          base::StrCat({title_->GetText(), u" ", domain_->GetText()}));
+      node_data->SetNameChecked(title_->GetText());
     } else {
       node_data->SetNameChecked(base::StrCat(
-          {title_->GetText(), u" ", domain_->GetText(), u" ",
+          {title_->GetText(), u" ",
            l10n_util::GetStringUTF16(
                IDS_PERFORMANCE_INTERVENTION_SINGLE_SUGGESTED_ROW_ACCNAME)}));
     }
@@ -122,13 +116,10 @@ class TextContainer : public views::View {
 
   views::Label* title() { return title_; }
 
-  views::Label* domain() { return domain_; }
-
  private:
   raw_ptr<TabListModel> tab_list_model_;
   base::RepeatingClosure on_reverse_focus_tab_traversal_;
   raw_ptr<views::Label> title_ = nullptr;
-  raw_ptr<views::Label> domain_ = nullptr;
 };
 
 BEGIN_METADATA(TextContainer)
@@ -190,8 +181,8 @@ TabListRowView::TabListRowView(
   favicon->SetProperty(
       views::kMarginsKey,
       gfx::Insets::TLBR(kFaviconVerticalMargin, 0, kFaviconVerticalMargin,
-                        ChromeLayoutProvider::Get()->GetDistanceMetric(
-                            views::DISTANCE_RELATED_CONTROL_HORIZONTAL)));
+                        kFaviconTabTitleSpacing));
+
   // Unretained(this) is safe to use in this instance because the callback is
   // owned by the text container which is a descendant of this. Therefore the
   // callback will not be invoked after this is destroyed.
@@ -204,7 +195,7 @@ TabListRowView::TabListRowView(
   std::unique_ptr<views::ImageButton> close_button =
       views::CreateVectorImageButtonWithNativeTheme(
           base::BindOnce(std::move(close_button_callback), this),
-          views::kIcCloseIcon);
+          vector_icons::kCloseChromeRefreshIcon);
 
   // The close button should not be visible by default and should show up when
   // the user's mouse is over TabListRowView.
@@ -216,12 +207,11 @@ TabListRowView::TabListRowView(
   close_button->GetViewAccessibility().SetName(l10n_util::GetStringFUTF16(
       IDS_PERFORMANCE_INTERVENTION_CLOSE_BUTTON_ACCNAME,
       text_container_->title()->GetText()));
-
-  close_button->SetTooltipText(l10n_util::GetStringUTF16(IDS_APP_CLOSE));
   close_button_ = row_container->AddChildView(std::move(close_button));
 
   inkdrop_container_->SetProperty(views::kViewIgnoredByLayoutKey, true);
   SetNotifyEnterExitOnChild(true);
+  tab_list_model_observation_.Observe(tab_list_model_);
 }
 
 TabListRowView::~TabListRowView() {
@@ -235,30 +225,22 @@ std::u16string TabListRowView::GetTitleTextForTesting() {
   return text_container_->title()->GetText();
 }
 
-std::u16string TabListRowView::GetDomainTextForTesting() {
-  return text_container_->domain()->GetText();
-}
-
 views::ImageButton* TabListRowView::GetCloseButtonForTesting() {
   return close_button_;
 }
 
+views::View* TabListRowView::GetTextContainerForTesting() {
+  return text_container_;
+}
+
 void TabListRowView::OnMouseEntered(const ui::MouseEvent& event) {
   views::View::OnMouseEntered(event);
-  // Show the highlight and "X" button when there is more than one item in the
-  // tab list.
-  const bool should_show_highlight =
-      tab_list_model_->page_contexts().size() > 1;
-  if (!should_show_highlight) {
-    views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
-  }
-  close_button_->SetVisible(should_show_highlight);
+  RefreshInkDropAndCloseButton();
 }
 
 void TabListRowView::OnMouseExited(const ui::MouseEvent& event) {
   View::OnMouseExited(event);
-  close_button_->SetVisible(text_container_->HasFocus() ||
-                            close_button_->HasFocus());
+  RefreshInkDropAndCloseButton();
 }
 
 void TabListRowView::AddLayerToRegion(ui::Layer* layer,
@@ -284,13 +266,28 @@ void TabListRowView::RemovedFromWidget() {
 
 void TabListRowView::OnDidChangeFocus(views::View* before, views::View* now) {
   if (now) {
-    const bool show_focus_ink_drop =
-        Contains(now) && (tab_list_model_->page_contexts().size() > 1);
-    // The close button should still be visible when the mouse is still hovered
-    // over the row even though focus has changed to something else.
-    close_button_->SetVisible(show_focus_ink_drop || IsMouseHovered());
-    views::InkDrop::Get(this)->GetInkDrop()->SetFocused(show_focus_ink_drop);
+    RefreshInkDropAndCloseButton();
   }
+}
+
+void TabListRowView::OnTabCountChanged(int count) {
+  if (count <= 1) {
+    RefreshInkDropAndCloseButton();
+  }
+}
+
+void TabListRowView::RefreshInkDropAndCloseButton() {
+  const bool has_focus =
+      text_container_->HasFocus() || close_button_->HasFocus();
+  const bool showing_multiple_rows =
+      tab_list_model_->page_contexts().size() > 1;
+  if (!showing_multiple_rows) {
+    views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
+  }
+  close_button_->SetVisible(showing_multiple_rows &&
+                            (has_focus || IsMouseHovered()));
+  views::InkDrop::Get(this)->GetInkDrop()->SetFocused(showing_multiple_rows &&
+                                                      has_focus);
 }
 
 void TabListRowView::MaybeFocusCloseButton() {

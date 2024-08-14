@@ -54,7 +54,8 @@ enum class BuiltInImage {
   kSparkRebuy = 2,
   kSpark1PApp = 3,
   kSparkV2 = 4,
-  kMaxValue = kSparkV2
+  kG1Notification = 5,
+  kMaxValue = kG1Notification
 };
 
 // Supported window anchor element.
@@ -63,6 +64,7 @@ enum class BuiltInImage {
 enum class WindowAnchorType {
   kCaptionButtonContainer = 0,
   kWindowBounds = 1,
+  kMaxValue = kWindowBounds
 };
 
 // These values are deserialized from Growth Campaign, so entries should not
@@ -410,6 +412,8 @@ class RuntimeTargeting : public TargetingBase {
 
   // Returns a list of triggers against the current trigger, e.g. `kAppOpened`.
   const std::vector<std::unique_ptr<TriggerTargeting>> GetTriggers() const;
+
+  const base::Value::List* GetUserPrefTargetings() const;
 };
 
 // Wrapper around the action dictionary for performing an action, including

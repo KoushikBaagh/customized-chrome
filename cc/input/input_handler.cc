@@ -1346,15 +1346,22 @@ InputHandler::ScrollHitTestResult InputHandler::HitTestScrollNode(
       return result;
     }
 
-    // If we hit a non-fast scrollable region, that means there's some reason we
-    // can't scroll in this region. Primarily, because there's another scroller
-    // there that isn't composited and we don't know about so we'll return
-    // failure.
-    if (ActiveTree().PointHitsNonFastScrollableRegion(device_viewport_point,
-                                                      *layer_impl)) {
+    // If we hit a main thread hit test region, that means there's some reason
+    // we can't scroll in this region. Primarily, because there's another
+    // scroller there that isn't composited and we don't know about so we'll
+    // return failure.
+    if (ActiveTree().PointHitsMainThreadScrollHitTestRegion(
+            device_viewport_point, *layer_impl)) {
       result.main_thread_hit_test_reasons =
-          MainThreadScrollingReason::kNonFastScrollableRegion;
+          MainThreadScrollingReason::kMainThreadScrollHitTestRegion;
       return result;
+    }
+
+    if (ElementId scroll_element_id = ActiveTree().PointHitsNonCompositedScroll(
+            device_viewport_point, *layer_impl)) {
+      node_to_scroll = GetScrollTree().FindNodeFromElementId(scroll_element_id);
+      CHECK(node_to_scroll);
+      break;
     }
   }
 

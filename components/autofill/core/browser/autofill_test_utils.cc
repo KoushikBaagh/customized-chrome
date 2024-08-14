@@ -21,16 +21,19 @@
 #include "build/build_config.h"
 #include "components/autofill/core/browser/autofill_external_delegate.h"
 #include "components/autofill/core/browser/data_model/autofill_profile.h"
+#include "components/autofill/core/browser/data_model/autofill_profile_test_api.h"
 #include "components/autofill/core/browser/data_model/bank_account.h"
 #include "components/autofill/core/browser/data_model/credit_card.h"
 #include "components/autofill/core/browser/data_model/credit_card_test_api.h"
 #include "components/autofill/core/browser/data_model/iban.h"
 #include "components/autofill/core/browser/field_types.h"
+#include "components/autofill/core/browser/metrics/suggestions_list_metrics.h"
 #include "components/autofill/core/browser/payments/card_unmask_challenge_option.h"
 #include "components/autofill/core/browser/payments_data_manager.h"
 #include "components/autofill/core/browser/randomized_encoder.h"
 #include "components/autofill/core/browser/test_autofill_client.h"
 #include "components/autofill/core/browser/test_personal_data_manager.h"
+#include "components/autofill/core/browser/ui/suggestion.h"
 #include "components/autofill/core/browser/ui/suggestion_type.h"
 #include "components/autofill/core/browser/webdata/payments/payments_autofill_table.h"
 #include "components/autofill/core/common/autofill_clock.h"
@@ -246,11 +249,11 @@ void SetProfileCategory(
     autofill_metrics::AutofillProfileSourceCategory category) {
   switch (category) {
     case autofill_metrics::AutofillProfileSourceCategory::kLocalOrSyncable:
-      profile.set_source_for_testing(AutofillProfile::Source::kLocalOrSyncable);
+      test_api(profile).set_source(AutofillProfile::Source::kLocalOrSyncable);
       break;
     case autofill_metrics::AutofillProfileSourceCategory::kAccountChrome:
     case autofill_metrics::AutofillProfileSourceCategory::kAccountNonChrome:
-      profile.set_source_for_testing(AutofillProfile::Source::kAccount);
+      test_api(profile).set_source(AutofillProfile::Source::kAccount);
       // Any value that is not kInitialCreatorOrModifierChrome works.
       const int kInitialCreatorOrModifierNonChrome =
           AutofillProfile::kInitialCreatorOrModifierChrome + 1;
@@ -288,7 +291,6 @@ Iban GetServerIban() {
   Iban iban(Iban::InstrumentId(1234567));
   iban.set_prefix(u"FR76");
   iban.set_suffix(u"0189");
-  iban.set_length(27);
   iban.set_nickname(u"My doctor's IBAN");
   return iban;
 }
@@ -297,7 +299,6 @@ Iban GetServerIban2() {
   Iban iban(Iban::InstrumentId(1234568));
   iban.set_prefix(u"BE71");
   iban.set_suffix(u"8676");
-  iban.set_length(16);
   iban.set_nickname(u"My sister's IBAN");
   return iban;
 }
@@ -306,7 +307,6 @@ Iban GetServerIban3() {
   Iban iban(Iban::InstrumentId(1234569));
   iban.set_prefix(u"DE91");
   iban.set_suffix(u"6789");
-  iban.set_length(22);
   iban.set_nickname(u"My IBAN");
   return iban;
 }
@@ -871,8 +871,9 @@ void GenerateTestAutofillPopup(
 
   std::vector<Suggestion> suggestions;
   suggestions.push_back(Suggestion(u"Test suggestion"));
-  autofill_external_delegate->OnSuggestionsReturned(field.global_id(),
-                                                    suggestions);
+  autofill_metrics::SuggestionRankingContext context;
+  autofill_external_delegate->OnSuggestionsReturned(
+      field.global_id(), suggestions, std::move(context));
 }
 
 std::string ObfuscatedCardDigitsAsUTF8(const std::string& str,
@@ -1002,11 +1003,47 @@ Suggestion CreateAutofillSuggestion(SuggestionType type,
   return suggestion;
 }
 
+Suggestion CreateAutofillSuggestion(const std::u16string& main_text_value,
+                                    const std::u16string& minor_text_value,
+                                    bool apply_deactivated_style) {
+  Suggestion suggestion;
+  suggestion.main_text.value = main_text_value;
+  suggestion.minor_text.value = minor_text_value;
+  suggestion.apply_deactivated_style = apply_deactivated_style;
+  return suggestion;
+}
+
 BankAccount CreatePixBankAccount(int64_t instrument_id) {
   BankAccount bank_account(
       instrument_id, u"nickname", GURL("http://www.example.com"), u"bank_name",
       u"account_number", BankAccount::AccountType::kChecking);
   return bank_account;
+}
+
+sync_pb::PaymentInstrument CreatePaymentInstrumentWithBankAccount(
+    int64_t instrument_id) {
+  sync_pb::PaymentInstrument payment_instrument;
+  payment_instrument.set_instrument_id(instrument_id);
+  sync_pb::BankAccountDetails* bank_account =
+      payment_instrument.mutable_bank_account();
+  bank_account->set_bank_name("bank_name");
+  bank_account->set_account_number_suffix("1234");
+  bank_account->set_account_type(
+      sync_pb::BankAccountDetails_AccountType_CHECKING);
+  return payment_instrument;
+}
+
+sync_pb::PaymentInstrument CreatePaymentInstrumentWithIban(
+    int64_t instrument_id) {
+  sync_pb::PaymentInstrument payment_instrument;
+  payment_instrument.set_instrument_id(instrument_id);
+  sync_pb::WalletMaskedIban* iban = payment_instrument.mutable_iban();
+  iban->set_instrument_id("instrument_id");
+  iban->set_prefix("FR76");
+  iban->set_suffix("0189");
+  iban->set_length(27);
+  iban->set_nickname("nickname");
+  return payment_instrument;
 }
 
 }  // namespace test

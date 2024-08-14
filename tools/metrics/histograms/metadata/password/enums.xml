@@ -26,6 +26,11 @@ chromium-metrics-reviews@google.com.
 
 <enums>
 
+<enum name="AcceptedGeneratedPasswordSourceType">
+  <int value="0" label="Proactive bottom sheet"/>
+  <int value="1" label="Keyboard accessory"/>
+</enum>
+
 <enum name="AccessoryAction">
   <int value="0" label="Automatic password generation"/>
   <int value="1" label="'Manage all passwords' link"/>
@@ -374,11 +379,11 @@ chromium-metrics-reviews@google.com.
 <enum name="LocalUpmActivationError">
   <int value="0"
       label="None (activated / migration scheduled / previously activated)"/>
-  <int value="1" label="Unenrolled from UPM"/>
-  <int value="2" label="Initial UPM migration missing"/>
+  <int value="1" label="(obsolete) Unenrolled from UPM"/>
+  <int value="2" label="(obsolete) Initial UPM migration missing"/>
   <int value="3" label="Login DB file move failed"/>
   <int value="4" label="Outdated GmsCore"/>
-  <int value="5" label="Flag disabled"/>
+  <int value="5" label="(obsolete) Flag disabled"/>
   <int value="6" label="Migration warning unacknowledged"/>
 </enum>
 
@@ -562,6 +567,23 @@ chromium-metrics-reviews@google.com.
   <int value="20"
       label="Opened automatically / Notifying the user that their password
              store setting changed"/>
+  <int value="21"
+      label="Opened automatically / Notifying the user that their passkey was
+             saved"/>
+  <int value="22"
+      label="Opened automatically / Notifying the user that their invalid
+             passkey has been deleted and that they need to log in to create
+             a new one"/>
+  <int value="23"
+      label="Opened manually / Notifying the user that their invalid passkey
+             has been deleted and that they need to log in to create a new
+             one"/>
+  <int value="24"
+      label="Opened automatically / Notifying the user that their passkey
+             details have been updated."/>
+  <int value="25"
+      label="Opened manually / Notifying the user that their passkey details
+             have been updated."/>
 </enum>
 
 <enum name="PasswordBubbleFollowupType">
@@ -672,6 +694,12 @@ chromium-metrics-reviews@google.com.
 <enum name="PasswordFormHadUsernameField">
   <int value="0" label="No username field"/>
   <int value="1" label="Username match"/>
+</enum>
+
+<enum name="PasswordFormPredictionWaitResult">
+  <int value="0" label="Predictions received before timeout"/>
+  <int value="1" label="Timed out with one closure outstanding"/>
+  <int value="2" label="Timed out with two or more closures outstanding"/>
 </enum>
 
 <enum name="PasswordFormType2">
@@ -893,13 +921,13 @@ chromium-metrics-reviews@google.com.
 </enum>
 
 <enum name="PasswordManagerEnableState">
-  <int value="0" label="Credentials Service enabled bu default"/>
+  <int value="0" label="Credentials Service enabled by default"/>
   <int value="1" label="Credentials Service enabled by the user"/>
   <int value="2" label="Credentials Service enabled by extension"/>
   <int value="3" label="Credentials Service enabled by policy"/>
   <int value="4" label="Credentials Service enabled by recommended policy"/>
   <int value="5" label="Credentials Service enabled by other"/>
-  <int value="6" label="Credentials Service disabled by the uer"/>
+  <int value="6" label="Credentials Service disabled by the user"/>
   <int value="7" label="Credentials Service disabled By extension"/>
   <int value="8" label="Credentials Service disabled by policy"/>
   <int value="9" label="Credentials Service disabled by recommended policy"/>
@@ -1078,15 +1106,25 @@ chromium-metrics-reviews@google.com.
   </int>
   <int value="2" label="Affiliated android app">
     A credential exists for an affiliated android app but not for the current
-    security origin.
+    security origin. This is provided as a credential sharing affiliation by
+    AffiliationService.
   </int>
   <int value="3" label="Affiliated website">
     A credential exists for an affiliated site but not for the current security
-    origin.
+    origin. This is provided as a credential sharing affiliation by
+    AffiliationService.
   </int>
-  <int value="4" label="Grouped website">
-    A credential exists for a web site, which is grouped with the current domain
-    by the AffiliationService.
+  <int value="4" label="Grouped (Deprecated in M129)">
+    A credential exists for another entity, which is grouped with the current
+    domain by the AffiliationService through a grouping affiliation.
+  </int>
+  <int value="5" label="Grouped android app">
+    A credential exists for an android application, which is grouped with the
+    current domain by the AffiliationService through a grouping affiliation.
+  </int>
+  <int value="6" label="Grouped website">
+    A credential exists for a website, which is grouped with the current domain
+    by the AffiliationService through a grouping affiliation.
   </int>
 </enum>
 
@@ -1470,6 +1508,11 @@ chromium-metrics-reviews@google.com.
   </int>
 </enum>
 
+<enum name="ProactivePasswordGenerationBottomSheetTransitionType">
+  <int value="0" label="Silenced"/>
+  <int value="1" label="Unsilenced"/>
+</enum>
+
 <enum name="ProvisionalSaveFailure">
   <summary>Reason why a provisional save failed.</summary>
   <int value="0" label="SAVING_DISABLED"/>
@@ -1487,6 +1530,11 @@ chromium-metrics-reviews@google.com.
   <int value="2" label="Other Gaia password"/>
   <int value="3" label="Enterprise password"/>
   <int value="4" label="Unknown password"/>
+</enum>
+
+<enum name="SaveFlowStep">
+  <int value="0" label="Form submitted"/>
+  <int value="1" label="Save prompt shown"/>
 </enum>
 
 <enum name="SavingOnUsernameFirstFlow">
@@ -1583,7 +1631,7 @@ chromium-metrics-reviews@google.com.
   <int value="6" label="More than two fields in the form"/>
   <int value="7" label="2-field form (username+password)"/>
   <int value="8" label="Password field not found"/>
-  <int value="9" label="Form has child frames (maybe CAPTCHA)"/>
+  <int value="9" label="Form likely has a CAPTCHA"/>
 </enum>
 
 <enum name="TouchToFillPasswordGenerationTriggerOutcome">

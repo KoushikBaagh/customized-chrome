@@ -36,7 +36,10 @@ class FaceGazeTestUtils {
     EYES_LOOK_LEFT,
     EYES_LOOK_RIGHT,
     EYES_LOOK_UP,
+    JAW_LEFT,
     JAW_OPEN,
+    JAW_RIGHT,
+    MOUTH_FUNNEL,
     MOUTH_LEFT,
     MOUTH_PUCKER,
     MOUTH_RIGHT,
@@ -94,6 +97,8 @@ class FaceGazeTestUtils {
     MOUSE_LONG_CLICK_LEFT = 45,
     TOGGLE_FACEGAZE = 46,
     OPEN_FACEGAZE_SETTINGS = 47,
+    TOGGLE_VIRTUAL_KEYBOARD = 48,
+    MOUSE_CLICK_LEFT_DOUBLE = 49,
   };
 
   // Facial gestures recognized by Mediapipe. Ensure this enum stays in sync
@@ -115,7 +120,10 @@ class FaceGazeTestUtils {
     EYE_LOOK_UP_RIGHT,
     EYE_SQUINT_LEFT,
     EYE_SQUINT_RIGHT,
+    JAW_LEFT,
     JAW_OPEN,
+    JAW_RIGHT,
+    MOUTH_FUNNEL,
     MOUTH_LEFT,
     MOUTH_PUCKER,
     MOUTH_RIGHT,
@@ -147,6 +155,7 @@ class FaceGazeTestUtils {
     Config& WithCursorLocation(const gfx::Point& location);
     Config& WithBufferSize(int size);
     Config& WithCursorAcceleration(bool acceleration);
+    Config& WithDialogAccepted(bool accepted);
     Config& WithGesturesToMacros(
         const base::flat_map<FaceGazeGesture, MacroName>& gestures_to_macros);
     Config& WithGestureConfidences(
@@ -158,6 +167,7 @@ class FaceGazeTestUtils {
     const gfx::Point& cursor_location() const { return cursor_location_; }
     int buffer_size() const { return buffer_size_; }
     bool use_cursor_acceleration() const { return use_cursor_acceleration_; }
+    bool dialog_accepted() const { return dialog_accepted_; }
     const std::optional<base::flat_map<FaceGazeGesture, MacroName>>&
     gestures_to_macros() const {
       return gestures_to_macros_;
@@ -179,6 +189,7 @@ class FaceGazeTestUtils {
     gfx::Point cursor_location_;
     int buffer_size_;
     bool use_cursor_acceleration_;
+    bool dialog_accepted_;
 
     // Optional properties.
     std::optional<base::flat_map<FaceGazeGesture, MacroName>>

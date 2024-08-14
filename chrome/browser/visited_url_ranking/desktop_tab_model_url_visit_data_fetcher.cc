@@ -13,8 +13,10 @@
 #include "chrome/browser/ui/tabs/tab_renderer_data.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/sessions/content/session_tab_helper.h"
+#include "components/url_deduplication/url_deduplication_helper.h"
 #include "components/visited_url_ranking/public/fetch_options.h"
 #include "components/visited_url_ranking/public/fetch_result.h"
+#include "components/visited_url_ranking/public/fetcher_config.h"
 #include "components/visited_url_ranking/public/url_visit.h"
 #include "components/visited_url_ranking/public/url_visit_data_fetcher.h"
 #include "components/visited_url_ranking/public/url_visit_util.h"
@@ -40,14 +42,6 @@ URLVisitAggregate::Tab MakeAggregateTabFromWebContents(
   return tab;
 }
 
-base::Time GetLastActiveTime(content::WebContents* web_contents) {
-  // Use the TimeDelta common ground between the two units to make the
-  // conversion.
-  const base::TimeDelta delta_since_epoch =
-      web_contents->GetLastActiveTime() - base::TimeTicks::UnixEpoch();
-  return base::Time::UnixEpoch() + delta_since_epoch;
-}
-
 }  // namespace
 
 DesktopTabModelURLVisitDataFetcher::DesktopTabModelURLVisitDataFetcher(
@@ -59,6 +53,7 @@ DesktopTabModelURLVisitDataFetcher::~DesktopTabModelURLVisitDataFetcher() =
 
 void DesktopTabModelURLVisitDataFetcher::FetchURLVisitData(
     const FetchOptions& options,
+    const FetcherConfig& config,
     FetchResultCallback callback) {
   std::map<URLMergeKey, URLVisitAggregate::TabData> url_visit_tab_data_map;
   const BrowserList* browser_list = BrowserList::GetInstance();
@@ -79,11 +74,13 @@ void DesktopTabModelURLVisitDataFetcher::FetchURLVisitData(
         continue;
       }
 
-      auto url_key = ComputeURLMergeKey(web_contents->GetLastCommittedURL());
+      auto url_key = ComputeURLMergeKey(web_contents->GetLastCommittedURL(),
+                                        web_contents->GetTitle(),
+                                        config.deduplication_helper);
       auto it = url_visit_tab_data_map.find(url_key);
       bool tab_data_map_already_has_url_entry =
           (it != url_visit_tab_data_map.end());
-      base::Time tab_entry_last_active = GetLastActiveTime(web_contents);
+      base::Time tab_entry_last_active = web_contents->GetLastActiveTime();
       if (!tab_data_map_already_has_url_entry) {
         auto tab_data = URLVisitAggregate::TabData(
             MakeAggregateTabFromWebContents(web_contents));

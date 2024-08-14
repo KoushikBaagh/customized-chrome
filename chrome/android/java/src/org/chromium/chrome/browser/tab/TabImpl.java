@@ -476,7 +476,7 @@ class TabImpl implements Tab {
     @CalledByNative
     @Override
     public String getTitle() {
-        if (mTitle == null) updateTitle();
+        if (TextUtils.isEmpty(mTitle)) updateTitle();
         return mTitle;
     }
 
@@ -646,7 +646,9 @@ class TabImpl implements Tab {
             // TODO(tedchoc): When showing the android NTP, delay the call to
             // TabImplJni.get().loadUrl until the android view has entirely rendered.
             if (!mIsNativePageCommitPending) {
-                boolean isPdf = PdfUtils.isPdfNavigation(params.getUrl(), params);
+                boolean isPdf =
+                        PdfUtils.shouldOpenPdfInline(isIncognito())
+                                && PdfUtils.isPdfNavigation(params.getUrl(), params);
                 mIsNativePageCommitPending =
                         maybeShowNativePage(params.getUrl(), false, isPdf ? new PdfInfo() : null);
                 if (isPdf) {
@@ -1208,8 +1210,10 @@ class TabImpl implements Tab {
 
     /** Hides the current {@link NativePage}, if any, and shows the {@link WebContents}'s view. */
     void showRenderedPage() {
-        updateTitle();
+        // During title update, we prioritize titles in NativePage instead of those from
+        // WebContents. Thus we should remove the obsolete NativePage before title update.
         if (mNativePage != null) hideNativePage(true, null);
+        updateTitle();
     }
 
     void updateWindowAndroid(WindowAndroid windowAndroid) {
@@ -1299,6 +1303,10 @@ class TabImpl implements Tab {
     }
 
     void handleBackForwardTransitionUiChanged() {
+        for (TabObserver observer : mObservers) {
+            observer.didBackForwardTransitionAnimationChange();
+        }
+
         // Start the cross-fade animation after the invoking animation is done.
         switch (getWebContents().getCurrentBackForwardTransitionStage()) {
             case AnimationStage.NONE:
@@ -1375,7 +1383,9 @@ class TabImpl implements Tab {
         // not set in some cases (e.g. Chrome restart or navigate backward to pdf page). When the
         // pdf file is downloaded to media store, we should set isPdf param and open pdf page
         // immediately, because no re-download is expected.
-        isPdf |= PdfUtils.isDownloadedPdf(url.getSpec());
+        isPdf |=
+                PdfUtils.shouldOpenPdfInline(isIncognito())
+                        && PdfUtils.isDownloadedPdf(url.getSpec());
         if (!maybeShowNativePage(url.getSpec(), isReload, isPdf ? new PdfInfo() : null)) {
             String downloadUrl = PdfUtils.decodePdfPageUrl(url.getSpec());
             if (downloadUrl != null) {
@@ -1450,7 +1460,7 @@ class TabImpl implements Tab {
      * @param url The url of the current navigation.
      * @param forceReload If true, the current native page (if any) will not be reused, even if it
      *     matches the URL.
-     * @param pdfInfo Information of the pdf, or null if not pdf.
+     * @param pdfInfo Information of the pdf, or null if there is no associated pdf download.
      * @return True, if a native page was displayed for url.
      */
     boolean maybeShowNativePage(String url, boolean forceReload, PdfInfo pdfInfo) {
@@ -1736,9 +1746,7 @@ class TabImpl implements Tab {
             WebContents oldWebContents = mWebContents;
             mWebContents = webContents;
 
-            ContentView cv =
-                    ContentView.createContentView(
-                            mThemedApplicationContext, /* eventOffsetHandler= */ null, webContents);
+            ContentView cv = ContentView.createContentView(mThemedApplicationContext, webContents);
             cv.setContentDescription(
                     mThemedApplicationContext
                             .getResources()

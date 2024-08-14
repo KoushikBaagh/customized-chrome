@@ -1288,8 +1288,8 @@ TEST_F(DocumentTest, RejectsHasPrivateTokenCallFromNonHttpNonHttpsDocument) {
   Document& document = scope.GetDocument();
   ScriptState* script_state = scope.GetScriptState();
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionContextType::kOperationInvoke,
-                                 "Document", "hasPrivateToken");
+                                 v8::ExceptionContext::kOperation, "Document",
+                                 "hasPrivateToken");
 
   auto promise = document.hasPrivateToken(
       script_state, "https://issuer.example", exception_state);
@@ -1401,8 +1401,8 @@ TEST_F(DocumentTest, HasPrivateTokenSuccess) {
 
   ScriptState* script_state = scope.GetScriptState();
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionContextType::kOperationInvoke,
-                                 "Document", "hasPrivateToken");
+                                 v8::ExceptionContext::kOperation, "Document",
+                                 "hasPrivateToken");
 
   auto promise = document.hasPrivateToken(
       script_state, "https://issuer.example", exception_state);
@@ -1429,8 +1429,8 @@ TEST_F(DocumentTest, HasPrivateTokenSuccessWithFalseValue) {
 
   ScriptState* script_state = scope.GetScriptState();
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionContextType::kOperationInvoke,
-                                 "Document", "hasPrivateToken");
+                                 v8::ExceptionContext::kOperation, "Document",
+                                 "hasPrivateToken");
 
   auto promise = document.hasPrivateToken(
       script_state, "https://issuer.example", exception_state);
@@ -1457,8 +1457,8 @@ TEST_F(DocumentTest, HasPrivateTokenOperationError) {
 
   ScriptState* script_state = scope.GetScriptState();
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionContextType::kOperationInvoke,
-                                 "Document", "hasPrivateToken");
+                                 v8::ExceptionContext::kOperation, "Document",
+                                 "hasPrivateToken");
 
   auto promise = document.hasPrivateToken(
       script_state, "https://issuer.example", exception_state);
@@ -1487,8 +1487,8 @@ TEST_F(DocumentTest, HasPrivateTokenInvalidArgument) {
 
   ScriptState* script_state = scope.GetScriptState();
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionContextType::kOperationInvoke,
-                                 "Document", "hasPrivateToken");
+                                 v8::ExceptionContext::kOperation, "Document",
+                                 "hasPrivateToken");
 
   auto promise = document.hasPrivateToken(
       script_state, "https://issuer.example", exception_state);
@@ -1517,8 +1517,8 @@ TEST_F(DocumentTest, HasPrivateTokenResourceExhausted) {
 
   ScriptState* script_state = scope.GetScriptState();
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionContextType::kOperationInvoke,
-                                 "Document", "hasPrivateToken");
+                                 v8::ExceptionContext::kOperation, "Document",
+                                 "hasPrivateToken");
 
   auto promise = document.hasPrivateToken(
       script_state, "https://issuer.example", exception_state);
@@ -1546,8 +1546,8 @@ TEST_F(DocumentTest, HasRedemptionRecordSuccess) {
 
   ScriptState* script_state = scope.GetScriptState();
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionContextType::kOperationInvoke,
-                                 "Document", "hasRedemptionRecord");
+                                 v8::ExceptionContext::kOperation, "Document",
+                                 "hasRedemptionRecord");
 
   auto promise = document.hasRedemptionRecord(
       script_state, "https://issuer.example", exception_state);
@@ -1574,8 +1574,8 @@ TEST_F(DocumentTest, HasRedemptionRecordSuccessWithFalseValue) {
 
   ScriptState* script_state = scope.GetScriptState();
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionContextType::kOperationInvoke,
-                                 "Document", "hasRedemptionRecord");
+                                 v8::ExceptionContext::kOperation, "Document",
+                                 "hasRedemptionRecord");
 
   auto promise = document.hasRedemptionRecord(
       script_state, "https://issuer.example", exception_state);
@@ -1602,8 +1602,8 @@ TEST_F(DocumentTest, HasRedemptionRecordOperationError) {
 
   ScriptState* script_state = scope.GetScriptState();
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionContextType::kOperationInvoke,
-                                 "Document", "hasRedemptionRecord");
+                                 v8::ExceptionContext::kOperation, "Document",
+                                 "hasRedemptionRecord");
 
   auto promise = document.hasRedemptionRecord(
       script_state, "https://issuer.example", exception_state);
@@ -1632,8 +1632,8 @@ TEST_F(DocumentTest, HasRedemptionRecordInvalidArgument) {
 
   ScriptState* script_state = scope.GetScriptState();
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionContextType::kOperationInvoke,
-                                 "Document", "hasRedemptionRecord");
+                                 v8::ExceptionContext::kOperation, "Document",
+                                 "hasRedemptionRecord");
 
   auto promise = document.hasRedemptionRecord(
       script_state, "https://issuer.example", exception_state);
@@ -1676,8 +1676,8 @@ TEST_F(DocumentTest,
   Document& document = scope.GetDocument();
   ScriptState* script_state = scope.GetScriptState();
   ExceptionState exception_state(script_state->GetIsolate(),
-                                 ExceptionContextType::kOperationInvoke,
-                                 "Document", "hasRedemptionRecord");
+                                 v8::ExceptionContext::kOperation, "Document",
+                                 "hasRedemptionRecord");
 
   auto promise = document.hasRedemptionRecord(
       script_state, "https://issuer.example", exception_state);
@@ -1907,8 +1907,7 @@ TEST_F(UnassociatedListedElementTest, GetUnassociatedListedElements) {
   EXPECT_THAT(GetDocument().UnassociatedListedElements(), expected_elements());
 }
 
-// We extract unassociated listed element in a shadow DOM iff
-// `kAutofillIncludeShadowDomInUnassociatedListedElements` is enabled.
+// We extract unassociated listed element in a shadow DOM.
 TEST_F(UnassociatedListedElementTest,
        GetUnassociatedListedElementsFromShadowTree) {
   ShadowRoot& shadow_root =
@@ -1919,16 +1918,9 @@ TEST_F(UnassociatedListedElementTest,
   shadow_root.AppendChild(input);
   ListedElement::List listed_elements =
       GetDocument().UnassociatedListedElements();
-
-  if (base::FeatureList::IsEnabled(
-          blink::features::
-              kAutofillIncludeShadowDomInUnassociatedListedElements)) {
-    EXPECT_THAT(listed_elements,
-                ElementsAre(ListedElement::From(*shadow_root.getElementById(
-                    AtomicString("unassociated_input")))));
-  } else {
-    EXPECT_THAT(listed_elements, IsEmpty());
-  }
+  EXPECT_THAT(listed_elements,
+              ElementsAre(ListedElement::From(*shadow_root.getElementById(
+                  AtomicString("unassociated_input")))));
 }
 
 // Check if the dynamically added unassociated listed element is properly

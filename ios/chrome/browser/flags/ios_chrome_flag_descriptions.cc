@@ -16,6 +16,13 @@ const char kAppBackgroundRefreshDescription[] =
     "Schedules app background refresh after some minimum period of time has "
     "passed after the last refresh.";
 
+// Title and description for the flag that enables autofill across iframes.
+extern const char kAutofillAcrossIframesName[] =
+    "Enables Autofill across iframes";
+extern const char kAutofillAcrossIframesDescription[] =
+    "When enabled, Autofill will fill and save information on forms that "
+    "spread across multiple iframes.";
+
 const char kAutofillCreditCardUploadName[] =
     "Offers uploading Autofilled credit cards";
 const char kAutofillCreditCardUploadDescription[] =
@@ -175,6 +182,13 @@ const char kAutofillStickyInfobarDescription[] =
     "Makes the Address Infobar sticky to only dismiss on navigation from user "
     "gesture.";
 
+const char kAutofillUnmaskCardRequestTimeoutName[] =
+    "Timeout for the credit card unmask request";
+const char kAutofillUnmaskCardRequestTimeoutDescription[] =
+    "When enabled, sets a client-side timeout on the Autofill credit card "
+    "unmask request. Upon timeout, the client will terminate the current "
+    "unmask server call, which may or may not terminate the ongoing unmask UI.";
+
 const char kAutofillUploadCardRequestTimeoutName[] =
     "Timeout for the credit card upload request";
 const char kAutofillUploadCardRequestTimeoutDescription[] =
@@ -201,25 +215,6 @@ const char kBottomOmniboxDefaultSettingDescription[] =
     "Changes the default setting of the omnibox position. If the user "
     "hasn't already changed the setting, changes the omnibox position to top "
     "or bottom of the screen on iPhone. The default is top omnibox.";
-
-const char kBottomOmniboxPromoAppLaunchName[] =
-    "Bottom omnibox promo app-launch";
-const char kBottomOmniboxPromoAppLaunchDescription[] =
-    "Enables the app-launch promo for the bottom omnibox.";
-
-const char kBottomOmniboxPromoDefaultPositionName[] =
-    "Bottom omnibox promo default position";
-const char kBottomOmniboxPromoDefaultPositionDescription[] =
-    "Changes the default omnibox position in the FRE and app-launch promos.";
-
-const char kBottomOmniboxPromoFREName[] = "Bottom omnibox promo FRE";
-const char kBottomOmniboxPromoFREDescription[] =
-    "Enables the FRE promo for the bottom omnibox.";
-
-const char kBottomOmniboxPromoRegionFilterName[] =
-    "Bottom omnibox promo region filter";
-const char kBottomOmniboxPromoRegionFilterDescription[] =
-    "When enabled the bottom omnibox promo is limited to some regions.";
 
 const char kBreakpadNoDelayInitialUploadName[] =
     "Remove delay on initial crash upload";
@@ -397,21 +392,6 @@ const char kEnableFeedHeaderSettingsName[] =
 const char kEnableFeedHeaderSettingsDescription[] =
     "When enabled, some UI elements of the feed header can be modified.";
 
-const char kEnableFriendlierSafeBrowsingSettingsEnhancedProtectionName[] =
-    "Enable friendlier safe browsing settings enhanced protection";
-const char
-    kEnableFriendlierSafeBrowsingSettingsEnhancedProtectionDescription[] =
-        "Updates the text, layout, icons, and links on both the privacy guide "
-        "and the security settings page.";
-
-const char kEnableFriendlierSafeBrowsingSettingsStandardProtectionName[] =
-    "Enable Friendlier Safe Browsing Settings for standard protection";
-const char
-    kEnableFriendlierSafeBrowsingSettingsStandardProtectionDescription[] =
-        "Updates the text and layout on both the privacy guide and the "
-        "security "
-        "settings page.";
-
 const char kDisableLensCameraName[] = "Disable Lens camera experience";
 const char kDisableLensCameraDescription[] =
     "When enabled, the option use Lens to search for images from your device "
@@ -538,6 +518,11 @@ const char kIdentityDiscAccountMenuDescription[] =
     "When enabled, tapping the identity disc on the New Tab page shows the "
     "account menu UI.";
 
+const char kIdentityConfirmationSnackbarName[] =
+    "Identity Confirmation Snackbar";
+const char kIdentityConfirmationSnackbarDescription[] =
+    "When enabled, the identity confirmation snackbar will show on startup.";
+
 const char kInactiveTabButtonRefactoringName[] =
     "Inactive tab button refactoring";
 const char kInactiveTabButtonRefactoringDescription[] =
@@ -592,12 +577,6 @@ const char kIOSKeyboardAccessoryUpgradeName[] =
     "Enable the keyboard accessory upgrade on iOS";
 const char kIOSKeyboardAccessoryUpgradeDescription[] =
     "When enabled, the upgraded keyboard accessory UI will be presented.";
-
-const char kIOSPasswordAuthOnEntryV2Name[] =
-    "Password Manager Auth on Entry V2";
-const char kIOSPasswordAuthOnEntryV2Description[] =
-    "Requires Local Authentication before showing saved credentials in "
-    "Password Manager subpages.";
 
 const char kIOSChooseFromDriveName[] = "IOS Choose from Drive";
 const char kIOSChooseFromDriveDescription[] =
@@ -670,18 +649,6 @@ const char kIOSTipsNotificationsDescription[] =
 const char kIPHForSafariSwitcherName[] = "IPH for Safari Switcher";
 const char kIPHForSafariSwitcherDescription[] =
     "Enables displaying IPH for users who are considered Safari Switcher";
-
-const char kIPHiOSSwipeBackForwardFeatureName[] = "IPH for Swipe Back/Forward";
-const char kIPHiOSSwipeBackForwardFeatureDescription[] =
-    "Enables displaying the gesture IPH instructing users to swipe back or "
-    "forward on the currently opened website to navigate to the previous or "
-    "next one visited.";
-
-const char kIPHiOSSwipeToolbarToChangeTabFeatureName[] =
-    "IPH for Swipe Toolbar To Change Tab";
-const char kIPHiOSSwipeToolbarToChangeTabFeatureDescription[] =
-    "Enables displaying the gesture IPH instructing users to swipe the toolbar "
-    "to navigate to the previous or next tab in the tab list.";
 
 const char kLensFiltersAblationModeEnabledName[] =
     "Lens filters ablation mode enabled";
@@ -911,6 +878,10 @@ extern const char kPageImageServiceSalientImageDescription[] =
     "Enables the PageImageService fetching images from the Optimization Guide "
     "Salient Images source.";
 
+const char kPageInfoLastVisitedIOSName[] = "Last Visited in Page Info for iOS";
+const char kPageInfoLastVisitedIOSDescription[] =
+    "Shows the Last Visited row in Page Info for iOS.";
+
 const char kPageContentAnnotationsPersistSalientImageMetadataName[] =
     "Page content annotations - Persist salient image metadata";
 const char kPageContentAnnotationsPersistSalientImageMetadataDescription[] =
@@ -940,12 +911,6 @@ const char kPasswordSharingDescription[] =
 const char kDownloadedPDFOpeningName[] = "Enables downloaded PDF opening";
 const char kDownloadedPDFOpeningDescription[] =
     "Enables the direct opening of downloaded PDF files in Chrome";
-
-const char kEnablePolicyTestPageName[] =
-    "Enable access to the policy test page";
-const char kEnablePolicyTestPageDescription[] =
-    "When enabled, allows the policy test page to be accessed at "
-    "chrome://policy/test.";
 
 const char kPrivacyGuideIosName[] = "Privacy Guide on iOS";
 const char kPrivacyGuideIosDescription[] =
@@ -980,6 +945,11 @@ const char kRevampPageInfoIosName[] = "Revamp Page Info";
 const char kRevampPageInfoIosDescription[] =
     "Revamps Page Info to add two new sections, AboutThisPage and Last "
     "Visited.";
+
+const char kRichBubbleWithoutImageName[] = "Remove image from rich IPH bubble";
+const char kRichBubbleWithoutImageDescription[] =
+    "When enabled, the rich bubble IPH type will not feature an image, instead "
+    "will only have a title and body text.";
 
 const char kSafeBrowsingAvailableName[] = "Make Safe Browsing available";
 const char kSafeBrowsingAvailableDescription[] =
@@ -1021,6 +991,12 @@ const char kSegmentationPlatformIosModuleRankerSplitBySurfaceName[] =
 const char kSegmentationPlatformIosModuleRankerSplitBySurfaceDescription[] =
     "Enables the Magic Stack module ranking to be split by surface for "
     "engagement";
+
+const char kSegmentedDefaultBrowserPromoName[] =
+    "Enable Personalized Messaging in Default Browser Promos";
+const char kSegmentedDefaultBrowserPromoDescription[] =
+    "Enables Default Browser promos with personalized messaging (using "
+    "Segmentation Platform).";
 
 const char kSendTabToSelfIOSPushNotificationsName[] =
     "Send tab to self iOS push notifications";

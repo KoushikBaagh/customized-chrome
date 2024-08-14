@@ -338,7 +338,6 @@
       </message>
 
       <!-- Editor Menu -->
-      <!-- TODO(b/286268215): Finalize these strings. -->
       <message name="IDS_EDITOR_MENU_PROMO_CARD_TITLE" desc="Title text in the dialog that is shown to introduce the Editor Menu feature.">
         Write faster and with more confidence
       </message>
@@ -374,6 +373,12 @@
       </message>
       <message name="IDS_EDITOR_MENU_EXPERIMENT_BADGE" desc="Label on the badge shown next to the Editor Menu title to indicate that it is an experimental feature.">
         Experiment
+      </message>
+      <message name="IDS_EDITOR_ANNOUNCEMENT_TEXT_FOR_FEEDBACK" desc="The announcement made when users submitted a feedback for a result received from Editor.">
+        Feedback submitted
+      </message>
+      <message name="IDS_EDITOR_ANNOUNCEMENT_TEXT_FOR_INSERTION" desc="The announcement made when users insert the text suggestion or replace the current selected text with the text suggestion from Editor.">
+        Replacing selected text with suggestion
       </message>
 
       <!-- Mahi -->
@@ -3138,7 +3143,7 @@
         </message>
 
         <!-- Sanitize UI -->
-        <message name="IDS_OS_SANITIZE_APP_NAME" desc="Name of the Sanitize web app" translateable="false">
+        <message name="IDS_SANITIZE" desc="Name of the Sanitize web app" translateable="false">
           Sanitize
         </message>
         <message name="IDS_SANITIZE_DONE_HEADING" desc="Name of the 'Safety reset done' window" translateable="false">
@@ -3182,6 +3187,42 @@
         </message>
         <message name="IDS_SANITIZE_DONE_ACCORDION_CHROME_LANGUAGES" translateable="false">
           Verify your language settings
+        </message>
+        <message name="IDS_SANITIZE_DONE_BUTTON_EXTENSIONS" translateable="false">
+          Extensions
+        </message>
+        <message name="IDS_SANITIZE_DONE_BUTTON_CHROMEOS_INPUT" translateable="false">
+          ChromeOS Input
+        </message>
+        <message name="IDS_SANITIZE_DONE_BUTTON_CHROMEOS_NETWORK" translateable="false">
+          ChromeOS Network
+        </message>
+        <message name="IDS_SANITIZE_DONE_BUTTON_CHROME_STARTUP" translateable="false">
+          Chrome Startup
+        </message>
+        <message name="IDS_SANITIZE_DONE_BUTTON_CHROME_HOMEPAGE" translateable="false">
+          Chrome Homepage
+        </message>
+        <message name="IDS_SANITIZE_DONE_BUTTON_CHROME_LANGUAGES" translateable="false">
+          Chrome Languages
+        </message>
+        <message name="IDS_SANITIZE_HEADING" translateable="false" desc="Name of the 'Safety reset' window">
+          Sanitize your device
+        </message>
+        <message name="IDS_SANITIZE_DESCRIPTION" translateable="false" desc="Description of the sanitization feature on the sanitize window">
+          Getting unwanted pop-ups, or other unexpected behavior? Sometimes,
+          apps and extensions that you install can change your ChromeOS settings
+          without you knowing.
+        </message>
+        <message name="IDS_SANITIZE_WARNING" translateable="false" desc="Warning text in the 'Sanitize' window">
+          This will disable extensions and reset your settings to safe defaults.
+          Tabs, files, and cookies will be preserved.
+        </message>
+        <message name="IDS_SANITIZE_FEEDBACK" translateable="false" desc="Feedback label in the Reset Profile Settings dialog">
+          Help make ChromeOS better by reporting the current settings
+        </message>
+        <message name="IDS_SANITIZE_CANCEL" translateable="false" desc="Button label to cancel proceeding with sanitize">
+          Cancel
         </message>
 
         <!-- Sea Pen UI -->
@@ -3337,6 +3378,47 @@
         </message>
         <message name="IDS_SEA_PEN_INTRODUCTION_DIALOG_CLOSE_BUTTON" desc="The button to close the introduction dialog.">
           Got it
+        </message>
+
+        <!-- Freeform prompts -->
+        <message name="IDS_SEA_PEN_FREEFORM_WALLPAPER_TEMPLATES_LABEL" desc="Label for the Wallpaper AI templates feature.">
+          AI Wallpapers
+        </message>
+        <message name="IDS_SEA_PEN_FREEFORM_SAMPLE_PROMPTS_LABEL" desc="Label for a list of sample prompts, used to help users write prompts to generate AI images.">
+          Sample prompts
+        </message>
+        <message name="IDS_SEA_PEN_FREEFORM_RESULTS_LABEL" desc="Label for a list of generated AI images.">
+          Results
+        </message>
+        <message name="IDS_SEA_PEN_FREEFORM_SHUFFLE" desc="Label for a button that shuffles a list">
+          Shuffle
+        </message>
+        <message name="IDS_SEA_PEN_FREEFORM_INPUT_PLACEHOLDER" desc="Default text for an input field that is used to generate AI images.">
+        Describe the wallpaper you want to create
+        </message>
+        <message name="IDS_SEA_PEN_FREEFORM_ERROR_NO_INTERNET" desc="Error message displayed when there is no internet connection.">
+          Make sure you're connected to the internet and try again.
+        </message>
+        <message name="IDS_SEA_PEN_FREEFORM_ERROR_UNSUPPORTED_LANGUAGE" desc="Error message displayed when the search query uses an unsupported language.">
+          This language isn't supported at this time
+        </message>
+        <message name="IDS_SEA_PEN_FREEFORM_ERROR_BLOCKED_OUTPUTS" desc="Error message displayed when the search results were blocked.">
+          Can't create images of this. Try another prompt.
+        </message>
+        <message name="IDS_SEA_PEN_FREEFORM_POWERED_BY_GOOGLE" desc="Section heading that indicates Google made these wallpapers.">
+          Powered by Google AI
+        </message>
+        <message name="IDS_SEA_PEN_FREEFORM_PREVIOUS_PROMPTS" desc="Section heading that shows previously-generated wallpapers.">
+          Previous prompts
+        </message>
+        <message name="IDS_SEA_PEN_FREEFORM_PREVIOUS_PROMPTS_TOOLTIP" desc="Tooltip for IDS_SEA_PEN_FREEFORM_PREVIOUS_PROMPTS">
+          Your 2 most recent prompts. You can only use these prompts while you're on this page.
+        </message>
+        <message name="IDS_SEA_PEN_FREEFORM_MORE_SUGGESTIONS_BUTTON" desc="Description for a button that will show more options">
+          More
+        </message>
+        <message name="IDS_SEA_PEN_FREEFORM_PROMPTING_GUIDE" desc="A link to a guide with instructions on how to write a prompt to generate AI images.">
+          Try one of these prompts or see the <ph name="BEGIN_LINK_PROMPTING_GUIDE">&lt;a href="chrome://help-app/help/sub/3399710/id/1251809"&gt;</ph>prompting guide<ph name="END_LINK_PROMPTING_GUIDE">&lt;/a&gt;</ph>
         </message>
         <message name="IDS_SEA_PEN_FREEFORM_NAVIGATION_DESCRIPTION" desc="Description shown in each template page to help users navigate to freeform page.">
           You can also <ph name="BEGIN_LINK_FREEFORM_SUBPAGE">&lt;a href="chrome://personalization/wallpaper/sea-pen/freeform"&gt;</ph>write your own prompt<ph name="END_LINK_FREEFORM_SUBPAGE">&lt;/a&gt;</ph>
@@ -4242,7 +4324,7 @@
           A painting of a <ph name="ART_FEATURE">$1<ex>field of flowers </ex></ph> in the <ph name="ART_MOVEMENT">$2<ex>avant-garde</ex></ph> style
         </message>
         <message name="IDS_SEA_PEN_OPTION_VC_BACKGROUND_ART_FEATURE_FIELD" desc="Option to fill in the VC_BACKGROUND_ART_FEATURE placeholder for IDS_SEA_PEN_TEMPLATE_VC_BACKGROUND_ART.">
-          field of flowers 
+          field of flowers
         </message>
         <message name="IDS_SEA_PEN_OPTION_VC_BACKGROUND_ART_FEATURE_SWAMP" desc="Option to fill in the VC_BACKGROUND_ART_FEATURE placeholder for IDS_SEA_PEN_TEMPLATE_VC_BACKGROUND_ART.">
           swamp
@@ -4808,7 +4890,7 @@
           Reset
         </message>
         <message name="IDS_TRAFFIC_COUNTERS_DATA_USAGE_RESET_LABEL" desc="Settings > Network > Mobile data > SIM > Data usage, text to reset data usage">
-          Manually reset data usage
+          Reset data usage
         </message>
         <message name="IDS_TRAFFIC_COUNTERS_DATA_USAGE_LAST_RESET_DATE_UNAVAILABLE_LABEL" desc="Settings > Network > Mobile data > SIM > Data usage, text to show missing last reset information">
           Date of last data reset is unavailable
@@ -4830,6 +4912,15 @@
         </message>
         <message name="IDS_TRAFFIC_COUNTERS_DATA_USAGE_RESET_DAY_TOOLTIP_TEXT" desc="Settings > Network > Mobile data > SIM > Data usage, text explaining what happens if last day of the month is before selected day">
           If the last day of the month is before this day, data will be reset on the last day of the month
+        </message>
+        <message name="IDS_TRAFFIC_COUNTERS_DATA_USAGE_DROPDOWN_LABEL" desc="Settings > Network > Mobile data > SIM > Data usage, text describing the reset days to choose from">
+          Select an auto reset day ranging from 1 to 31, inclusive
+        </message>
+        <message name="IDS_TRAFFIC_COUNTERS_DATA_USAGE_RESET_DAY_TOOLTIP_A11Y_LABEL" desc="Settings > Network > Mobile data > SIM > Data usage, accessible label for reset button help tooltip icon">
+          More info on Reset date
+        </message>
+        <message name="IDS_TRAFFIC_COUNTERS_DATA_USAGE_RESET_BUTTON_PRESSED_A11Y_MESSAGE" desc="Settings > Network > Mobile data > SIM > Data usage, accessible message to indicate reset data usage button pressed">
+          Data usage has been reset
         </message>
 
         <!-- Bluetooth -->
@@ -6235,6 +6326,10 @@
         <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_ZOOM_TOGGLE" desc="The text read aloud by the screen reader describing the keyboard icon 'full screen'.">
           full screen
         </message>
+        <message name="IDS_SHORTCUT_CUSTOMIZATION_ICON_LABEL_ACCESSIBILITY" desc="The text read aloud by the screen reader describing the keyboard icon 'accessibility'.">
+          accessibility action
+        </message>
+
         <!-- End of Shortcut Customization -->
 
         <!-- APN -->

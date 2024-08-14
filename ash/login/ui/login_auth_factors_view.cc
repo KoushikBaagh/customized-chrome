@@ -264,9 +264,7 @@ LoginAuthFactorsView::LoginAuthFactorsView(
   label_wrapper_->SetProperty(
       views::kMarginsKey,
       gfx::Insets::TLBR(kSpacingBetweenIconsAndLabelDp, 0, 0, 0));
-  if (chromeos::features::IsJellyEnabled()) {
-    label_wrapper_->label()->SetEnabledColorId(cros_tokens::kCrosSysOnSurface);
-  }
+  label_wrapper_->label()->SetEnabledColorId(cros_tokens::kCrosSysOnSurface);
 }
 
 LoginAuthFactorsView::~LoginAuthFactorsView() = default;
@@ -540,9 +538,9 @@ void LoginAuthFactorsView::ArrowButtonPressed(const ui::Event& event) {
 
 void LoginAuthFactorsView::RelayArrowButtonPressed() {
   if (arrow_button_) {
-    ArrowButtonPressed(ui::MouseEvent(ui::ET_MOUSE_PRESSED, gfx::Point(),
-                                      gfx::Point(), base::TimeTicks::Now(), 0,
-                                      0));
+    ArrowButtonPressed(ui::MouseEvent(ui::EventType::kMousePressed,
+                                      gfx::Point(), gfx::Point(),
+                                      base::TimeTicks::Now(), 0, 0));
   }
 }
 

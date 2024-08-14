@@ -21,6 +21,7 @@
 #include "gpu/command_buffer/common/mailbox.h"
 #include "gpu/command_buffer/common/sync_token.h"
 #include "skia/buildflags.h"
+#include "third_party/blink/public/platform/web_graphics_shared_image_interface_provider.h"
 #include "third_party/blink/renderer/platform/graphics/graphics_types.h"
 #include "third_party/blink/renderer/platform/graphics/web_graphics_context_3d_provider_wrapper.h"
 #include "third_party/blink/renderer/platform/scheduler/public/thread.h"
@@ -285,6 +286,7 @@ class PLATFORM_EXPORT CanvasResourceSharedBitmap final : public CanvasResource {
   static scoped_refptr<CanvasResourceSharedBitmap> Create(
       const SkImageInfo&,
       base::WeakPtr<CanvasResourceProvider>,
+      base::WeakPtr<WebGraphicsSharedImageInterfaceProvider>,
       cc::PaintFlags::FilterQuality);
   ~CanvasResourceSharedBitmap() override;
   bool IsRecycleable() const final { return IsValid(); }
@@ -301,10 +303,14 @@ class PLATFORM_EXPORT CanvasResourceSharedBitmap final : public CanvasResource {
   void NotifyResourceLost() override;
 
  private:
-  CanvasResourceSharedBitmap(const SkImageInfo&,
-                             base::WeakPtr<CanvasResourceProvider>,
-                             cc::PaintFlags::FilterQuality);
+  CanvasResourceSharedBitmap(
+      const SkImageInfo&,
+      base::WeakPtr<CanvasResourceProvider>,
+      base::WeakPtr<WebGraphicsSharedImageInterfaceProvider>,
+      cc::PaintFlags::FilterQuality);
 
+  scoped_refptr<gpu::ClientSharedImage> shared_image_;
+  gpu::SyncToken sync_token_;
   viz::SharedBitmapId shared_bitmap_id_;
   base::WritableSharedMemoryMapping shared_mapping_;
   gfx::Size size_;
@@ -454,21 +460,10 @@ class PLATFORM_EXPORT CanvasResourceSharedImage final : public CanvasResource {
 // context that support GL.
 class PLATFORM_EXPORT ExternalCanvasResource final : public CanvasResource {
  public:
-  // Creates ExternalCanvasResource with a TransferableResource but without a
-  // ClientSharedImage.
-  // TODO(crbug.com/353744937): Transition all clients to the below constructor
-  // and eliminate this constructor.
-  static scoped_refptr<ExternalCanvasResource> Create(
-      const viz::TransferableResource& transferable_resource,
-      viz::ReleaseCallback release_callback,
-      base::WeakPtr<WebGraphicsContext3DProviderWrapper>,
-      base::WeakPtr<CanvasResourceProvider>,
-      cc::PaintFlags::FilterQuality,
-      bool is_origin_top_left);
-
   // Creates ExternalCanvasResource with a ClientSharedImage instance whose
   // mailbox matches that of `transferable_resource`.
-  // TODO(crbug.com/353744937): Once all clients are using this constructor:
+  // TODO(crbug.com/353744937): Remove this class taking in
+  // TransferableResource:
   // * Ensure that it would be correct for CanvasResource to go into all
   //   relevant UsesClientSharedImage() codepaths for ExternalCanvasResource
   //   (in particular, PrepareAcceleratedTransferableResourceFromClientSI())
@@ -507,7 +502,6 @@ class PLATFORM_EXPORT ExternalCanvasResource final : public CanvasResource {
   bool IsOverlayCandidate() const final {
     return transferable_resource_.is_overlay_candidate;
   }
-  bool HasGpuMailbox() const;
   const gpu::SyncToken GetSyncTokenWithOptionalVerification(
       bool needs_verified_token) override;
   base::WeakPtr<WebGraphicsContext3DProviderWrapper> ContextProviderWrapper()
@@ -568,7 +562,6 @@ class PLATFORM_EXPORT CanvasResourceSwapChain final : public CanvasResource {
 
  private:
   bool IsOverlayCandidate() const final { return true; }
-  bool HasGpuMailbox() const;
   const gpu::SyncToken GetSyncTokenWithOptionalVerification(
       bool needs_verified_token) override;
   base::WeakPtr<WebGraphicsContext3DProviderWrapper> ContextProviderWrapper()

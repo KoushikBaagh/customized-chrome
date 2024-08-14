@@ -26,6 +26,22 @@ chromium-metrics-reviews@google.com.
 
 <enums>
 
+<enum name="AndroidAutofillAvailabilityStatus">
+  <summary>
+    Describes whether Android Autofill was available. If not, it splits the
+    reasons why. Only one reason is recorded (e.g. the pref isn't checked if a
+    policy makes it impossible to set the pref).
+  </summary>
+  <int value="0" label="Available and turned on in Chrome settings"/>
+  <int value="1" label="Not allowed by policy"/>
+  <int value="2" label="Android OS version is too old"/>
+  <int value="3" label="The system's AutofillManager is not available"/>
+  <int value="4" label="The system does not support autofill"/>
+  <int value="5" label="The system's AutofillService cannot be determined."/>
+  <int value="6" label="The user chose Google to as AutofillService"/>
+  <int value="7" label="The user turned the Chrome setting off"/>
+</enum>
+
 <enum name="AndroidAutofillPrefillRequestState">
   <summary>
     Describes the state of a prefill request for a given, cacheable, form.
@@ -946,6 +962,7 @@ Called by update_autofill_enums.py.-->
   <int value="5" label="MASKED_SERVER_CARD_RISK_BASED_UNMASKING_NETWORK_ERROR"/>
   <int value="6" label="MASKED_SERVER_IBAN_UNMASKING_TEMPORARY_ERROR"/>
   <int value="7" label="CREDIT_CARD_UPLOAD_ERROR"/>
+  <int value="8" label="VIRTUAL_CARD_ENROLLMENT_TEMPORARY_ERROR"/>
 </enum>
 
 <enum name="AutofillExpirationDateFixFlowPromptEvent">
@@ -3997,6 +4014,11 @@ Called by update_autofill_enums.py.-->
   <int value="12" label="ProfileMigrationAndSilentUpdate"/>
 </enum>
 
+<enum name="AutofillProfileSource">
+  <int value="0" label="The profile is saved to local store."/>
+  <int value="1" label="The profile is saved to account store."/>
+</enum>
+
 <enum name="AutofillProfileTokenQualityObservationType">
   <int value="0" label="Unknown"/>
   <int value="1" label="Accepted"/>
@@ -4686,8 +4708,10 @@ Called by update_autofill_enums.py.-->
 <enum name="IbanSuggestionsEvent">
   <int value="0" label="IBAN suggestions shown"/>
   <int value="1" label="IBAN suggestions shown (once)"/>
-  <int value="2" label="IBAN suggestion selected"/>
-  <int value="3" label="IBAN suggestion selected (once)"/>
+  <int value="2" label="Local IBAN suggestion selected"/>
+  <int value="3" label="Local IBAN suggestion selected (once)"/>
+  <int value="4" label="Server IBAN suggestion selected"/>
+  <int value="5" label="Server IBAN suggestion selected (once)"/>
 </enum>
 
 <enum name="IbanUploadEnabledStatus">
@@ -4872,6 +4896,12 @@ Called by update_autofill_enums.py.-->
   <int value="13"
       label="Server and heuristic type, garbage autocomplete attribute"/>
   <int value="14" label="Server and heuristic type, autocomplete=off"/>
+</enum>
+
+<enum name="RelativePosition">
+  <int value="0" label="Ranked higher"/>
+  <int value="1" label="Ranked lower"/>
+  <int value="2" label="Ranked same"/>
 </enum>
 
 <enum name="RendererFillSkipReason">

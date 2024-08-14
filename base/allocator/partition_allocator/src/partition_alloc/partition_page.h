@@ -150,7 +150,8 @@ struct SlotSpanMetadata {
       uintptr_t address);
   PA_ALWAYS_INLINE static SlotSpanMetadata* FromObjectInnerPtr(void* ptr);
 
-  PA_ALWAYS_INLINE PartitionSuperPageExtentEntry* ToSuperPageExtent() const;
+  PA_ALWAYS_INLINE ReadOnlyPartitionSuperPageExtentEntry* ToSuperPageExtent()
+      const;
 
   // Checks if it is feasible to store raw_size.
   PA_ALWAYS_INLINE bool CanStoreRawSize() const { return can_store_raw_size_; }
@@ -172,7 +173,7 @@ struct SlotSpanMetadata {
     // - Exact size needed to satisfy allocation (incl. extras), for large
     //   buckets and direct-mapped allocations (see also the comment in
     //   CanStoreRawSize() for more info).
-    if (PA_LIKELY(!CanStoreRawSize())) {
+    if (!CanStoreRawSize()) [[likely]] {
       return bucket->slot_size;
     }
     return GetRawSize();
@@ -227,6 +228,8 @@ struct SlotSpanMetadata {
   PA_ALWAYS_INLINE void set_freelist_sorted() { freelist_is_sorted_ = true; }
 
  private:
+  void IncrementNumberOfNonemptySlotSpans();
+
   // sentinel_slot_span_ is used as a sentinel to indicate that there is no slot
   // span in the active list. We could use nullptr, but in that case we need to
   // add a null-check branch to the hot allocation path. We want to avoid that.
@@ -353,10 +356,10 @@ PA_ALWAYS_INLINE SubsequentPageMetadata* GetSubsequentPageMetadata(
   return &(page_metadata + 1)->subsequent_page_metadata;
 }
 
-PA_ALWAYS_INLINE PartitionSuperPageExtentEntry* PartitionSuperPageToExtent(
-    uintptr_t super_page) {
+PA_ALWAYS_INLINE ReadOnlyPartitionSuperPageExtentEntry*
+PartitionSuperPageToExtent(uintptr_t super_page) {
   // The very first entry of the metadata is the super page extent entry.
-  return reinterpret_cast<PartitionSuperPageExtentEntry*>(
+  return reinterpret_cast<ReadOnlyPartitionSuperPageExtentEntry*>(
       PartitionSuperPageToMetadataArea(super_page));
 }
 
@@ -396,7 +399,7 @@ PA_ALWAYS_INLINE size_t SuperPagePayloadSize(uintptr_t super_page,
          SuperPagePayloadBegin(super_page, with_quarantine);
 }
 
-PA_ALWAYS_INLINE PartitionSuperPageExtentEntry*
+PA_ALWAYS_INLINE ReadOnlyPartitionSuperPageExtentEntry*
 SlotSpanMetadata::ToSuperPageExtent() const {
   uintptr_t super_page = reinterpret_cast<uintptr_t>(this) & kSuperPageBaseMask;
   return PartitionSuperPageToExtent(super_page);
@@ -614,7 +617,7 @@ PA_ALWAYS_INLINE void SlotSpanMetadata::Free(
   --num_allocated_slots;
   // If the span is marked full, or became empty, take the slow path to update
   // internal state.
-  if (PA_UNLIKELY(marked_full || num_allocated_slots == 0)) {
+  if (marked_full || num_allocated_slots == 0) [[unlikely]] {
     FreeSlowPath(1);
   } else {
     // All single-slot allocations must go through the slow path to
@@ -659,7 +662,7 @@ PA_ALWAYS_INLINE void SlotSpanMetadata::AppendFreeList(
   num_allocated_slots -= number_of_freed;
   // If the span is marked full, or became empty, take the slow path to update
   // internal state.
-  if (PA_UNLIKELY(marked_full || num_allocated_slots == 0)) {
+  if (marked_full || num_allocated_slots == 0) [[unlikely]] {
     FreeSlowPath(number_of_freed);
   } else {
     // All single-slot allocations must go through the slow path to
@@ -718,7 +721,7 @@ PA_ALWAYS_INLINE void SlotSpanMetadata::Reset() {
   num_unprovisioned_slots = static_cast<uint16_t>(num_slots_per_span);
   PA_DCHECK(num_unprovisioned_slots);
 
-  ToSuperPageExtent()->IncrementNumberOfNonemptySlotSpans();
+  IncrementNumberOfNonemptySlotSpans();
 
   next_slot_span = nullptr;
 }

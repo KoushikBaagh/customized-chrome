@@ -34,7 +34,7 @@ incoming reviews. Googlers can read more about this at go/gwsq-gerrit.
 </histogram>
 
 <histogram name="ChromeOS.Settings.Accessibility.CaretBlinkInterval" units="ms"
-    expires_after="2024-10-16">
+    expires_after="2025-02-02">
   <owner>katie@chromium.org</owner>
   <owner>chrome-a11y-core@google.com</owner>
   <summary>
@@ -142,6 +142,7 @@ incoming reviews. Googlers can read more about this at go/gwsq-gerrit.
     <variant name="CursorHighlight"/>
     <variant name="Dictation"/>
     <variant name="DockedMagnifier"/>
+    <variant name="FlashNotifications"/>
     <variant name="FocusHighlight"/>
     <variant name="FullscreenMagnifier"/>
     <variant name="HighContrast"/>
@@ -160,7 +161,7 @@ incoming reviews. Googlers can read more about this at go/gwsq-gerrit.
 </histogram>
 
 <histogram name="ChromeOS.Settings.Apps.DoNotDisturbOnOff"
-    enum="BooleanToggled" expires_after="2024-11-17">
+    enum="BooleanToggled" expires_after="2025-01-26">
   <owner>hsuregan@chromium.org</owner>
   <owner>jimmyxgong@chromium.org</owner>
   <summary>
@@ -271,7 +272,7 @@ incoming reviews. Googlers can read more about this at go/gwsq-gerrit.
 </histogram>
 
 <histogram name="ChromeOS.Settings.Device.LowBatterySoundButtonEnabled"
-    enum="BooleanEnabled" expires_after="2024-07-31">
+    enum="BooleanEnabled" expires_after="2025-07-22">
   <owner>hongyulong@chromium.org</owner>
   <owner>bicioglu@google.com</owner>
   <owner>chromeos-wms@google.com</owner>
@@ -696,7 +697,7 @@ incoming reviews. Googlers can read more about this at go/gwsq-gerrit.
 
 <histogram
     name="ChromeOS.Settings.NumUniqueSettingsChanged.DeviceLifetime2.{Time}"
-    units="Unique Setting(s) Changed" expires_after="2024-11-24">
+    units="Unique Setting(s) Changed" expires_after="2025-01-26">
   <owner>moteva@google.com</owner>
   <owner>wesokuhara@google.com</owner>
   <owner>cros-settings@google.com</owner>
@@ -821,7 +822,7 @@ incoming reviews. Googlers can read more about this at go/gwsq-gerrit.
 </histogram>
 
 <histogram name="ChromeOS.Settings.SearchRequests"
-    enum="OsSettingSearchRequestTypes" expires_after="2024-11-17">
+    enum="OsSettingSearchRequestTypes" expires_after="2025-01-26">
   <owner>wesokuhara@google.com</owner>
   <owner>xiaohuic@chromium.org</owner>
   <owner>cros-settings@google.com</owner>
@@ -919,7 +920,7 @@ incoming reviews. Googlers can read more about this at go/gwsq-gerrit.
 </histogram>
 
 <histogram base="true" name="ChromeOS.Settings.TimeUntilChange" units="ms"
-    expires_after="2024-11-17">
+    expires_after="2025-01-19">
 <!-- Name completed by histogram_suffixes name="OsSettingsChangeType" -->
 
   <owner>wesokuhara@google.com</owner>
@@ -978,7 +979,7 @@ incoming reviews. Googlers can read more about this at go/gwsq-gerrit.
 </histogram>
 
 <histogram name="ChromeOS.Settings.WindowOpenDuration" units="ms"
-    expires_after="2024-11-24">
+    expires_after="2025-01-26">
   <owner>wesokuhara@google.com</owner>
   <owner>xiaohuic@chromium.org</owner>
   <owner>cros-settings@google.com</owner>

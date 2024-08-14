@@ -7,6 +7,7 @@
 
 #include <stddef.h>
 
+#include <array>
 #include <map>
 #include <memory>
 #include <optional>
@@ -29,6 +30,7 @@
 #include "components/search_engines/template_url.h"
 #include "components/url_formatter/url_formatter.h"
 #include "third_party/metrics_proto/omnibox_event.pb.h"
+#include "third_party/metrics_proto/omnibox_scoring_signals.pb.h"
 #include "third_party/omnibox_proto/answer_type.pb.h"
 #include "third_party/omnibox_proto/groups.pb.h"
 #include "third_party/omnibox_proto/navigational_intent.pb.h"
@@ -65,7 +67,7 @@ const char kACMatchPropertyContentsStartIndex[] = "match contents start index";
 // scoring non-default match.
 const char kACMatchPropertyScoreBoostedFrom[] = "score_boosted_from";
 
-// RichAutocompletionParams ---------------------------------------------------
+// Util structs/enums ----------------------------------------------------------
 
 // `RichAutocompletionParams` is a cache for the params used by
 // `TryRichAutocompletion()`. `TryRichAutocompletion()` is called about 80 times
@@ -89,6 +91,29 @@ struct RichAutocompletionParams {
   bool autocomplete_prefer_urls_over_prefixes;
 };
 
+enum class IphType {
+  kNone,
+  // '@gemini' promo; shown in zero state.
+  kGemini,
+  // Featured search promo; shown in zero state.
+  kFeaturedEnterpriseSearch,
+  // Embeddings' setting promo when embeddings are disabled; shown in '@history'
+  // scope.
+  kHistoryEmbeddingsSettingsPromo,
+  // Disclaimer when embeddings are enabled; shown in '@history' scope.
+  kHistoryEmbeddingsDisclaimer,
+  // '@history' promo when embeddings are disabled; shown in zero state.
+  kHistoryScopePromo,
+  // '@history' promo when embeddings are enabled; shown in zero state.
+  kHistoryEmbeddingsScopePromo,
+};
+
+enum class FeedbackType {
+  kNone,
+  kThumbsUp,
+  kThumbsDown,
+};
+
 // AutocompleteMatch ----------------------------------------------------------
 
 // A single result line with classified spans.  The autocomplete popup displays
@@ -99,8 +124,7 @@ struct RichAutocompletionParams {
 // example, a search result may say "Search for asdf" as the description, but
 // "asdf" should appear in the box.
 struct AutocompleteMatch {
-  using ScoringSignals =
-      ::metrics::OmniboxEventProto::Suggestion::ScoringSignals;
+  using ScoringSignals = ::metrics::OmniboxScoringSignals;
 
   // Autocomplete matches contain strings that are classified according to a
   // separate vector of styles.  This vector associates flags with particular
@@ -200,7 +224,15 @@ struct AutocompleteMatch {
     kMaxValue = kShortcutTextPrefix,
   };
 
-  static const char* const kDocumentTypeStrings[];
+  static constexpr auto kDocumentTypeStrings = std::to_array<const char*>(
+      {"none", "drive_docs", "drive_forms", "drive_sheets", "drive_slides",
+       "drive_image", "drive_pdf", "drive_video", "drive_folder",
+       "drive_other"});
+
+  static_assert(kDocumentTypeStrings.size() ==
+                    static_cast<int>(DocumentType::DOCUMENT_TYPE_SIZE),
+                "Sizes of AutocompleteMatch::kDocumentTypeStrings and "
+                "AutocompleteMatch::DocumentType don't match.");
 
   // Return a string version of the core type values. Only used for
   // `RecordAdditionalInfo()`.
@@ -512,8 +544,12 @@ struct AutocompleteMatch {
   void RecordAdditionalInfo(const std::string& property, base::Time value);
 
   // Returns the value recorded for |property| in the |additional_info|
-  // dictionary.  Returns the empty string if no such value exists.
-  std::string GetAdditionalInfo(const std::string& property) const;
+  // dictionary. Returns the empty string if no such value exists. This is for
+  // debugging in chrome://omnibox only. It should only be called by
+  // `OmniboxPageHandler` and tests. For match info that's used for
+  // non-debugging, use class fields. Unfortunately, There are existing
+  // non-debug callsites; those should be cleaned up, not added to.
+  std::string GetAdditionalInfoForDebugging(const std::string& property) const;
 
   // Returns the provider type selected from this match, which is by default
   // taken from the match `provider` type but may be a (pseudo-)provider
@@ -538,6 +574,9 @@ struct AutocompleteMatch {
   // shown.
   bool IsVerbatimType() const;
 
+  // Returns whether this match is a "verbatim URL" suggestion.
+  bool IsVerbatimUrlSuggestion() const;
+
   // Returns whether this match is a search suggestion provided by search
   // provider.
   bool IsSearchProviderSearchSuggestion() const;
@@ -551,8 +590,11 @@ struct AutocompleteMatch {
   // next.
   int GetSortingOrder() const;
 
-  // Returns true if the match is eligible to be re-scored by ML Url scoring.
-  bool IsUrlScoringEligible() const;
+  // Returns true if the match is eligible for ML scoring signal logging.
+  bool IsMlSignalLoggingEligible() const;
+
+  // Returns true if the match is eligible to be re-scored by ML scoring.
+  bool IsMlScoringEligible() const;
 
   // Filter OmniboxActions based on the supplied qualifiers.
   // The order of the supplied qualifiers determines the preference.
@@ -917,12 +959,6 @@ struct AutocompleteMatch {
   // Signals for ML scoring.
   std::optional<ScoringSignals> scoring_signals;
 
-  // A flag that's set during the de-duplication process in order to forcibly
-  // exclude this match from ML scoring (e.g. this match is ML-eligible, but one
-  // of the matches in `duplicate_matches` is not). Furthermore, when this flag
-  // is set, ML scoring signals will NOT be logged for this particular match.
-  bool force_skip_ml_scoring = false;
-
   // A flag to mark whether this would've been excluded from the "original" list
   // of matches. Traditionally, providers limit the number of suggestions they
   // provide to the top N most relevant matches. When ML scoring is enabled,
@@ -938,6 +974,18 @@ struct AutocompleteMatch {
   //   launches. In the meantime, shortcut grouping won't work for users in the
   //   grouping experiments.
   bool shortcut_boosted = false;
+
+  // E.g. the gemini IPH match shown at the bottom of the popup.
+  IphType iph_type = IphType::kNone;
+
+  // IPH matches aren't clickable like other matches, but may have a next-action
+  // or learn-more type of link. This link is always appended to the end of
+  // their contents/description text.
+  std::u16string iph_link_text;
+  GURL iph_link_url;
+
+  // The user feedback on the match.
+  FeedbackType feedback_type = FeedbackType::kNone;
 
   // So users of AutocompleteMatch can use the same ellipsis that it uses.
   static const char16_t kEllipsis[];

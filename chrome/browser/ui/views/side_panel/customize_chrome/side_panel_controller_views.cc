@@ -61,7 +61,7 @@ bool SidePanelControllerViews::IsCustomizeChromeEntryShowing() const {
 }
 
 bool SidePanelControllerViews::IsCustomizeChromeEntryAvailable() const {
-  auto* registry = SidePanelRegistry::Get(tab_->GetContents());
+  auto* registry = tab_->GetTabFeatures()->side_panel_registry();
   return registry ? (registry->GetEntryForKey(
                          SidePanelEntry::Key(kSidePanelEntryId)) != nullptr)
                   : false;
@@ -102,13 +102,17 @@ void SidePanelControllerViews::DidFinishNavigation(
 
   if (CanShowOnURL(entry->GetURL())) {
     CreateAndRegisterEntry();
+    if (customize_chrome_ui_) {
+      customize_chrome_ui_->AttachedTabStateUpdated(
+          NewTabPageUI::IsNewTabPageOrigin(entry->GetURL()));
+    }
   } else {
     DeregisterEntry();
   }
 }
 
 void SidePanelControllerViews::CreateAndRegisterEntry() {
-  auto* registry = SidePanelRegistry::Get(tab_->GetContents());
+  auto* registry = tab_->GetTabFeatures()->side_panel_registry();
 
   if (!registry) {
     return;
@@ -129,7 +133,7 @@ void SidePanelControllerViews::CreateAndRegisterEntry() {
 }
 
 void SidePanelControllerViews::DeregisterEntry() {
-  auto* registry = SidePanelRegistry::Get(tab_->GetContents());
+  auto* registry = tab_->GetTabFeatures()->side_panel_registry();
 
   if (!registry) {
     return;
@@ -196,6 +200,16 @@ SidePanelControllerViews::CreateCustomizeChromeWebView() {
     customize_chrome_ui_->ScrollToSection(*section_);
     section_.reset();
   }
+
+  // Immediately apply the tab's state to the customize chrome UI.
+  content::NavigationEntry* entry =
+      tab_->GetContents()->GetController().GetLastCommittedEntry();
+  if (!entry) {
+    entry = tab_->GetContents()->GetController().GetVisibleEntry();
+  }
+  customize_chrome_ui_->AttachedTabStateUpdated(
+      NewTabPageUI::IsNewTabPageOrigin(entry->GetURL()));
+
   return customize_chrome_web_view;
 }
 

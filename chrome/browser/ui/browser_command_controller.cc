@@ -12,6 +12,7 @@
 #include "base/containers/contains.h"
 #include "base/debug/debugging_buildflags.h"
 #include "base/debug/profiler.h"
+#include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/user_metrics.h"
@@ -548,6 +549,9 @@ bool BrowserCommandController::ExecuteCommandWithDisposition(
       break;
     case IDC_NAME_WINDOW:
       PromptToNameWindow(browser_);
+      break;
+    case IDC_COMPACT_MODE:
+      ToggleCompactMode(browser_);
       break;
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -1224,14 +1228,6 @@ bool BrowserCommandController::IsShowingLocationBar() {
   return browser_->SupportsWindowFeature(Browser::FEATURE_LOCATIONBAR);
 }
 
-bool BrowserCommandController::IsWebAppOrCustomTab() const {
-  return
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-      browser_->is_type_custom_tab() ||
-#endif
-      web_app::AppBrowserController::IsWebApp(browser_);
-}
-
 void BrowserCommandController::InitCommandState() {
   // All browser commands whose state isn't set automagically some other way
   // (like Back & Forward with initial page load) must have their state
@@ -1257,6 +1253,10 @@ void BrowserCommandController::InitCommandState() {
   UpdateTabRestoreCommandState();
   command_updater_.UpdateCommandEnabled(IDC_EXIT, true);
   command_updater_.UpdateCommandEnabled(IDC_NAME_WINDOW, true);
+  if (base::FeatureList::IsEnabled(features::kCompactMode)) {
+    command_updater_.UpdateCommandEnabled(IDC_COMPACT_MODE, true);
+  }
+
   command_updater_.UpdateCommandEnabled(IDC_ORGANIZE_TABS, true);
   command_updater_.UpdateCommandEnabled(IDC_CREATE_NEW_TAB_GROUP, true);
 #if BUILDFLAG(IS_CHROMEOS)
@@ -1394,7 +1394,7 @@ void BrowserCommandController::InitCommandState() {
                     browser_->is_type_app_popup());
 
   // Hosted app browser commands.
-  const bool is_web_app_or_custom_tab = IsWebAppOrCustomTab();
+  const bool is_web_app_or_custom_tab = IsWebAppOrCustomTab(browser_);
   const bool enable_copy_url =
       is_web_app_or_custom_tab ||
       !sharing_hub::SharingIsDisabledByPolicy(browser_->profile());
@@ -1453,10 +1453,6 @@ void BrowserCommandController::InitCommandState() {
     command_updater_.UpdateCommandEnabled(IDC_DEBUG_PRINT_VIEW_TREE_DETAILS,
                                           true);
   }
-
-  command_updater_.UpdateCommandEnabled(
-      IDC_CONTENT_CONTEXT_LENS_OVERLAY,
-      LensOverlayController::IsEnabled(browser_));
 
 #if BUILDFLAG(ENABLE_LENS_DESKTOP_GOOGLE_BRANDED_FEATURES)
   if (base::FeatureList::IsEnabled(
@@ -1638,7 +1634,7 @@ void BrowserCommandController::UpdateCommandsForTabState() {
       browser_->tab_strip_model(), browser_->tab_strip_model()->active_index());
   command_updater_.UpdateCommandEnabled(
       IDC_OPEN_IN_CHROME,
-      IsWebAppOrCustomTab() && !is_isolated_app && !is_pinned_home_tab);
+      IsWebAppOrCustomTab(browser_) && !is_isolated_app && !is_pinned_home_tab);
 
   command_updater_.UpdateCommandEnabled(
       IDC_TOGGLE_REQUEST_TABLET_SITE,
@@ -1937,8 +1933,8 @@ void BrowserCommandController::UpdateCommandsForMediaRouter() {
   if (is_locked_fullscreen_)
     return;
 
-  command_updater_.UpdateCommandEnabled(IDC_ROUTE_MEDIA,
-                                        CanRouteMedia(browser_));
+  UpdateCommandAndActionEnabled(IDC_ROUTE_MEDIA, kActionRouteMedia,
+                                CanRouteMedia(browser_));
 }
 
 void BrowserCommandController::UpdateCommandsForTabKeyboardFocus(

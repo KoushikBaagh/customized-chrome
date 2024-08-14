@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "media/filters/win/media_foundation_audio_decoder.h"
 
 #include <mfapi.h>
@@ -132,7 +137,7 @@ bool PopulateInputSample(IMFSample* sample, const DecoderBuffer& input) {
   RETURN_ON_FAILURE(!current_length, "Input length is zero", false);
   RETURN_ON_FAILURE(input.size() <= max_length, "Input length is too long",
                     false);
-  destination.first(input.size()).copy_from(input);
+  destination.copy_prefix_from(input);
 
   hr = buffer->SetCurrentLength(input.size());
   RETURN_ON_HR_FAILURE(hr, "Failed to set buffer length", false);

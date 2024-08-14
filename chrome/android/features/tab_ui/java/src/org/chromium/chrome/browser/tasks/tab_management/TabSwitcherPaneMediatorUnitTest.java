@@ -21,7 +21,6 @@ import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerP
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.BROWSER_CONTROLS_STATE_PROVIDER;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.FOCUS_TAB_INDEX_FOR_ACCESSIBILITY;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.INITIAL_SCROLL_INDEX;
-import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.IS_INCOGNITO;
 import static org.chromium.chrome.browser.tasks.tab_management.TabListContainerProperties.MODE;
 
 import android.view.View;
@@ -156,7 +155,6 @@ public class TabSwitcherPaneMediatorUnitTest {
                 new PropertyModel.Builder(ALL_KEYS)
                         .with(BROWSER_CONTROLS_STATE_PROVIDER, null)
                         .with(MODE, TabListMode.GRID)
-                        .with(IS_INCOGNITO, false)
                         .build();
         mTabGridDialogControllerSupplier = LazyOneshotSupplier.fromValue(mTabGridDialogController);
         mMediator =
@@ -198,6 +196,7 @@ public class TabSwitcherPaneMediatorUnitTest {
         mMediator.destroy();
 
         verify(mTabModelFilter, atLeastOnce()).removeObserver(mTabModelObserverCaptor.getValue());
+        verify(mTabGridDialogController, atLeastOnce()).hideDialog(false);
 
         assertFalse(mTabModelFilterSupplier.hasObservers());
         assertFalse(mIsVisibleSupplier.hasObservers());
@@ -243,8 +242,12 @@ public class TabSwitcherPaneMediatorUnitTest {
     @Test
     @SmallTest
     public void testLateTabModelFilterWhileVisible() {
+        when(mTabListEditorController.isVisible()).thenReturn(true);
         // Reset to simulate the UI is shown with no tab model filter set.
         mIsVisibleSupplier.set(false);
+        verify(mTabGridDialogController).hideDialog(false);
+        verify(mTabListEditorController).hide();
+        when(mTabListEditorController.isVisible()).thenReturn(false);
         mTabModelFilterSupplier.set(null);
         verify(mTabModelFilter, times(1)).addObserver(mTabModelObserverCaptor.capture());
 
@@ -333,9 +336,8 @@ public class TabSwitcherPaneMediatorUnitTest {
         mTabListEditorBackPressChangedSupplier.set(false);
         assertFalse(mMediator.getHandleBackPressChangedSupplier().get());
 
-        verify(mTabGridDialogController).hideDialog(true);
         mIsAnimatingSupplier.set(true);
-        verify(mTabGridDialogController, times(2)).hideDialog(true);
+        verify(mTabGridDialogController).hideDialog(true);
         assertTrue(mMediator.getHandleBackPressChangedSupplier().get());
         assertEquals(BackPressResult.SUCCESS, mMediator.handleBackPress());
         mIsAnimatingSupplier.set(false);

@@ -5,12 +5,29 @@ On success, you will see a series of "PASS" messages, followed by "TEST COMPLETE
 [INTERFACES]
 interface AI
     attribute @@toStringTag
+    getter summarizer
     method canCreateTextSession
     method constructor
     method createTextSession
-    method defaultTextSessionOptions
+    method textModelInfo
+interface AISummarizer
+    attribute @@toStringTag
+    method constructor
+    method destroy
+    method summarize
+    method summarizeStreaming
+interface AISummarizerCapabilities
+    attribute @@toStringTag
+    getter available
+    method constructor
+interface AISummarizerFactory
+    attribute @@toStringTag
+    method capabilities
+    method constructor
+    method create
 interface AITextSession
     attribute @@toStringTag
+    method clone
     method constructor
     method destroy
     method prompt
@@ -963,7 +980,9 @@ interface CSSPositionTryDescriptors : CSSStyleDeclaration
     getter place-self
     getter placeSelf
     getter position-anchor
+    getter position-area
     getter positionAnchor
+    getter positionArea
     getter right
     getter top
     getter width
@@ -1034,7 +1053,9 @@ interface CSSPositionTryDescriptors : CSSStyleDeclaration
     setter place-self
     setter placeSelf
     setter position-anchor
+    setter position-area
     setter positionAnchor
+    setter positionArea
     setter right
     setter top
     setter width
@@ -1345,6 +1366,7 @@ interface CanvasRenderingContext2D
     method lineTo
     method measureText
     method moveTo
+    method placeElement
     method putImageData
     method quadraticCurveTo
     method rect
@@ -2596,7 +2618,6 @@ interface Element : Node
     method getElementsByTagName
     method getElementsByTagNameNS
     method getHTML
-    method getInnerHTML
     method hasAttribute
     method hasAttributeNS
     method hasAttributes
@@ -2907,8 +2928,8 @@ interface EventTarget
     method addEventListener
     method constructor
     method dispatchEvent
-    method on
     method removeEventListener
+    method when
 interface External
     attribute @@toStringTag
     method AddSearchProvider
@@ -2944,8 +2965,6 @@ interface Fence
     method setReportEventDataForAutomaticBeacons
 interface FencedFrameConfig
     attribute @@toStringTag
-    getter height
-    getter width
     method constructor
     method setSharedStorageContext
 interface FetchLaterResult
@@ -4973,6 +4992,7 @@ interface HTMLSelectElement : HTMLElement
     getter options
     getter required
     getter selectedIndex
+    getter selectedOptionElement
     getter selectedOptions
     getter size
     getter type
@@ -4997,6 +5017,7 @@ interface HTMLSelectElement : HTMLElement
     setter name
     setter required
     setter selectedIndex
+    setter selectedOptionElement
     setter size
     setter value
 interface HTMLSelectListElement : HTMLElement
@@ -5763,6 +5784,10 @@ interface KeyframeEffect : AnimationEffect
     setter composite
     setter pseudoElement
     setter target
+interface LanguageDetector
+    attribute @@toStringTag
+    method constructor
+    method detect
 interface LanguageTranslator
     attribute @@toStringTag
     method constructor
@@ -7697,6 +7722,7 @@ interface RTCDataChannel : EventTarget
     getter onmessage
     getter onopen
     getter ordered
+    getter priority
     getter protocol
     getter readyState
     getter reliable
@@ -7891,6 +7917,9 @@ interface RTCRtpReceiver
     method getSynchronizationSources
     setter jitterBufferTarget
     setter playoutDelayHint
+interface RTCRtpScriptTransform
+    attribute @@toStringTag
+    method constructor
 interface RTCRtpSendResult
     attribute @@toStringTag
     getter sent
@@ -7939,8 +7968,7 @@ interface RTCRtpTransceiver
 interface RTCRtpTransport
     attribute @@toStringTag
     method constructor
-    method readReceivedAcks
-    method readSentRtp
+    method createProcessor
 interface RTCSctpTransport : EventTarget
     attribute @@toStringTag
     getter maxChannels
@@ -9436,6 +9464,7 @@ interface Selection
     method deleteFromDocument
     method empty
     method extend
+    method getComposedRanges
     method getRangeAt
     method modify
     method removeAllRanges
@@ -9562,7 +9591,6 @@ interface ShadowRoot : DocumentFragment
     method elementsFromPoint
     method getAnimations
     method getHTML
-    method getInnerHTML
     method getSelection
     method setHTMLUnsafe
     setter adoptedStyleSheets
@@ -10068,8 +10096,10 @@ interface TransitionEvent : Event
     method constructor
 interface Translation
     attribute @@toStringTag
+    method canDetect
     method canTranslate
     method constructor
+    method createDetector
     method createTranslator
 interface TreeWalker
     attribute @@toStringTag

@@ -59,6 +59,10 @@ inline constexpr char kBrowserStatesLastActive[] =
 // browser states directories.
 inline constexpr char kBrowserStatesNumCreated[] = "profile.profiles_created";
 
+// A map of a scene and a browser state.
+inline constexpr char kBrowserStateForScene[] =
+    "ios.multiprofile.profile_for_scene";
+
 // A string of NSUUID used to access the WebKit storage per BrowserState.
 inline constexpr char kBrowserStateStorageIdentifier[] = "profile.storage_id";
 
@@ -74,6 +78,17 @@ inline constexpr char kClearBrowsingDataHistoryNoticeShownTimes[] =
 // stored in BrowserState prefs.
 inline constexpr char kContentNotificationsEnrollmentEligibility[] =
     "ios.content_notification.enrollment_eligibility";
+
+// String indicating the content notification enrollment type.
+// "" - undecided (feature unchecked because the user is not eligible)
+// "promo_enabled" - top of feed promo is enabled
+// "promo_registered" - top of feed promo is registered
+// "provisional_enabled" - provisional is enabled
+// "provisional_registered" - provisional is registered
+// "setuplist_enabled" - set up list is enabled
+// "setuplist_registered" - set up list is registered
+inline constexpr char kContentNotificationsEnrollmentType[] =
+    "ios.content_notification.enrollment_type";
 
 // String indicating the Contextual Search enabled state.
 // "false" - opt-out (disabled)
@@ -233,6 +248,12 @@ inline constexpr char kIosDiscoverFeedLastRefreshTime[] =
 inline constexpr char kIosDiscoverFeedLastUnseenRefreshTime[] =
     "ios.discover_feed.last_unseen_refresh_time";
 
+// Boolean to represent if the user has ever met the criteria to be shown the
+// Docking Promo. Once true, remains true permanently. Used only when
+// `kIOSDockingPromoForEligibleUsersOnly` is enabled.
+inline constexpr char kIosDockingPromoEligibilityMet[] =
+    "ios.docking_promo.eligibility_met";
+
 // A list of the latest fetched Most Visited Sites.
 inline constexpr char kIosLatestMostVisitedSites[] = "ios.most_visited_sites";
 
@@ -246,6 +267,12 @@ inline constexpr char kIosMagicStackSegmentationMVTImpressionsSinceFreshness[] =
 inline constexpr char
     kIosMagicStackSegmentationParcelTrackingImpressionsSinceFreshness[] =
         "ios.magic_stack_segmentation.parcel_tracking_freshness";
+
+// Integer representing the number of impressions of the Price Tracking Promo
+// module since a freshness signal.
+inline constexpr char
+    kIosMagicStackSegmentationPriceTrackingPromoImpressionsSinceFreshness[] =
+        "ios.magic_stack_segmentation.price_tracking_promo_freshness";
 
 // Integer representing the number of impressions of Shortcuts since a freshness
 // signal.
@@ -623,12 +650,22 @@ inline constexpr char kChoiceScreenSkippedCount[] =
     "ios.search_engine_choice_screen.skip_count";
 
 // Prefs indicating whether Home surface modules are enabled.
-inline constexpr char kHomeCustomizationShortcutsEnabled[] =
-    "ios.home_customization.shortcuts.enabled";
+inline constexpr char kHomeCustomizationMostVisitedEnabled[] =
+    "ios.home_customization.most_visited.enabled";
 inline constexpr char kHomeCustomizationMagicStackEnabled[] =
     "ios.home_customization.magic_stack.enabled";
 inline constexpr char kHomeCustomizationDiscoverEnabled[] =
     "ios.home_customization.discover.enabled";
+
+// Prefs indicating whether Magic Stack cards are enabled.
+inline constexpr char kHomeCustomizationMagicStackSetUpListEnabled[] =
+    "ios.home_customization.magic_stack.set_up_list.enabled";
+inline constexpr char kHomeCustomizationMagicStackSafetyCheckEnabled[] =
+    "ios.home_customization.magic_stack.safety_check.enabled";
+inline constexpr char kHomeCustomizationMagicStackTabResumptionEnabled[] =
+    "ios.home_customization.magic_stack.tab_resumption.enabled";
+inline constexpr char kHomeCustomizationMagicStackParcelTrackingEnabled[] =
+    "ios.home_customization.magic_stack.parcel_tracking.enabled";
 
 // A time object storing when the last the identity confirmation snackbar was
 // prompted. Used to limit the frequency of this snackbar.

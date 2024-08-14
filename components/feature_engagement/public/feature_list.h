@@ -47,6 +47,7 @@ namespace {
 // Defines a flags_ui::FeatureEntry::FeatureParam for each feature.
 DEFINE_VARIATION_PARAM(kIPHDummyFeature, "IPH_Dummy");
 #if BUILDFLAG(IS_ANDROID)
+DEFINE_VARIATION_PARAM(kIPHAndroidTabDeclutter, "IPH_AndroidTabDeclutter");
 DEFINE_VARIATION_PARAM(kIPHAdaptiveButtonInTopToolbarCustomizationNewTabFeature,
                        "IPH_AdaptiveButtonInTopToolbarCustomization_NewTab");
 DEFINE_VARIATION_PARAM(kIPHAdaptiveButtonInTopToolbarCustomizationShareFeature,
@@ -152,16 +153,22 @@ DEFINE_VARIATION_PARAM(kIPHTabGroupsQuicklyComparePagesFeature,
                        "IPH_TabGroupsQuicklyComparePages");
 DEFINE_VARIATION_PARAM(kIPHTabGroupsTapToSeeAnotherTabFeature,
                        "IPH_TabGroupsTapToSeeAnotherTab");
+DEFINE_VARIATION_PARAM(kIPHTabGroupCreationDialogSyncTextFeature,
+                       "IPH_TabGroupCreationDialogSyncText");
 DEFINE_VARIATION_PARAM(kIPHTabGroupSyncOnStripFeature,
                        "IPH_TabGroupSyncOnStrip");
 DEFINE_VARIATION_PARAM(kIPHTabGroupsYourTabsAreTogetherFeature,
                        "IPH_TabGroupsYourTabsTogether");
 DEFINE_VARIATION_PARAM(kIPHTabGroupsDragAndDropFeature,
                        "IPH_TabGroupsDragAndDrop");
+DEFINE_VARIATION_PARAM(kIPHTabGroupsRemoteGroupFeature,
+                       "IPH_TabGroupsRemoteGroup");
 DEFINE_VARIATION_PARAM(kIPHTabGroupsSurfaceFeature, "IPH_TabGroupsSurface");
 DEFINE_VARIATION_PARAM(kIPHTabGroupsSurfaceOnHideFeature,
                        "IPH_TabGroupsSurfaceOnHide");
 DEFINE_VARIATION_PARAM(kIPHTabSwitcherButtonFeature, "IPH_TabSwitcherButton");
+DEFINE_VARIATION_PARAM(kIPHTabSwitcherFloatingActionButtonFeature,
+                       "IPH_TabSwitcherFloatingActionButton");
 DEFINE_VARIATION_PARAM(kIPHTranslateMenuButtonFeature,
                        "IPH_TranslateMenuButton");
 DEFINE_VARIATION_PARAM(kIPHVideoTutorialNTPChromeIntroFeature,
@@ -200,7 +207,6 @@ DEFINE_VARIATION_PARAM(kIPHRestoreTabsOnFREFeature, "IPH_RestoreTabsOnFRE");
 DEFINE_VARIATION_PARAM(kIPHBottomToolbarTipFeature, "IPH_BottomToolbarTip");
 DEFINE_VARIATION_PARAM(kIPHLongPressToolbarTipFeature,
                        "IPH_LongPressToolbarTip");
-DEFINE_VARIATION_PARAM(kIPHNewIncognitoTabTipFeature, "IPH_NewIncognitoTabTip");
 DEFINE_VARIATION_PARAM(kIPHBadgedReadingListFeature, "IPH_BadgedReadingList");
 DEFINE_VARIATION_PARAM(kIPHWhatsNewUpdatedFeature, "IPH_WhatsNewUpdated");
 DEFINE_VARIATION_PARAM(kIPHWhatsNewFeature, "IPH_WhatsNew");
@@ -226,8 +232,6 @@ DEFINE_VARIATION_PARAM(kIPHiOSPromoCredentialProviderExtensionFeature,
                        "IPH_iOSPromoCredentialProviderExtension");
 DEFINE_VARIATION_PARAM(kIPHiOSPromoDefaultBrowserReminderFeature,
                        "IPH_iOSPromoDefaultBrowserReminder");
-DEFINE_VARIATION_PARAM(kIPHiOSPromoOmniboxPositionFeature,
-                       "IPH_iOSPromoOmniboxPosition");
 DEFINE_VARIATION_PARAM(kIPHiOSNewTabToolbarItemFeature,
                        "IPH_iOSNewTabToolbarItemFeature");
 DEFINE_VARIATION_PARAM(kIPHiOSTabGridToolbarItemFeature,
@@ -359,12 +363,6 @@ DEFINE_VARIATION_PARAM(kIPHTabAudioMutingFeature, "IPH_TabAudioMuting");
 DEFINE_VARIATION_PARAM(kIPHTabOrganizationSuccessFeature,
                        "IPH_TabOrganizationSuccess");
 DEFINE_VARIATION_PARAM(kIPHTabSearchFeature, "IPH_TabSearch");
-DEFINE_VARIATION_PARAM(kIPHTrackingProtectionOnboardingFeature,
-                       "IPH_TrackingProtectionOnboarding");
-DEFINE_VARIATION_PARAM(kIPHTrackingProtectionFullOnboardingFeature,
-                       "IPH_TrackingProtectionFullOnboarding");
-DEFINE_VARIATION_PARAM(kIPHTrackingProtectionReminderFeature,
-                       "IPH_TrackingProtectionReminder");
 DEFINE_VARIATION_PARAM(kIPHWebUITabStripFeature, "IPH_WebUITabStrip");
 DEFINE_VARIATION_PARAM(kIPHDesktopPwaInstallFeature, "IPH_DesktopPwaInstall");
 DEFINE_VARIATION_PARAM(kIPHProfileSwitchFeature, "IPH_ProfileSwitch");
@@ -475,6 +473,8 @@ DEFINE_VARIATION_PARAM(kIPHScalableIphGamingFeature, "IPH_ScalableIphGaming");
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 DEFINE_VARIATION_PARAM(kIPHDesktopPWAsLinkCapturingLaunch,
                        "IPH_DesktopPWAsLinkCapturingLaunch");
+DEFINE_VARIATION_PARAM(kIPHToolbarManagementButtonFeature,
+                       "IPH_ToolbarManagementButton");
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 
 #if !BUILDFLAG(IS_ANDROID) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
@@ -507,6 +507,7 @@ constexpr flags_ui::FeatureEntry::FeatureVariation
         VARIATION_ENTRY(
             kIPHAdaptiveButtonInTopToolbarCustomizationReadAloudFeature),
         VARIATION_ENTRY(kIPHAddToHomescreenMessageFeature),
+        VARIATION_ENTRY(kIPHAndroidTabDeclutter),
         VARIATION_ENTRY(kIPHAutoDarkOptOutFeature),
         VARIATION_ENTRY(kIPHAutoDarkUserEducationMessageFeature),
         VARIATION_ENTRY(kIPHAutoDarkUserEducationMessageOptInFeature),
@@ -557,13 +558,16 @@ constexpr flags_ui::FeatureEntry::FeatureVariation
         VARIATION_ENTRY(kIPHRequestDesktopSiteWindowSettingFeature),
         VARIATION_ENTRY(kIPHShoppingListMenuItemFeature),
         VARIATION_ENTRY(kIPHShoppingListSaveFlowFeature),
+        VARIATION_ENTRY(kIPHTabGroupCreationDialogSyncTextFeature),
         VARIATION_ENTRY(kIPHTabGroupsQuicklyComparePagesFeature),
         VARIATION_ENTRY(kIPHTabGroupsTapToSeeAnotherTabFeature),
         VARIATION_ENTRY(kIPHTabGroupsYourTabsAreTogetherFeature),
         VARIATION_ENTRY(kIPHTabGroupsDragAndDropFeature),
+        VARIATION_ENTRY(kIPHTabGroupsRemoteGroupFeature),
         VARIATION_ENTRY(kIPHTabGroupsSurfaceFeature),
         VARIATION_ENTRY(kIPHTabGroupsSurfaceOnHideFeature),
         VARIATION_ENTRY(kIPHTabSwitcherButtonFeature),
+        VARIATION_ENTRY(kIPHTabSwitcherFloatingActionButtonFeature),
         VARIATION_ENTRY(kIPHTranslateMenuButtonFeature),
         VARIATION_ENTRY(kIPHVideoTutorialNTPChromeIntroFeature),
         VARIATION_ENTRY(kIPHVideoTutorialNTPDownloadFeature),
@@ -588,7 +592,6 @@ constexpr flags_ui::FeatureEntry::FeatureVariation
 #elif BUILDFLAG(IS_IOS)
         VARIATION_ENTRY(kIPHBottomToolbarTipFeature),
         VARIATION_ENTRY(kIPHLongPressToolbarTipFeature),
-        VARIATION_ENTRY(kIPHNewIncognitoTabTipFeature),
         VARIATION_ENTRY(kIPHBadgedReadingListFeature),
         VARIATION_ENTRY(kIPHReadingListMessagesFeature),
         VARIATION_ENTRY(kIPHWhatsNewFeature),
@@ -604,7 +607,6 @@ constexpr flags_ui::FeatureEntry::FeatureVariation
         VARIATION_ENTRY(kIPHiOSPromoWhatsNewFeature),
         VARIATION_ENTRY(kIPHiOSPromoPostRestoreFeature),
         VARIATION_ENTRY(kIPHiOSPromoCredentialProviderExtensionFeature),
-        VARIATION_ENTRY(kIPHiOSPromoOmniboxPositionFeature),
         VARIATION_ENTRY(kIPHiOSNewTabToolbarItemFeature),
         VARIATION_ENTRY(kIPHiOSTabGridToolbarItemFeature),
         VARIATION_ENTRY(kIPHiOSHistoryOnOverflowMenuFeature),
@@ -673,9 +675,6 @@ constexpr flags_ui::FeatureEntry::FeatureVariation
         VARIATION_ENTRY(kIPHTabAudioMutingFeature),
         VARIATION_ENTRY(kIPHTabSearchFeature),
         VARIATION_ENTRY(kIPHTabOrganizationSuccessFeature),
-        VARIATION_ENTRY(kIPHTrackingProtectionOnboardingFeature),
-        VARIATION_ENTRY(kIPHTrackingProtectionFullOnboardingFeature),
-        VARIATION_ENTRY(kIPHTrackingProtectionReminderFeature),
         VARIATION_ENTRY(kIPHWebUITabStripFeature),
         VARIATION_ENTRY(kIPHDesktopPwaInstallFeature),
         VARIATION_ENTRY(kIPHProfileSwitchFeature),
@@ -740,6 +739,7 @@ constexpr flags_ui::FeatureEntry::FeatureVariation
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
         VARIATION_ENTRY(kIPHDesktopPWAsLinkCapturingLaunch),
+        VARIATION_ENTRY(kIPHToolbarManagementButtonFeature),
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 
 #if !BUILDFLAG(IS_ANDROID) && BUILDFLAG(GOOGLE_CHROME_BRANDING)

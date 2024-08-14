@@ -6,5 +6,6 @@
 
 validateInputFromAnotherBuilder('gelu');
 
-validateUnaryOperation(
-    'gelu', floatingPointTypes, /*alsoBuildActivation=*/ true);
+const label = 'gelu_123';
+const regrexp = new RegExp('\\[' + label + '\\]');
+validateSingleInputOperation('gelu', label, regrexp);

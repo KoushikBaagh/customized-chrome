@@ -5,10 +5,12 @@
 #import "base/strings/escape.h"
 #import "base/strings/stringprintf.h"
 #import "base/strings/sys_string_conversions.h"
+#import "components/feature_engagement/public/feature_constants.h"
 #import "components/plus_addresses/features.h"
 #import "components/plus_addresses/metrics/plus_address_metrics.h"
 #import "components/plus_addresses/plus_address_test_utils.h"
 #import "components/strings/grit/components_strings.h"
+#import "ios/chrome/browser/autofill/ui_bundled/autofill_app_interface.h"
 #import "ios/chrome/browser/metrics/model/metrics_app_interface.h"
 #import "ios/chrome/browser/plus_addresses/ui/plus_address_bottom_sheet_constants.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity.h"
@@ -83,7 +85,9 @@ void ExpectModalTimeSample(
           &plus_addresses::test::HandleRequestToPlusAddressWithSuccess)));
   GREYAssertTrue(self.testServer->Start(), @"Server did not start.");
 
-  if ([self isRunningTest:@selector(testConfirmPlusAddressUsingBottomSheet)]) {
+  if ([self isRunningTest:@selector(testConfirmPlusAddressUsingBottomSheet)] ||
+      [self isRunningTest:@selector(testRefresh)] ||
+      [self isRunningTest:@selector(testCreatePlusAddressIPH)]) {
     [self relaunchAppAndSetConfiguration];
   }
 
@@ -115,6 +119,16 @@ void ExpectModalTimeSample(
          {"manage-url", {plus_addresses::test::kFakeManagementUrl}},
          {"error-report-url", {plus_addresses::test::kFakeErrorReportUrl}}}}});
 
+  if ([self isRunningTest:@selector(testRefresh)]) {
+    config.features_enabled_and_params.push_back(
+        {plus_addresses::features::kPlusAddressRefresh, {}});
+  }
+
+  if ([self isRunningTest:@selector(testCreatePlusAddressIPH)]) {
+    config.iph_feature_enabled =
+        feature_engagement::kIPHPlusAddressCreateSuggestionFeature.name;
+  }
+
   // Relaunch the app to take the configuration into account.
   [[AppLaunchManager sharedManager] ensureAppLaunchedWithConfiguration:config];
 }
@@ -144,6 +158,26 @@ void ExpectModalTimeSample(
 - (void)loadPlusAddressEligiblePage {
   [ChromeEarlGrey loadURL:self.testServer->GetURL(kEmailFormUrl)];
   [ChromeEarlGrey waitForWebStateContainingText:"Signup form"];
+}
+
+// Taps on the create plus address suggestion to open the bottom sheet.
+- (void)openCreatePlusAddressBottomSheet {
+  // Tap an element that is eligible for plus_address autofilling.
+  [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
+      performAction:chrome_test_util::TapWebElementWithId(kEmailFieldId)];
+
+  NSString* suggestionLabel = base::SysUTF8ToNSString(kFakeSuggestionLabel);
+  id<GREYMatcher> userChip =
+      [AutofillAppInterface isKeyboardAccessoryUpgradeEnabled]
+          ? grey_accessibilityLabel([NSString
+                stringWithFormat:@"%@, %@", suggestionLabel, suggestionLabel])
+          : grey_text(suggestionLabel);
+
+  // Ensure the plus_address suggestion appears.
+  [ChromeEarlGrey waitForUIElementToAppearWithMatcher:userChip];
+
+  // Tapping it will trigger the UI.
+  [[EarlGrey selectElementWithMatcher:userChip] performAction:grey_tap()];
 }
 
 id<GREYMatcher> GetMatcherForErrorReportLink() {
@@ -194,17 +228,7 @@ id<GREYMatcher> GetMatcherForPlusAddressLabel(NSString* labelText) {
 // Tests showing up a bottom sheet to confirm a plus address. Once, the plus
 // address is confirmed checks if it is filled in the file.d
 - (void)testConfirmPlusAddressUsingBottomSheet {
-  // Tap an element that is eligible for plus_address autofilling.
-  [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
-      performAction:chrome_test_util::TapWebElementWithId(kEmailFieldId)];
-  id<GREYMatcher> user_chip =
-      grey_text(base::SysUTF8ToNSString(kFakeSuggestionLabel));
-
-  // Ensure the plus_address suggestion appears.
-  [ChromeEarlGrey waitForUIElementToAppearWithMatcher:user_chip];
-
-  // Tapping it will trigger the UI.
-  [[EarlGrey selectElementWithMatcher:user_chip] performAction:grey_tap()];
+  [self openCreatePlusAddressBottomSheet];
 
   id<GREYMatcher> plusAddressLabelMatcher = GetMatcherForPlusAddressLabel(
       base::SysUTF8ToNSString(plus_addresses::test::kFakePlusAddress));
@@ -235,21 +259,7 @@ id<GREYMatcher> GetMatcherForPlusAddressLabel(NSString* labelText) {
 // A basic test that simply opens the bottom sheet with an error and then
 // dismisses the bottom sheet.
 - (void)testShowPlusAddressBottomSheetWithError {
-  // Tap an element that is eligible for plus_address autofilling.
-  [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
-      performAction:chrome_test_util::TapWebElementWithId(kEmailFieldId)];
-  id<GREYMatcher> user_chip =
-      grey_text(base::SysUTF8ToNSString(kFakeSuggestionLabel));
-
-  // Ensure the plus_address suggestion appears.
-  [ChromeEarlGrey waitForUIElementToAppearWithMatcher:user_chip];
-
-  // Tapping it will trigger the UI.
-  // TODO(crbug.com/40276862): Flesh this out as more functionality is
-  // implemented. An app interface or demo feature param will be necessary here,
-  // too, such that actions that normally trigger server calls can be mocked
-  // out.
-  [[EarlGrey selectElementWithMatcher:user_chip] performAction:grey_tap()];
+  [self openCreatePlusAddressBottomSheet];
 
   // The primary email address should be shown.
   [ChromeEarlGrey
@@ -287,16 +297,7 @@ id<GREYMatcher> GetMatcherForPlusAddressLabel(NSString* labelText) {
 }
 
 - (void)testPlusAddressBottomSheetErrorReportLink {
-  // Tap an element that is eligible for plus_address autofilling.
-  [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
-      performAction:chrome_test_util::TapWebElementWithId(kEmailFieldId)];
-  id<GREYMatcher> user_chip =
-      grey_text(base::SysUTF8ToNSString(kFakeSuggestionLabel));
-
-  // Ensure the plus_address suggestion appears.
-  [ChromeEarlGrey waitForUIElementToAppearWithMatcher:user_chip];
-
-  [[EarlGrey selectElementWithMatcher:user_chip] performAction:grey_tap()];
+  [self openCreatePlusAddressBottomSheet];
 
   id<GREYMatcher> link_text = GetMatcherForErrorReportLink();
 
@@ -322,21 +323,7 @@ id<GREYMatcher> GetMatcherForPlusAddressLabel(NSString* labelText) {
     EARL_GREY_TEST_DISABLED(@"Fails on iPad.");
   }
 
-  // Tap an element that is eligible for plus_address autofilling.
-  [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
-      performAction:chrome_test_util::TapWebElementWithId(kEmailFieldId)];
-  id<GREYMatcher> user_chip =
-      grey_text(base::SysUTF8ToNSString(kFakeSuggestionLabel));
-
-  // Ensure the plus_address suggestion appears.
-  [ChromeEarlGrey waitForUIElementToAppearWithMatcher:user_chip];
-
-  // Tapping it will trigger the UI.
-  // TODO(crbug.com/40276862): Flesh this out as more functionality is
-  // implemented. An app interface or demo feature param will be necessary here,
-  // too, such that actions that normally trigger server calls can be mocked
-  // out.
-  [[EarlGrey selectElementWithMatcher:user_chip] performAction:grey_tap()];
+  [self openCreatePlusAddressBottomSheet];
 
   id<GREYMatcher> emailDescription =
       GetMatcherForEmailDescription(_fakeIdentity.userEmail);
@@ -377,6 +364,47 @@ id<GREYMatcher> GetMatcherForPlusAddressLabel(NSString* labelText) {
   // A new tab should open after tapping the link.
   [ChromeEarlGrey waitForMainTabCount:oldRegularTabCount + 1];
   [ChromeEarlGrey waitForIncognitoTabCount:oldIncognitoTabCount];
+}
+
+// A test to check the refresh plus address functionality.
+- (void)testRefresh {
+  [self openCreatePlusAddressBottomSheet];
+
+  id<GREYMatcher> plusAddressLabelMatcher = GetMatcherForPlusAddressLabel(
+      base::SysUTF8ToNSString(plus_addresses::test::kFakePlusAddress));
+  [ChromeEarlGrey waitForUIElementToAppearWithMatcher:plusAddressLabelMatcher];
+
+  id<GREYMatcher> refreshButton = grey_allOf(
+      grey_accessibilityID(kPlusAddressRefreshButtonAccessibilityIdentifier),
+      grey_accessibilityTrait(UIAccessibilityTraitButton), nil);
+
+  // Tap on the refresh button
+  [[EarlGrey selectElementWithMatcher:refreshButton] performAction:grey_tap()];
+
+  id<GREYMatcher> refreshed_plus_address = GetMatcherForPlusAddressLabel(
+      base::SysUTF8ToNSString(plus_addresses::test::kFakePlusAddressRefresh));
+  // Test that the plus address has been refreshed.
+  [ChromeEarlGrey waitForUIElementToAppearWithMatcher:refreshed_plus_address];
+
+  // Ensure the cancel button is shown.
+  id<GREYMatcher> cancelButton =
+      chrome_test_util::ButtonWithAccessibilityLabelId(
+          IDS_PLUS_ADDRESS_MODAL_CANCEL_TEXT);
+
+  // Click the cancel button, dismissing the bottom sheet.
+  [[EarlGrey selectElementWithMatcher:cancelButton] performAction:grey_tap()];
+}
+
+// A test to check the plus address create suggestion IPH feature.
+- (void)testCreatePlusAddressIPH {
+  // Tap an element that is eligible for plus_address autofilling.
+  [[EarlGrey selectElementWithMatcher:chrome_test_util::WebViewMatcher()]
+      performAction:chrome_test_util::TapWebElementWithId(kEmailFieldId)];
+  id<GREYMatcher> iph_chip = grey_text(
+      l10n_util::GetNSString(IDS_PLUS_ADDRESS_CREATE_SUGGESTION_IPH_IOS));
+
+  // Ensure the plus_address suggestion IPH appears.
+  [ChromeEarlGrey waitForUIElementToAppearWithMatcher:iph_chip];
 }
 
 @end

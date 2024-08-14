@@ -5,8 +5,8 @@
 
 load("//lib/branches.star", "branches")
 load("//lib/builder_config.star", "builder_config")
-load("//lib/builder_url.star", "linkify_builder")
 load("//lib/builders.star", "os", "siso")
+load("//lib/html.star", "linkify_builder")
 load("//lib/try.star", "try_")
 load("//lib/consoles.star", "consoles")
 load("//project.star", "settings")
@@ -154,7 +154,7 @@ try_.orchestrator_builder(
         # crbug/940930
         "chromium.enable_cleandead": 100,
         # b/346598710
-        "chromium.luci_analysis_v2": 50,
+        "chromium.luci_analysis_v2": 100,
     },
     main_list_view = "try",
     # TODO (crbug.com/1372179): Use orchestrator pool once overloaded test pools
@@ -328,10 +328,8 @@ try_.orchestrator_builder(
     ),
     mirrors = [
         "ci/win-arm64-rel",
-        # TODO (https://crbug.com/341773363): Until the testing pool is
-        # stabilized, the ci tester is disabled on the branches, so it can only
-        # be mirrored on trunk
-    ] + (["ci/win11-arm64-rel-tests"] if settings.is_main else []),
+        "ci/win11-arm64-rel-tests",
+    ],
     gn_args = gn_args.config(
         configs = [
             "ci/win-arm64-rel",
@@ -350,7 +348,6 @@ try_.orchestrator_builder(
     # are addressed
     #use_orchestrator_pool = True,
     tryjob = try_.job(
-        experiment_percentage = 100,
         location_filters = [
             "sandbox/win/.+",
             "sandbox/policy/win/.+",
@@ -482,6 +479,7 @@ try_.gpu.optional_tests_builder(
             cq.location_filter(path_regexp = "chrome/browser/vr/.+"),
             cq.location_filter(path_regexp = "components/cdm/renderer/.+"),
             cq.location_filter(path_regexp = "content/browser/xr/.+"),
+            cq.location_filter(path_regexp = "content/test/data/gpu/.+"),
             cq.location_filter(path_regexp = "content/test/gpu/.+"),
             cq.location_filter(path_regexp = "device/vr/.+"),
             cq.location_filter(path_regexp = "gpu/.+"),

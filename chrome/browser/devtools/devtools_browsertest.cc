@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include <stddef.h>
 
 #include <deque>
@@ -61,6 +66,8 @@
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/browser/sync/test/integration/sync_service_impl_harness.h"
 #include "chrome/browser/sync/test/integration/sync_test.h"
+#include "chrome/browser/ui/autofill/autofill_popup_controller_impl.h"
+#include "chrome/browser/ui/autofill/autofill_popup_controller_impl_test_api.h"
 #include "chrome/browser/ui/autofill/autofill_suggestion_controller.h"
 #include "chrome/browser/ui/autofill/chrome_autofill_client.h"
 #include "chrome/browser/ui/browser.h"
@@ -2308,7 +2315,8 @@ class BrowserAutofillManagerTestDelegateDevtoolsImpl
             autofill::ChromeAutofillClient::FromWebContentsForTesting(
                 inspected_contents_.get())
                 ->suggestion_controller_for_testing()) {
-      controller->DisableThresholdForTesting(true);
+      test_api(static_cast<autofill::AutofillPopupControllerImpl&>(*controller))
+          .DisableThreshold(true);
     }
     ASSERT_TRUE(content::ExecJs(inspected_contents_,
                                 "console.log('didShowSuggestions');"));
@@ -4024,9 +4032,9 @@ bool hasQueryParam(WebContents* wc, std::string query_param) {
          wc->GetLastCommittedURL().query().find(query_param);
 }
 
+// TODO(crbug.com/348136212): Temporarily disable to land DevTools changes.
 IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest,
-                       EnterprisePolicyEnabledByDefault) {
-  g_browser_process->variations_service()->OverrideStoredPermanentCountry("us");
+                       DISABLED_NotBeBlockedByFeatureFlag) {
   SetupAccountCapabilities();
   OpenDevToolsWindow(kDebuggerTestPage, false);
   LoadLegacyFilesInFrontend(window_);
@@ -4046,15 +4054,48 @@ IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest,
 #else
   EXPECT_TRUE(configConsoleInsights->FindBool("blockedByFeatureFlag").value());
 #endif
+  CloseDevToolsWindow();
+}
+
+// TODO(crbug.com/348136212): Temporarily disable to land DevTools changes.
+IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest,
+                       DISABLED_EnterprisePolicyEnabledByDefault) {
+  g_browser_process->variations_service()->OverrideStoredPermanentCountry("us");
+  SetupAccountCapabilities();
+  OpenDevToolsWindow(kDebuggerTestPage, false);
+  LoadLegacyFilesInFrontend(window_);
+  WebContents* wc = DevToolsWindowTesting::Get(window_)->main_web_contents();
+  const auto result = content::EvalJs(wc, content::JsReplace(R"(
+    (async function() {
+      return new Promise(resolve => {
+        Host.InspectorFrontendHost.getHostConfig(resolve);
+      });
+    })();
+  )"));
+  ASSERT_TRUE(result.value.is_dict());
+  auto* configConsoleInsights =
+      result.value.GetDict().FindDict("devToolsConsoleInsights");
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+  EXPECT_TRUE(configConsoleInsights->FindBool("enabled").value());
   EXPECT_FALSE(
       configConsoleInsights->FindBool("blockedByEnterprisePolicy").value());
   EXPECT_FALSE(configConsoleInsights->FindBool("blockedByAge").value());
   EXPECT_FALSE(configConsoleInsights->FindBool("blockedByGeo").value());
   EXPECT_FALSE(configConsoleInsights->FindBool("optIn").value());
+#else
+  EXPECT_FALSE(configConsoleInsights->FindBool("enabled").value());
+  EXPECT_TRUE(
+      configConsoleInsights->FindBool("blockedByEnterprisePolicy").value());
+  EXPECT_TRUE(configConsoleInsights->FindBool("blockedByAge").value());
+  EXPECT_TRUE(configConsoleInsights->FindBool("blockedByGeo").value());
+  EXPECT_FALSE(configConsoleInsights->FindBool("optIn").value());
+#endif
+
   CloseDevToolsWindow();
 }
 
-IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest, IsBlockedByGeo) {
+// TODO(crbug.com/348136212): Temporarily disable to land DevTools changes.
+IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest, DISABLED_IsBlockedByGeo) {
   g_browser_process->variations_service()->OverrideStoredPermanentCountry("cn");
   SetupAccountCapabilities();
   OpenDevToolsWindow(kDebuggerTestPage, false);
@@ -4071,19 +4112,24 @@ IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest, IsBlockedByGeo) {
   auto* configConsoleInsights =
       result.value.GetDict().FindDict("devToolsConsoleInsights");
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  EXPECT_FALSE(configConsoleInsights->FindBool("blockedByFeatureFlag").value());
+  EXPECT_TRUE(configConsoleInsights->FindBool("enabled").value());
   EXPECT_TRUE(configConsoleInsights->FindBool("blockedByGeo").value());
-#else
-  EXPECT_TRUE(configConsoleInsights->FindBool("blockedByFeatureFlag").value());
-  EXPECT_FALSE(configConsoleInsights->FindBool("blockedByGeo").value());
-#endif
   EXPECT_FALSE(
       configConsoleInsights->FindBool("blockedByEnterprisePolicy").value());
   EXPECT_FALSE(configConsoleInsights->FindBool("blockedByAge").value());
+#else
+  EXPECT_FALSE(configConsoleInsights->FindBool("enabled").value());
+  EXPECT_TRUE(configConsoleInsights->FindBool("blockedByGeo").value());
+  EXPECT_TRUE(
+      configConsoleInsights->FindBool("blockedByEnterprisePolicy").value());
+  EXPECT_TRUE(configConsoleInsights->FindBool("blockedByAge").value());
+#endif
   CloseDevToolsWindow();
 }
 
-IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest, IsNotEnabledForMinors) {
+// TODO(crbug.com/348136212): Temporarily disable to land DevTools changes.
+IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest,
+                       DISABLED_IsNotEnabledForMinors) {
   g_browser_process->variations_service()->OverrideStoredPermanentCountry("us");
   SetupAccountCapabilities(true);
   OpenDevToolsWindow(kDebuggerTestPage, false);
@@ -4100,20 +4146,25 @@ IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest, IsNotEnabledForMinors) {
   auto* configConsoleInsights =
       result.value.GetDict().FindDict("devToolsConsoleInsights");
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  EXPECT_FALSE(configConsoleInsights->FindBool("blockedByFeatureFlag").value());
+  EXPECT_TRUE(configConsoleInsights->FindBool("enabled").value());
   EXPECT_TRUE(configConsoleInsights->FindBool("blockedByAge").value());
-#else
-  EXPECT_TRUE(configConsoleInsights->FindBool("blockedByFeatureFlag").value());
-  EXPECT_FALSE(configConsoleInsights->FindBool("blockedByAge").value());
-#endif
   EXPECT_FALSE(
       configConsoleInsights->FindBool("blockedByEnterprisePolicy").value());
   EXPECT_FALSE(configConsoleInsights->FindBool("blockedByGeo").value());
+#else
+  EXPECT_FALSE(configConsoleInsights->FindBool("enabled").value());
+  EXPECT_TRUE(configConsoleInsights->FindBool("blockedByAge").value());
+  EXPECT_TRUE(
+      configConsoleInsights->FindBool("blockedByEnterprisePolicy").value());
+  EXPECT_TRUE(configConsoleInsights->FindBool("blockedByGeo").value());
+#endif
+
   CloseDevToolsWindow();
 }
 
+// TODO(crbug.com/348136212): Temporarily disable to land DevTools changes.
 IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest,
-                       CanBeDisabledByEnterprisePolicy) {
+                       DISABLED_CanBeDisabledByEnterprisePolicy) {
   g_browser_process->variations_service()->OverrideStoredPermanentCountry("us");
   SetupAccountCapabilities();
   // Disable via enterprise policy.
@@ -4139,19 +4190,20 @@ IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest,
   auto* configConsoleInsights =
       result.value.GetDict().FindDict("devToolsConsoleInsights");
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  EXPECT_FALSE(configConsoleInsights->FindBool("blockedByFeatureFlag").value());
+  EXPECT_TRUE(configConsoleInsights->FindBool("enabled").value());
   EXPECT_TRUE(
       configConsoleInsights->FindBool("blockedByEnterprisePolicy").value());
 #else
-  EXPECT_TRUE(configConsoleInsights->FindBool("blockedByFeatureFlag").value());
-  EXPECT_FALSE(
+  EXPECT_FALSE(configConsoleInsights->FindBool("enabled").value());
+  EXPECT_TRUE(
       configConsoleInsights->FindBool("blockedByEnterprisePolicy").value());
 #endif
   CloseDevToolsWindow();
 }
 
+// TODO(crbug.com/348136212): Temporarily disable to land DevTools changes.
 IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest,
-                       CanBeEnabledByEnterprisePolicy) {
+                       DISABLED_CanBeEnabledByEnterprisePolicy) {
   g_browser_process->variations_service()->OverrideStoredPermanentCountry("us");
   SetupAccountCapabilities();
   // Enable via enterprise policy.
@@ -4177,17 +4229,21 @@ IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest,
   auto* configConsoleInsights =
       result.value.GetDict().FindDict("devToolsConsoleInsights");
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  EXPECT_FALSE(configConsoleInsights->FindBool("blockedByFeatureFlag").value());
-#else
-  EXPECT_TRUE(configConsoleInsights->FindBool("blockedByFeatureFlag").value());
-#endif
+  EXPECT_TRUE(configConsoleInsights->FindBool("enabled").value());
   EXPECT_FALSE(
       configConsoleInsights->FindBool("blockedByEnterprisePolicy").value());
+#else
+  EXPECT_FALSE(configConsoleInsights->FindBool("enabled").value());
+  EXPECT_TRUE(
+      configConsoleInsights->FindBool("blockedByEnterprisePolicy").value());
+#endif
+
   CloseDevToolsWindow();
 }
 
+// TODO(crbug.com/348136212): Temporarily disable to land DevTools changes.
 IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest,
-                       IsDisabledWhenPolicySetToOne) {
+                       DISABLED_IsDisabledWhenPolicySetToOne) {
   g_browser_process->variations_service()->OverrideStoredPermanentCountry("us");
   policy::PolicyMap policies;
   policies.Set(
@@ -4211,13 +4267,16 @@ IN_PROC_BROWSER_TEST_F(DevToolsConsoleInsightsTest,
   auto* configConsoleInsights =
       result.value.GetDict().FindDict("devToolsConsoleInsights");
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  EXPECT_FALSE(configConsoleInsights->FindBool("blockedByFeatureFlag").value());
+  EXPECT_TRUE(configConsoleInsights->FindBool("enabled").value());
   EXPECT_TRUE(configConsoleInsights->FindBool("disallowLogging").value());
-#else
-  EXPECT_TRUE(configConsoleInsights->FindBool("blockedByFeatureFlag").value());
-#endif
   EXPECT_FALSE(
       configConsoleInsights->FindBool("blockedByEnterprisePolicy").value());
+#else
+  EXPECT_FALSE(configConsoleInsights->FindBool("enabled").value());
+  EXPECT_TRUE(
+      configConsoleInsights->FindBool("blockedByEnterprisePolicy").value());
+#endif
+
   CloseDevToolsWindow();
 }
 

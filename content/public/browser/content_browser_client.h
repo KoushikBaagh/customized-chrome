@@ -71,7 +71,7 @@
 #include "third_party/blink/public/common/mediastream/media_devices.h"
 #include "third_party/blink/public/common/permissions_policy/permissions_policy.h"
 #include "third_party/blink/public/common/user_agent/user_agent_metadata.h"
-#include "third_party/blink/public/mojom/ai/ai_manager.mojom.h"
+#include "third_party/blink/public/mojom/ai/ai_manager.mojom-forward.h"
 #include "third_party/blink/public/mojom/browsing_topics/browsing_topics.mojom-forward.h"
 #include "third_party/blink/public/mojom/file_system_access/file_system_access_cloud_identifier.mojom-forward.h"
 #include "third_party/blink/public/mojom/file_system_access/file_system_access_error.mojom-forward.h"
@@ -971,7 +971,8 @@ class CONTENT_EXPORT ContentBrowserClient {
 
   virtual void OnAuctionComplete(
       RenderFrameHost* render_frame_host,
-      InterestGroupManager::InterestGroupDataKey data_key);
+      std::optional<content::InterestGroupManager::InterestGroupDataKey>
+          winner_data_key);
 
   // These values are persisted to logs. Entries should not be renumbered and
   // numeric values should never be reused.
@@ -2836,11 +2837,6 @@ class CONTENT_EXPORT ContentBrowserClient {
   virtual bool IsTransientActivationRequiredForShowFileOrDirectoryPicker(
       WebContents* web_contents);
 
-  // Return whether entering fullscreen requires transient activation.
-  // The embedder may waive that requirement for user settings or tests.
-  virtual bool IsTransientActivationRequiredForHtmlFullscreen(
-      content::RenderFrameHost* render_frame_host);
-
   // Checks if `origin` should always receive a first-party StorageKey
   // in RenderFrameHostImpl. Currently in Chrome, this is true for all
   // extension origins.
@@ -2990,6 +2986,12 @@ class CONTENT_EXPORT ContentBrowserClient {
       base::OnceCallback<void(std::optional<blink::mojom::RelatedApplication>)>
           callback);
 #endif  // !BUILDFLAG(IS_ANDROID)
+
+  // Whether the destination URL from a NavigationHandle can be saved and
+  // synced to another machine and reloaded there. Some navigations, such as
+  // http POST requests, cannot be synced across machines as the request body
+  // is no longer available when reloading the URL.
+  virtual bool IsSaveableNavigation(NavigationHandle* navigation_handle);
 };
 
 }  // namespace content

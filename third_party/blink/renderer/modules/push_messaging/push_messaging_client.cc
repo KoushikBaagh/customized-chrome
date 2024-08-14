@@ -92,11 +92,13 @@ void PushMessagingClient::DidGetManifest(
     mojom::blink::PushSubscriptionOptionsPtr options,
     bool user_gesture,
     std::unique_ptr<PushSubscriptionCallbacks> callbacks,
+    mojom::blink::ManifestRequestResult result,
     const KURL& manifest_url,
     mojom::blink::ManifestPtr manifest) {
   // Get the application_server_key from the manifest since it wasn't provided
   // by the caller.
-  if (manifest_url.IsEmpty() || manifest == mojom::blink::Manifest::New()) {
+  if (manifest_url.IsEmpty() || manifest == mojom::blink::Manifest::New() ||
+      result != mojom::blink::ManifestRequestResult::kSuccess) {
     DidSubscribe(
         service_worker_registration, std::move(callbacks),
         mojom::blink::PushRegistrationStatus::MANIFEST_EMPTY_OR_MISSING,
@@ -107,8 +109,7 @@ void PushMessagingClient::DidGetManifest(
   if (!manifest->gcm_sender_id.IsNull()) {
     StringUTF8Adaptor gcm_sender_id_as_utf8_string(manifest->gcm_sender_id);
     Vector<uint8_t> application_server_key;
-    application_server_key.Append(gcm_sender_id_as_utf8_string.data(),
-                                  gcm_sender_id_as_utf8_string.size());
+    application_server_key.AppendSpan(base::span(gcm_sender_id_as_utf8_string));
     options->application_server_key = std::move(application_server_key);
   }
 

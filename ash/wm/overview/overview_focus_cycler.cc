@@ -109,7 +109,7 @@ class ScopedActivatable : public views::WidgetObserver {
       return;
     }
 
-    OverviewItemBase* item = item_view->GetOverviewItem();
+    OverviewItemBase* item = item_view->overview_item();
     if (!item) {
       return;
     }
@@ -193,12 +193,13 @@ bool OverviewFocusCycler::AcceptSelection() {
   }
 
   if (auto* preview_view = views::AsViewClass<DeskPreviewView>(focused_view)) {
-    return preview_view->MaybeActivateFocusedViewOnOverviewExit(
-        overview_session_);
+    preview_view->AcceptSelection();
+    return true;
   }
 
   if (auto* item_view = views::AsViewClass<OverviewItemView>(focused_view)) {
-    return item_view->MaybeActivateFocusedViewOnOverviewExit(overview_session_);
+    item_view->AcceptSelection(overview_session_);
+    return true;
   }
 
   return false;
@@ -287,7 +288,7 @@ std::vector<views::Widget*> OverviewFocusCycler::GetTraversableWidgets(
   maybe_add_widget(overview_session_->overview_focus_widget());
 
   for (const auto& grid : overview_session_->grid_list()) {
-    for (const auto& item : grid->window_list()) {
+    for (const auto& item : grid->item_list()) {
       // There may be two widgets if the item is a snap group item.
       for (views::Widget* item_widget : item->GetFocusableWidgets()) {
         maybe_add_widget(item_widget);

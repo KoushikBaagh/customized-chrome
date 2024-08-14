@@ -313,14 +313,7 @@ class MODULES_EXPORT RTCPeerConnection final
   // state.
   void UpdateIceConnectionState();
 
-  RTCRtpTransport* rtpTransport() {
-    if (rtp_transport_ && !rtp_transport_registered_) {
-      rtp_transport_registered_ = true;
-      rtp_transport_->Register(
-          peer_handler_->NativePeerConnection()->GetNetworkController());
-    }
-    return rtp_transport_;
-  }
+  RTCRtpTransport* rtpTransport() { return rtp_transport_; }
 
   void Trace(Visitor*) const override;
 
@@ -560,7 +553,6 @@ class MODULES_EXPORT RTCPeerConnection final
   bool encoded_insertable_streams_;
 
   Member<RTCRtpTransport> rtp_transport_;
-  bool rtp_transport_registered_ = false;
 };
 
 }  // namespace blink

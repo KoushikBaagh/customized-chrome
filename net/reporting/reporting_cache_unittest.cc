@@ -174,7 +174,7 @@ class ReportingCacheTest : public ReportingTestBase,
       EXPECT_EQ(endpoint1.group_key, group);
       EXPECT_EQ(endpoint2.group_key, group);
       EXPECT_TRUE(cache()->ClientExistsForTesting(
-          group.network_anonymization_key, group.origin));
+          group.network_anonymization_key, group.origin.value()));
     }
     EXPECT_EQ(exist,
               EndpointGroupExistsInCache(group, OriginSubdomains::DEFAULT));
@@ -656,6 +656,133 @@ TEST_P(ReportingCacheTest, Endpoints) {
   EXPECT_EQ(2u, origins_in_cache.size());
 }
 
+TEST_P(ReportingCacheTest, SetEnterpriseReportingEndpointsWithFeatureEnabled) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      net::features::kReportingApiEnableEnterpriseCookieIssues);
+  EXPECT_EQ(0u, cache()->GetEnterpriseEndpointsForTesting().size());
+  base::flat_map<std::string, GURL> test_enterprise_endpoints{
+      {"endpoint-1", GURL("https://example.com/reports")},
+      {"endpoint-2", GURL("https://reporting.example/cookie-issues")},
+      {"endpoint-3", GURL("https://report-collector.example")},
+  };
+
+  std::vector<ReportingEndpoint> expected_enterprise_endpoints = {
+      {ReportingEndpointGroupKey(
+           NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
+           /*origin=*/std::nullopt, "endpoint-1",
+           ReportingTargetType::kEnterprise),
+       {.url = GURL("https://example.com/reports")}},
+      {ReportingEndpointGroupKey(
+           NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
+           /*origin=*/std::nullopt, "endpoint-2",
+           ReportingTargetType::kEnterprise),
+       {.url = GURL("https://reporting.example/cookie-issues")}},
+      {ReportingEndpointGroupKey(
+           NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
+           /*origin=*/std::nullopt, "endpoint-3",
+           ReportingTargetType::kEnterprise),
+       {.url = GURL("https://report-collector.example")}}};
+
+  cache()->SetEnterpriseReportingEndpoints(test_enterprise_endpoints);
+  EXPECT_EQ(expected_enterprise_endpoints,
+            cache()->GetEnterpriseEndpointsForTesting());
+}
+
+TEST_P(ReportingCacheTest, SetEnterpriseReportingEndpointsWithFeatureDisabled) {
+  EXPECT_EQ(0u, cache()->GetEnterpriseEndpointsForTesting().size());
+  base::flat_map<std::string, GURL> test_enterprise_endpoints{
+      {"endpoint-1", GURL("https://example.com/reports")},
+      {"endpoint-2", GURL("https://reporting.example/cookie-issues")},
+      {"endpoint-3", GURL("https://report-collector.example")},
+  };
+
+  std::vector<ReportingEndpoint> expected_enterprise_endpoints = {
+      {ReportingEndpointGroupKey(
+           NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
+           /*origin=*/std::nullopt, "endpoint-1",
+           ReportingTargetType::kEnterprise),
+       {.url = GURL("https://example.com/reports")}},
+      {ReportingEndpointGroupKey(
+           NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
+           /*origin=*/std::nullopt, "endpoint-2",
+           ReportingTargetType::kEnterprise),
+       {.url = GURL("https://reporting.example/cookie-issues")}},
+      {ReportingEndpointGroupKey(
+           NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
+           /*origin=*/std::nullopt, "endpoint-3",
+           ReportingTargetType::kEnterprise),
+       {.url = GURL("https://report-collector.example")}}};
+
+  cache()->SetEnterpriseReportingEndpoints(test_enterprise_endpoints);
+  EXPECT_EQ(0u, cache()->GetEnterpriseEndpointsForTesting().size());
+}
+
+TEST_P(ReportingCacheTest, ReportingCacheImplConstructionWithFeatureEnabled) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      net::features::kReportingApiEnableEnterpriseCookieIssues);
+  EXPECT_EQ(0u, cache()->GetEnterpriseEndpointsForTesting().size());
+  base::flat_map<std::string, GURL> test_enterprise_endpoints{
+      {"endpoint-1", GURL("https://example.com/reports")},
+      {"endpoint-2", GURL("https://reporting.example/cookie-issues")},
+      {"endpoint-3", GURL("https://report-collector.example")},
+  };
+  std::unique_ptr<ReportingCache> reporting_cache_impl =
+      ReportingCache::Create(context(), test_enterprise_endpoints);
+
+  std::vector<ReportingEndpoint> expected_enterprise_endpoints = {
+      {ReportingEndpointGroupKey(
+           NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
+           /*origin=*/std::nullopt, "endpoint-1",
+           ReportingTargetType::kEnterprise),
+       {.url = GURL("https://example.com/reports")}},
+      {ReportingEndpointGroupKey(
+           NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
+           /*origin=*/std::nullopt, "endpoint-2",
+           ReportingTargetType::kEnterprise),
+       {.url = GURL("https://reporting.example/cookie-issues")}},
+      {ReportingEndpointGroupKey(
+           NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
+           /*origin=*/std::nullopt, "endpoint-3",
+           ReportingTargetType::kEnterprise),
+       {.url = GURL("https://report-collector.example")}}};
+
+  EXPECT_EQ(expected_enterprise_endpoints,
+            reporting_cache_impl->GetEnterpriseEndpointsForTesting());
+}
+
+TEST_P(ReportingCacheTest, ReportingCacheImplConstructionWithFeatureDisabled) {
+  EXPECT_EQ(0u, cache()->GetEnterpriseEndpointsForTesting().size());
+  base::flat_map<std::string, GURL> test_enterprise_endpoints{
+      {"endpoint-1", GURL("https://example.com/reports")},
+      {"endpoint-2", GURL("https://reporting.example/cookie-issues")},
+      {"endpoint-3", GURL("https://report-collector.example")},
+  };
+  std::unique_ptr<ReportingCache> reporting_cache_impl =
+      ReportingCache::Create(context(), test_enterprise_endpoints);
+
+  std::vector<ReportingEndpoint> expected_enterprise_endpoints = {
+      {ReportingEndpointGroupKey(
+           NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
+           /*origin=*/std::nullopt, "endpoint-1",
+           ReportingTargetType::kEnterprise),
+       {.url = GURL("https://example.com/reports")}},
+      {ReportingEndpointGroupKey(
+           NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
+           /*origin=*/std::nullopt, "endpoint-2",
+           ReportingTargetType::kEnterprise),
+       {.url = GURL("https://reporting.example/cookie-issues")}},
+      {ReportingEndpointGroupKey(
+           NetworkAnonymizationKey(), /*reporting_source=*/std::nullopt,
+           /*origin=*/std::nullopt, "endpoint-3",
+           ReportingTargetType::kEnterprise),
+       {.url = GURL("https://report-collector.example")}}};
+
+  EXPECT_EQ(0u,
+            reporting_cache_impl->GetEnterpriseEndpointsForTesting().size());
+}
+
 TEST_P(ReportingCacheTest, ClientsKeyedByEndpointGroupKey) {
   // Raise the endpoint limits for this test.
   // (This needs to first remove the cache observer because this destroys the
@@ -1127,6 +1254,24 @@ TEST_P(ReportingCacheTest, GetCandidateEndpointsForDelivery) {
   EXPECT_EQ(kGroupKey21_, candidate_endpoints[0].group_key);
 }
 
+TEST_P(ReportingCacheTest, GetCandidateEnterpriseEndpointsForDelivery) {
+  const ReportingEndpointGroupKey kEnterpriseGroupKey_ =
+      ReportingEndpointGroupKey(kIsolationInfo1_.network_anonymization_key(),
+                                *kReportingSource_, /*origin=*/std::nullopt,
+                                kGroup1_, ReportingTargetType::kEnterprise);
+
+  cache()->SetEnterpriseEndpointForTesting(kEnterpriseGroupKey_, kUrl1_);
+  cache()->SetEnterpriseEndpointForTesting(kEnterpriseGroupKey_, kUrl2_);
+
+  std::vector<ReportingEndpoint> candidate_endpoints =
+      cache()->GetCandidateEndpointsForDelivery(kEnterpriseGroupKey_);
+  ASSERT_EQ(2u, candidate_endpoints.size());
+  EXPECT_EQ(kEnterpriseGroupKey_, candidate_endpoints[0].group_key);
+  EXPECT_EQ(kUrl1_, candidate_endpoints[0].info.url);
+  EXPECT_EQ(kEnterpriseGroupKey_, candidate_endpoints[1].group_key);
+  EXPECT_EQ(kUrl2_, candidate_endpoints[1].info.url);
+}
+
 TEST_P(ReportingCacheTest, GetCandidateEndpointsFromDocumentForDelivery) {
   const base::UnguessableToken reporting_source_1 =
       base::UnguessableToken::Create();
@@ -1137,7 +1282,7 @@ TEST_P(ReportingCacheTest, GetCandidateEndpointsFromDocumentForDelivery) {
       kIsolationInfo1_.network_anonymization_key();
   const ReportingEndpointGroupKey document_group_key_1 =
       ReportingEndpointGroupKey(network_anonymization_key, reporting_source_1,
-                                kOrigin1_, kGroup1_,
+                                /*origin=*/std::nullopt, kGroup1_,
                                 ReportingTargetType::kEnterprise);
   const ReportingEndpointGroupKey document_group_key_2 =
       ReportingEndpointGroupKey(network_anonymization_key, reporting_source_1,
@@ -1148,15 +1293,14 @@ TEST_P(ReportingCacheTest, GetCandidateEndpointsFromDocumentForDelivery) {
                                 kOrigin1_, kGroup1_,
                                 ReportingTargetType::kDeveloper);
 
-  SetV1EndpointInCache(document_group_key_1, reporting_source_1,
-                       kIsolationInfo1_, kEndpoint1_);
+  SetEnterpriseEndpointInCache(document_group_key_1, kEndpoint1_);
   SetV1EndpointInCache(document_group_key_2, reporting_source_1,
                        kIsolationInfo1_, kEndpoint2_);
   SetV1EndpointInCache(document_group_key_3, reporting_source_2,
                        kIsolationInfo1_, kEndpoint1_);
   const ReportingEndpointGroupKey kReportGroupKey = ReportingEndpointGroupKey(
-      network_anonymization_key, reporting_source_1, kOrigin1_, kGroup1_,
-      ReportingTargetType::kEnterprise);
+      network_anonymization_key, reporting_source_1, /*origin=*/std::nullopt,
+      kGroup1_, ReportingTargetType::kEnterprise);
   std::vector<ReportingEndpoint> candidate_endpoints =
       cache()->GetCandidateEndpointsForDelivery(kReportGroupKey);
   ASSERT_EQ(1u, candidate_endpoints.size());
@@ -1848,13 +1992,15 @@ TEST_P(ReportingCacheTest,
   EXPECT_TRUE(
       EndpointGroupExistsInCache(kOtherGroupKey21_, OriginSubdomains::DEFAULT));
   EXPECT_TRUE(cache()->ClientExistsForTesting(
-      kGroupKey11_.network_anonymization_key, kGroupKey11_.origin));
+      kGroupKey11_.network_anonymization_key, kGroupKey11_.origin.value()));
   EXPECT_TRUE(cache()->ClientExistsForTesting(
-      kGroupKey21_.network_anonymization_key, kGroupKey21_.origin));
+      kGroupKey21_.network_anonymization_key, kGroupKey21_.origin.value()));
   EXPECT_TRUE(cache()->ClientExistsForTesting(
-      kOtherGroupKey11_.network_anonymization_key, kOtherGroupKey11_.origin));
+      kOtherGroupKey11_.network_anonymization_key,
+      kOtherGroupKey11_.origin.value()));
   EXPECT_TRUE(cache()->ClientExistsForTesting(
-      kOtherGroupKey21_.network_anonymization_key, kOtherGroupKey21_.origin));
+      kOtherGroupKey21_.network_anonymization_key,
+      kOtherGroupKey21_.origin.value()));
 }
 
 TEST_P(ReportingCacheTest, DoNotStoreMoreThanLimits) {
@@ -2084,12 +2230,12 @@ TEST_P(ReportingCacheTest, GetV1ReportingEndpointsForOrigin) {
   cache()->SetV1EndpointForTesting(
       ReportingEndpointGroupKey(network_anonymization_key_1, *kReportingSource_,
                                 kOrigin1_, kGroup1_,
-                                ReportingTargetType::kEnterprise),
+                                ReportingTargetType::kDeveloper),
       *kReportingSource_, kIsolationInfo1_, kUrl1_);
   cache()->SetV1EndpointForTesting(
       ReportingEndpointGroupKey(network_anonymization_key_1, *kReportingSource_,
                                 kOrigin1_, kGroup2_,
-                                ReportingTargetType::kEnterprise),
+                                ReportingTargetType::kDeveloper),
       *kReportingSource_, kIsolationInfo1_, kUrl2_);
   cache()->SetV1EndpointForTesting(
       ReportingEndpointGroupKey(network_anonymization_key_2, reporting_source_2,
@@ -2104,12 +2250,12 @@ TEST_P(ReportingCacheTest, GetV1ReportingEndpointsForOrigin) {
   EXPECT_EQ(2u, origin_1_endpoints.size());
   EXPECT_EQ(ReportingEndpointGroupKey(network_anonymization_key_1,
                                       *kReportingSource_, kOrigin1_, kGroup1_,
-                                      ReportingTargetType::kEnterprise),
+                                      ReportingTargetType::kDeveloper),
             origin_1_endpoints[0].group_key);
   EXPECT_EQ(kUrl1_, origin_1_endpoints[0].info.url);
   EXPECT_EQ(ReportingEndpointGroupKey(network_anonymization_key_1,
                                       *kReportingSource_, kOrigin1_, kGroup2_,
-                                      ReportingTargetType::kEnterprise),
+                                      ReportingTargetType::kDeveloper),
             origin_1_endpoints[1].group_key);
   EXPECT_EQ(kUrl2_, origin_1_endpoints[1].info.url);
   auto origin_2_endpoints = endpoints.at(kOrigin2_);
@@ -2128,13 +2274,12 @@ TEST_P(ReportingCacheTest, ReportingTargetType) {
                                 ReportingTargetType::kDeveloper);
   const ReportingEndpointGroupKey kEnterpriseGroupKey_ =
       ReportingEndpointGroupKey(kIsolationInfo1_.network_anonymization_key(),
-                                *kReportingSource_, kOrigin2_, kGroup1_,
-                                ReportingTargetType::kEnterprise);
+                                *kReportingSource_, /*origin=*/std::nullopt,
+                                kGroup1_, ReportingTargetType::kEnterprise);
 
   cache()->SetV1EndpointForTesting(kDeveloperGroupKey_, *kReportingSource_,
                                    kIsolationInfo1_, kUrl1_);
-  cache()->SetV1EndpointForTesting(kEnterpriseGroupKey_, *kReportingSource_,
-                                   kIsolationInfo1_, kUrl1_);
+  cache()->SetEnterpriseEndpointForTesting(kEnterpriseGroupKey_, kUrl1_);
 
   std::vector<ReportingEndpoint> candidate_endpoints =
       cache()->GetCandidateEndpointsForDelivery(kDeveloperGroupKey_);

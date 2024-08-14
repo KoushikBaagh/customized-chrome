@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "components/bookmarks/browser/bookmark_model.h"
 
 #include <stddef.h>
@@ -2624,6 +2629,17 @@ TEST_F(BookmarkModelTest, IsLocalOnlyNodeWithSyncFeatureOn) {
   EXPECT_FALSE(model_->IsLocalOnlyNode(*model_->other_node()));
   EXPECT_FALSE(model_->IsLocalOnlyNode(*model_->mobile_node()));
   EXPECT_FALSE(model_->IsLocalOnlyNode(*folder));
+}
+
+TEST_F(BookmarkModelTest, IsLocalOnlyNodeWithSyncFeatureOnAndDettachedNode) {
+  static_cast<TestBookmarkClient*>(model_->client())
+      ->SetIsSyncFeatureEnabledIncludingBookmarks(true);
+
+  auto dettached_node =
+      std::make_unique<BookmarkNode>(/*id=*/200, base::Uuid::GenerateRandomV4(),
+                                     GURL());
+
+  EXPECT_TRUE(model_->IsLocalOnlyNode(*dettached_node));
 }
 
 }  // namespace

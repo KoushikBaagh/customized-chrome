@@ -19,6 +19,7 @@
 #include "base/no_destructor.h"
 #include "base/notreached.h"
 #include "base/process/current_process.h"
+#include "base/profiler/process_type.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -42,6 +43,7 @@
 #include "chrome/common/secure_origin_allowlist.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/common/webui_url_constants.h"
+#include "chrome/common/webui_util.h"
 #include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/grit/renderer_resources.h"
@@ -86,7 +88,6 @@
 #include "components/dom_distiller/core/url_constants.h"
 #include "components/error_page/common/error.h"
 #include "components/error_page/common/localized_error.h"
-#include "components/feed/buildflags.h"
 #include "components/feed/feed_feature_list.h"
 #include "components/grit/components_scaled_resources.h"
 #include "components/heap_profiling/in_process/heap_profiler_controller.h"
@@ -118,9 +119,11 @@
 #include "components/web_cache/renderer/web_cache_impl.h"
 #include "components/webapps/renderer/web_page_metadata_agent.h"
 #include "content/public/common/content_constants.h"
+#include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/page_visibility_state.h"
 #include "content/public/common/url_constants.h"
+#include "content/public/common/url_utils.h"
 #include "content/public/common/webplugininfo.h"
 #include "content/public/renderer/render_frame.h"
 #include "content/public/renderer/render_frame_visitor.h"
@@ -140,6 +143,7 @@
 #include "services/tracing/public/cpp/stack_sampling/tracing_sampler_profiler.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
 #include "third_party/blink/public/common/features.h"
+#include "third_party/blink/public/common/tokens/tokens.h"
 #include "third_party/blink/public/mojom/fetch/fetch_api_request.mojom-shared.h"
 #include "third_party/blink/public/mojom/page/page_visibility_state.mojom.h"
 #include "third_party/blink/public/platform/platform.h"
@@ -176,6 +180,8 @@
 #include "chrome/renderer/wallet/boarding_pass_extractor.h"
 #include "components/facilitated_payments/content/renderer/facilitated_payments_agent.h"
 #include "components/facilitated_payments/core/features/features.h"
+#include "components/feed/content/renderer/rss_link_reader.h"
+#include "components/feed/feed_feature_list.h"
 #else
 #include "chrome/renderer/searchbox/searchbox.h"
 #include "chrome/renderer/searchbox/searchbox_extension.h"
@@ -188,11 +194,6 @@
 
 #if BUILDFLAG(IS_WIN)
 #include "chrome/renderer/render_frame_font_family_accessor.h"
-#endif
-
-#if BUILDFLAG(ENABLE_FEED_V2)
-#include "components/feed/content/renderer/rss_link_reader.h"
-#include "components/feed/feed_feature_list.h"
 #endif
 
 #if BUILDFLAG(ENABLE_NACL)
@@ -760,9 +761,10 @@ void ChromeContentRendererClient::RenderFrameCreated(
   new SpellCheckPanel(render_frame, registry, this);
 #endif  // BUILDFLAG(HAS_SPELLCHECK_PANEL)
 #endif
-#if BUILDFLAG(ENABLE_FEED_V2)
-  if (render_frame->IsMainFrame() &&
-      feed::IsWebFeedEnabledForLocale(country_codes::GetCurrentCountryCode())) {
+#if BUILDFLAG(IS_ANDROID)
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  if (command_line->HasSwitch(feed::switches::kEnableRssLinkReader) &&
+      render_frame->IsMainFrame()) {
     new feed::RssLinkReader(render_frame, registry);
   }
 #endif
@@ -863,6 +865,25 @@ bool ChromeContentRendererClient::IsPluginHandledExternally(
 #else   // !(BUILDFLAG(ENABLE_EXTENSIONS) && BUILDFLAG(ENABLE_PLUGINS))
   return false;
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS) && BUILDFLAG(ENABLE_PLUGINS)
+}
+
+bool ChromeContentRendererClient::IsDomStorageDisabled() const {
+  if (!base::FeatureList::IsEnabled(features::kPdfEnforcements)) {
+    return false;
+  }
+
+#if BUILDFLAG(ENABLE_PDF) && BUILDFLAG(ENABLE_EXTENSIONS)
+  // PDF renderers shouldn't need to access DOM storage interfaces. Note that
+  // it's still possible to access localStorage or sessionStorage in a PDF
+  // document's context via DevTools; returning false here ensures that these
+  // objects are just seen as null by JavaScript (similarly to what happens for
+  // opaque origins). This avoids a renderer kill by the browser process which
+  // isn't expecting PDF renderer processes to ever use DOM storage
+  // interfaces. See https://crbug.com/357014503.
+  return pdf::IsPdfRenderer();
+#else
+  return false;
+#endif
 }
 
 v8::Local<v8::Object> ChromeContentRendererClient::GetScriptableObject(
@@ -1371,15 +1392,14 @@ void ChromeContentRendererClient::PostIOThreadCreated(
     base::SingleThreadTaskRunner* io_thread_task_runner) {
   io_thread_task_runner->PostTask(
       FROM_HERE, base::BindOnce(&ThreadProfiler::StartOnChildThread,
-                                metrics::CallStackProfileParams::Thread::kIo));
+                                base::ProfilerThreadType::kIo));
 }
 
 void ChromeContentRendererClient::PostCompositorThreadCreated(
     base::SingleThreadTaskRunner* compositor_thread_task_runner) {
   compositor_thread_task_runner->PostTask(
-      FROM_HERE,
-      base::BindOnce(&ThreadProfiler::StartOnChildThread,
-                     metrics::CallStackProfileParams::Thread::kCompositor));
+      FROM_HERE, base::BindOnce(&ThreadProfiler::StartOnChildThread,
+                                base::ProfilerThreadType::kCompositor));
   // Enable stack sampling for tracing.
   // We pass in CreateCoreUnwindersFactory here since it lives in the chrome/
   // layer while TracingSamplerProfiler is outside of chrome/.
@@ -1582,6 +1602,14 @@ ChromeContentRendererClient::CreateWebSocketHandshakeThrottleProvider() {
       browser_interface_broker_.get());
 }
 
+bool ChromeContentRendererClient::ShouldUseCodeCacheWithHashing(
+    const blink::WebURL& request_url) const {
+  if (content::HasWebUIScheme(request_url)) {
+    return chrome::ShouldUseCodeCacheForWebUIUrl(GURL(request_url));
+  }
+  return true;
+}
+
 std::unique_ptr<media::KeySystemSupportRegistration>
 ChromeContentRendererClient::GetSupportedKeySystems(
     content::RenderFrame* render_frame,
@@ -1702,8 +1730,7 @@ bool ChromeContentRendererClient::AllowScriptExtensionForServiceWorker(
 void ChromeContentRendererClient::
     WillInitializeServiceWorkerContextOnWorkerThread() {
   // This is called on the service worker thread.
-  ThreadProfiler::StartOnChildThread(
-      metrics::CallStackProfileParams::Thread::kServiceWorker);
+  ThreadProfiler::StartOnChildThread(base::ProfilerThreadType::kServiceWorker);
 }
 
 void ChromeContentRendererClient::
@@ -1724,13 +1751,14 @@ void ChromeContentRendererClient::WillEvaluateServiceWorkerOnWorkerThread(
     v8::Local<v8::Context> v8_context,
     int64_t service_worker_version_id,
     const GURL& service_worker_scope,
-    const GURL& script_url) {
+    const GURL& script_url,
+    const blink::ServiceWorkerToken& service_worker_token) {
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   ChromeExtensionsRendererClient::GetInstance()
       ->extension_dispatcher()
       ->WillEvaluateServiceWorkerOnWorkerThread(
           context_proxy, v8_context, service_worker_version_id,
-          service_worker_scope, script_url);
+          service_worker_scope, script_url, service_worker_token);
 #endif
 }
 

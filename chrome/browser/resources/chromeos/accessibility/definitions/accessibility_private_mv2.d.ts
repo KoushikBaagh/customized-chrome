@@ -164,6 +164,7 @@ declare global {
         y: number;
         touchAccessibility?: boolean;
         mouseButton?: SyntheticMouseEventButton;
+        isDoubleClick?: boolean;
       }
 
       export enum SelectToSpeakState {
@@ -491,6 +492,8 @@ declare global {
 
       export const onToggleDictation: ChromeEvent<(activated: boolean) => void>;
 
+      export const onToggleGestureInfoForSettings:
+          ChromeEvent<(enabled: boolean) => void>;
     }
   }
 }

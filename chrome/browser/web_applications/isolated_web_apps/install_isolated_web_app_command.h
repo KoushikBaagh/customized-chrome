@@ -29,6 +29,7 @@
 #include "chrome/browser/web_applications/locks/app_lock.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
+#include "components/web_package/signed_web_bundles/signed_web_bundle_integrity_block.h"
 #include "components/webapps/browser/install_result_code.h"
 #include "components/webapps/browser/installable/installable_logging.h"
 #include "components/webapps/common/web_app_id.h"
@@ -176,20 +177,24 @@ class InstallIsolatedWebAppCommand
       base::OnceClosure next_step_callback,
       base::expected<IsolatedWebAppStorageLocation, std::string> new_location);
 
-  void CheckTrustAndSignatures(base::OnceClosure next_step_callback);
+  void CheckTrustAndSignatures(
+      base::OnceCallback<
+          void(std::optional<web_package::SignedWebBundleIntegrityBlock>)>
+          next_step_callback);
 
-  void CreateStoragePartition(base::OnceClosure next_step_callback);
+  void CreateStoragePartition(
+      base::OnceClosure next_step_callback,
+      std::optional<web_package::SignedWebBundleIntegrityBlock>
+          integrity_block);
 
   void LoadInstallUrl(base::OnceClosure next_step_callback);
 
   void CheckInstallabilityAndRetrieveManifest(
-      base::OnceCallback<
-          void(IsolatedWebAppInstallCommandHelper::ManifestAndUrl)>
-          next_step_callback);
+      base::OnceCallback<void(blink::mojom::ManifestPtr)> next_step_callback);
 
   void ValidateManifestAndCreateInstallInfo(
       base::OnceCallback<void(WebAppInstallInfo)> next_step_callback,
-      IsolatedWebAppInstallCommandHelper::ManifestAndUrl manifest_and_url);
+      blink::mojom::ManifestPtr manifest);
 
   void RetrieveIconsAndPopulateInstallInfo(
       base::OnceCallback<void(WebAppInstallInfo)> next_step_callback,
@@ -209,6 +214,8 @@ class InstallIsolatedWebAppCommand
   const IsolatedWebAppUrlInfo url_info_;
   const std::optional<base::Version> expected_version_;
   const webapps::WebappInstallSource install_surface_;
+
+  std::optional<web_package::SignedWebBundleIntegrityBlock> integrity_block_;
 
   std::optional<IwaSourceWithModeAndFileOp> install_source_;
   std::optional<IwaSourceWithMode> destination_source_;

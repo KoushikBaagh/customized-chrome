@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "chrome/browser/policy/configuration_policy_handler_list_factory.h"
 
 #include <limits.h>
@@ -77,11 +82,13 @@
 #include "components/enterprise/browser/reporting/cloud_reporting_policy_handler.h"
 #include "components/enterprise/browser/reporting/common_pref_names.h"
 #include "components/enterprise/buildflags/buildflags.h"
-#include "components/enterprise/connectors/device_trust/prefs.h"
+#include "components/enterprise/connectors/core/connectors_prefs.h"
+#include "components/enterprise/connectors/core/enterprise_connectors_policy_handler.h"
 #include "components/enterprise/content/copy_prevention_settings_policy_handler.h"
 #include "components/enterprise/content/pref_names.h"
-#include "components/enterprise/data_controls/core/data_controls_policy_handler.h"
-#include "components/enterprise/data_controls/core/prefs.h"
+#include "components/enterprise/data_controls/core/browser/data_controls_policy_handler.h"
+#include "components/enterprise/data_controls/core/browser/prefs.h"
+#include "components/enterprise/device_trust/prefs.h"
 #include "components/feed/core/shared_prefs/pref_names.h"
 #include "components/history/core/common/pref_names.h"
 #include "components/history_clusters/core/history_clusters_prefs.h"
@@ -116,6 +123,8 @@
 #include "components/search_engines/search_engines_pref_names.h"
 #include "components/security_interstitials/core/https_only_mode_policy_handler.h"
 #include "components/security_interstitials/core/pref_names.h"
+#include "components/sharing_message/buildflags.h"
+#include "components/sharing_message/pref_names.h"
 #include "components/signin/public/base/signin_buildflags.h"
 #include "components/signin/public/base/signin_pref_names.h"
 #include "components/spellcheck/spellcheck_buildflags.h"
@@ -147,8 +156,7 @@
 #include "chrome/browser/policy/local_sync_policy_handler.h"
 #include "chrome/browser/policy/managed_account_policy_handler.h"
 #include "chrome/browser/web_applications/policy/web_app_settings_policy_handler.h"
-#include "components/enterprise/connectors/connectors_prefs.h"
-#include "components/enterprise/connectors/enterprise_connectors_policy_handler.h"
+#include "components/enterprise/connectors/core/connectors_prefs.h"
 #include "components/headless/policy/headless_mode_policy_handler.h"
 #include "components/lens/lens_overlay_permission_utils.h"
 #include "components/media_router/common/pref_names.h"
@@ -388,6 +396,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kQRCodeGeneratorEnabled,
     prefs::kQRCodeGeneratorEnabled,
     base::Value::Type::BOOLEAN },
+  { key::kReportingEndpoints,
+    prefs::kReportingEndpoints,
+    base::Value::Type::DICT },
 // Policies for all platforms - End
 #if BUILDFLAG(IS_ANDROID)
   { key::kAccessibilityPerformanceFilteringAllowed,
@@ -991,9 +1002,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kMetricsReportingEnabled,
     metrics::prefs::kMetricsReportingEnabled,
     base::Value::Type::BOOLEAN },
-  { key::kReportingEndpoints,
-    prefs::kReportingEndpoints,
-    base::Value::Type::DICT },
   { key::kVariationsRestrictParameter,
     variations::prefs::kVariationsRestrictParameter,
     base::Value::Type::STRING },
@@ -1982,6 +1990,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kKioskBrowserPermissionsAllowedForOrigins,
     prefs::kKioskBrowserPermissionsAllowedForOrigins,
     base::Value::Type::LIST },
+  { key::kKioskWebAppOfflineEnabled,
+    prefs::kKioskWebAppOfflineEnabled,
+    base::Value::Type::BOOLEAN},
   { key::kDevicePolicyRefreshRate,
     prefs::kDevicePolicyRefreshRate,
     base::Value::Type::INTEGER },
@@ -2212,13 +2223,15 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     optimization_guide::model_execution::prefs::kHistorySearchEnterprisePolicyAllowed,
     base::Value::Type::INTEGER},
 #endif
+  { key::kTabCompareSettings,
+    optimization_guide::model_execution::prefs::kTabCompareSettingsEnterprisePolicyAllowed,
+    base::Value::Type::INTEGER},
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_ANDROID)
   { key::kChromeForTestingAllowed,
     prefs::kChromeForTestingAllowed,
     base::Value::Type::BOOLEAN },
 #endif
 
-#if BUILDFLAG(CHROME_CERTIFICATE_POLICIES_SUPPORTED)
   { key::kCACertificates,
     prefs::kCACertificates,
     base::Value::Type::LIST },
@@ -2236,7 +2249,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     prefs::kCAPlatformIntegrationEnabled,
     base::Value::Type::BOOLEAN },
 #endif
-#endif // BUILDFLAG(CHROME_CERTIFICATE_POLICIES_SUPPORTED)
 
 #if BUILDFLAG(ENTERPRISE_CLIENT_CERTIFICATES)
   { key::kProvisionManagedClientCertificateForUser,
@@ -2254,6 +2266,12 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     ash::prefs::kAuthenticationFlowAutoReloadInterval,
     base::Value::Type::INTEGER },
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+
+#if BUILDFLAG(IS_MAC)
+  { key::kAdHocCodeSigningForPWAsEnabled,
+    prefs::kWebAppsUseAdHocCodeSigningForAppShims,
+    base::Value::Type::BOOLEAN },
+#endif // BUILDFLAG(IS_MAC)
 };
 // clang-format on
 
@@ -2380,6 +2398,13 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
         // BUILDFLAG(IS_CHROMEOS)
 
+  handlers->AddHandler(
+      std::make_unique<
+          enterprise_connectors::EnterpriseConnectorsPolicyHandler>(
+          key::kEnterpriseRealTimeUrlCheckMode,
+          enterprise_connectors::kEnterpriseRealTimeUrlCheckMode,
+          enterprise_connectors::kEnterpriseRealTimeUrlCheckScope,
+          chrome_schema));
 #if BUILDFLAG(IS_ANDROID)
   handlers->AddHandler(
       std::make_unique<ContextualSearchPolicyHandlerAndroid>());
@@ -2432,13 +2457,6 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
           chrome_schema.GetValidationSchema(),
           SimpleSchemaValidatingPolicyHandler::RECOMMENDED_ALLOWED,
           SimpleSchemaValidatingPolicyHandler::MANDATORY_ALLOWED));
-
-  handlers->AddHandler(
-      std::make_unique<
-          enterprise_connectors::EnterpriseConnectorsPolicyHandler>(
-          key::kEnterpriseRealTimeUrlCheckMode,
-          prefs::kSafeBrowsingEnterpriseRealTimeUrlCheckMode,
-          prefs::kSafeBrowsingEnterpriseRealTimeUrlCheckScope, chrome_schema));
 
   handlers->AddHandler(std::make_unique<SimpleSchemaValidatingPolicyHandler>(
       key::kExemptDomainFileTypePairsFromFileTypeDownloadWarnings,
@@ -2621,7 +2639,8 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
   handlers->AddHandler(
       std::make_unique<ExplicitlyAllowedNetworkPortsPolicyHandler>());
   handlers->AddHandler(std::make_unique<HttpsOnlyModePolicyHandler>(
-      prefs::kHttpsOnlyModeEnabled, prefs::kHttpsFirstModeIncognito));
+      prefs::kHttpsOnlyModeEnabled, prefs::kHttpsFirstModeIncognito,
+      prefs::kHttpsFirstBalancedMode));
 
   handlers->AddHandler(std::make_unique<BrowsingDataLifetimePolicyHandler>(
       key::kBrowsingDataLifetime, browsing_data::prefs::kBrowsingDataLifetime,
@@ -2993,6 +3012,17 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
   handlers->AddHandler(
       std::make_unique<ContextualGoogleIntegrationsPoliciesHandler>(
           chrome_schema));
+  handlers->AddHandler(std::make_unique<SimpleSchemaValidatingPolicyHandler>(
+      key::kDeviceRestrictionSchedule,
+      chromeos::prefs::kDeviceRestrictionSchedule, chrome_schema,
+      SCHEMA_ALLOW_UNKNOWN,
+      SimpleSchemaValidatingPolicyHandler::RECOMMENDED_PROHIBITED,
+      SimpleSchemaValidatingPolicyHandler::MANDATORY_ALLOWED));
+  handlers->AddHandler(std::make_unique<SimpleSchemaValidatingPolicyHandler>(
+      key::kGraduationEnablementStatus, ash::prefs::kGraduationEnablementStatus,
+      chrome_schema, SCHEMA_ALLOW_UNKNOWN,
+      SimpleSchemaValidatingPolicyHandler::RECOMMENDED_PROHIBITED,
+      SimpleSchemaValidatingPolicyHandler::MANDATORY_ALLOWED));
 #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
 
 // On most platforms, there is a legacy policy

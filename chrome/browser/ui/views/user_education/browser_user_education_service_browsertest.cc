@@ -269,7 +269,6 @@ bool IsComparatorLimited(const feature_engagement::Comparator& comparator,
 
 using BrowserUserEducationServiceBrowserTest = InProcessBrowserTest;
 
-// TODO: crbug.com/336983096 - Consistently failing test.
 IN_PROC_BROWSER_TEST_F(BrowserUserEducationServiceBrowserTest,
                        FeatureConfigurationConsistencyCheck) {
   // Exceptions to the consistency checks. All of those with crbug.com IDs

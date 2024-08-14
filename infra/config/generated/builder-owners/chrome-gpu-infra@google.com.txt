@@ -9,6 +9,7 @@ ci/Android FYI Release (Samsung A13)
 ci/Android FYI Release (Samsung A23)
 ci/Android FYI Release (Samsung S23)
 ci/Android Release (Nexus 5X)
+ci/Android Release (Pixel 2)
 ci/ChromeOS FYI Release (amd64-generic)
 ci/ChromeOS FYI Release Skylab (volteer)
 ci/Dawn Android arm Builder
@@ -30,6 +31,7 @@ ci/Dawn Linux x64 DEPS Builder
 ci/Dawn Linux x64 DEPS Release (Intel UHD 630)
 ci/Dawn Linux x64 DEPS Release (NVIDIA)
 ci/Dawn Linux x64 Experimental Release (Intel UHD 630)
+ci/Dawn Linux x64 Experimental Release (NVIDIA GTX 1660)
 ci/Dawn Linux x64 Release (Intel UHD 630)
 ci/Dawn Linux x64 Release (Intel UHD 770)
 ci/Dawn Linux x64 Release (NVIDIA)
@@ -130,6 +132,7 @@ ci/Win10 FYI x64 Experimental Release (Intel)
 ci/Win10 FYI x64 Release (AMD RX 5500 XT)
 ci/Win10 FYI x64 Release (Intel UHD 770)
 ci/Win10 FYI x64 Release (Intel)
+ci/Win10 FYI x64 Release (NVIDIA RTX 4070 Super)
 ci/Win10 FYI x64 Release (NVIDIA)
 ci/Win10 FYI x64 Release XR Perf (NVIDIA)
 ci/Win10 FYI x86 Release (NVIDIA)
@@ -214,6 +217,7 @@ try/gpu-fyi-try-win10-amd-rel-64
 try/gpu-fyi-try-win10-intel-exp-64
 try/gpu-fyi-try-win10-intel-rel-64
 try/gpu-fyi-try-win10-intel-uhd770-rel
+try/gpu-fyi-try-win10-nvidia-4070-rel-64
 try/gpu-fyi-try-win10-nvidia-dbg-64
 try/gpu-fyi-try-win10-nvidia-dx12vk-dbg-64
 try/gpu-fyi-try-win10-nvidia-dx12vk-rel-64
@@ -222,12 +226,14 @@ try/gpu-fyi-try-win10-nvidia-rel-32
 try/gpu-fyi-try-win10-nvidia-rel-64
 try/gpu-fyi-try-win11-qualcomm-rel-64
 try/gpu-try-android-m-nexus-5x-64
+try/gpu-try-android-pixel-2-64
 try/gpu-try-linux-nvidia-dbg
 try/gpu-try-linux-nvidia-rel
 try/gpu-try-mac-amd-retina-dbg
 try/gpu-try-mac-intel-dbg
 try/gpu-try-win-nvidia-dbg
 try/linux-dawn-intel-exp-rel
+try/linux-dawn-nvidia-1660-exp-rel
 try/linux-dawn-rel
 try/mac-arm64-dawn-rel
 try/mac-dawn-rel

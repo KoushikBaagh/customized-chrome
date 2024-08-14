@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "chrome/browser/ui/lens/lens_untrusted_ui.h"
 
 #include "base/strings/strcat.h"
@@ -73,6 +78,8 @@ LensUntrustedUI::LensUntrustedUI(content::WebUI* web_ui)
   html_source->AddLocalizedString(
       "networkErrorPageBottomLine",
       IDS_SIDE_PANEL_COMPANION_ERROR_PAGE_SECOND_LINE);
+  html_source->AddLocalizedString("autoDetect",
+                                  IDS_LENS_OVERLAY_AUTO_DETECT_LANGUAGE_LABEL);
 
   // Add default theme colors.
   const auto& palette = lens::kPaletteColors.at(lens::PaletteId::kFallback);
@@ -137,6 +144,23 @@ LensUntrustedUI::LensUntrustedUI(content::WebUI* web_ui)
   html_source->AddInteger(
       "segmentationMaskCornerRadius",
       lens::features::GetLensOverlaySegmentationMaskCornerRadius());
+  html_source->AddBoolean(
+      "enableOverlayTranslateButton",
+      lens::features::GetLensOverlayEnableTranslateButton());
+
+  // Two instances of LensUntrustedUI are constructed: one for the main overlay
+  // and one for the side panel. We cannot distinguish them at this time. As a
+  // hack, we try to look up the LensOverlayController, which will only be
+  // available for the main overlay, and use that to set state only used by the
+  // main overlay.
+  // TODO(b/354802414): Split this into 2 separate classes for overlay and
+  // side panel.
+  if (auto* controller =
+          LensOverlayController::GetControllerFromWebViewWebContents(
+              web_ui->GetWebContents())) {
+    html_source->AddDouble("invocationTime",
+                           controller->GetInvocationTimeSinceEpoch());
+  }
 
   // Allow FrameSrc from all Google subdomains as redirects can occur.
   GURL results_side_panel_url =
@@ -172,7 +196,7 @@ LensUntrustedUI::LensUntrustedUI(content::WebUI* web_ui)
       "//resources/cr_components/searchbox/icons/google_g.svg");
   html_source->AddBoolean("reportMetrics", false);
   html_source->AddLocalizedString("searchBoxHint",
-                                  IDS_GOOGLE_SEARCH_BOX_EMPTY_HINT_SHORT);
+                                  IDS_GOOGLE_LENS_SEARCH_BOX_EMPTY_HINT);
   html_source->AddLocalizedString("searchBoxHintMultimodal",
                                   IDS_GOOGLE_SEARCH_BOX_EMPTY_HINT_MULTIMODAL);
   html_source->AddBoolean("searchboxInSidePanel", true);

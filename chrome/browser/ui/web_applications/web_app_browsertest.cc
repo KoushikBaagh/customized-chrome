@@ -347,6 +347,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, ThemeColor) {
   {
     const SkColor theme_color = SkColorSetA(SK_ColorBLUE, 0xF0);
     blink::mojom::Manifest manifest;
+    manifest.manifest_url = GURL(kExampleManifestURL);
     manifest.start_url = GURL(kExampleURL);
     manifest.id = GenerateManifestIdFromStartUrlOnly(manifest.start_url);
     manifest.scope = GURL(kExampleURL);
@@ -354,8 +355,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, ThemeColor) {
     manifest.theme_color = theme_color;
     auto web_app_info =
         std::make_unique<WebAppInstallInfo>(manifest.id, manifest.start_url);
-    web_app::UpdateWebAppInfoFromManifest(manifest, GURL(kExampleManifestURL),
-                                          web_app_info.get());
+    web_app::UpdateWebAppInfoFromManifest(manifest, web_app_info.get());
 
     webapps::AppId app_id = InstallWebApp(std::move(web_app_info));
     Browser* app_browser = LaunchWebAppBrowser(app_id);
@@ -379,6 +379,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, ThemeColor) {
 
 IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, BackgroundColor) {
   blink::mojom::Manifest manifest;
+  manifest.manifest_url = GURL(kExampleManifestURL);
   manifest.start_url = GURL(kExampleURL);
   manifest.id = GenerateManifestIdFromStartUrlOnly(manifest.start_url);
   manifest.scope = GURL(kExampleURL);
@@ -386,8 +387,7 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, BackgroundColor) {
   manifest.background_color = SkColorSetA(SK_ColorBLUE, 0xF0);
   auto web_app_info =
       std::make_unique<WebAppInstallInfo>(manifest.id, manifest.start_url);
-  web_app::UpdateWebAppInfoFromManifest(manifest, GURL(kExampleManifestURL),
-                                        web_app_info.get());
+  web_app::UpdateWebAppInfoFromManifest(manifest, web_app_info.get());
   webapps::AppId app_id = InstallWebApp(std::move(web_app_info));
 
   auto* provider = WebAppProvider::GetForTest(profile());
@@ -483,29 +483,6 @@ class ColorSystemWebAppBrowserTest : public WebAppBrowserTest {
       system_web_app_installation_;
 };
 
-class BackgroundColorChangeSystemWebAppBrowserTest
-    : public ColorSystemWebAppBrowserTest,
-      public testing::WithParamInterface<
-          /*prefer_manifest_background_color=*/bool> {
- public:
-  BackgroundColorChangeSystemWebAppBrowserTest() {
-    // TODO(b/284501548): Delete this test when Jelly is fully enabled.
-    // UseSystemTheme() supersedes this behavior.
-    features_.InitAndDisableFeature(chromeos::features::kJelly);
-
-    static_cast<ash::UnittestingSystemAppDelegate*>(
-        system_web_app_installation_->GetDelegate())
-        ->SetPreferManifestBackgroundColor(PreferManifestBackgroundColor());
-  }
-
-  // Returns whether the web app under test prefers manifest background colors
-  // over web contents background colors.
-  bool PreferManifestBackgroundColor() const { return GetParam(); }
-
- private:
-  base::test::ScopedFeatureList features_;
-};
-
 class DynamicColorSystemWebAppBrowserTest
     : public ColorSystemWebAppBrowserTest,
       public testing::WithParamInterface</*use_system_theme_color=*/bool> {
@@ -525,61 +502,6 @@ class DynamicColorSystemWebAppBrowserTest
   base::test::ScopedFeatureList scoped_feature_list_{
       chromeos::features::kJelly};
 };
-
-INSTANTIATE_TEST_SUITE_P(All,
-                         BackgroundColorChangeSystemWebAppBrowserTest,
-                         /*prefer_manifest_background_color=*/testing::Bool(),
-                         [](const testing::TestParamInfo<
-                             /*prefer_manifest_background_color=*/bool>& info) {
-                           return info.param ? "PreferManifestBackgroundColor"
-                                             : "WebContentsBackgroundColor";
-                         });
-
-// Also see WebAppBrowserTest.BackgroundColorChange above.
-IN_PROC_BROWSER_TEST_P(BackgroundColorChangeSystemWebAppBrowserTest,
-                       BackgroundColorChange) {
-  const webapps::AppId app_id = WaitForSwaInstall();
-  Browser* const app_browser = LaunchWebAppBrowser(app_id);
-  content::WebContents* const web_contents =
-      app_browser->tab_strip_model()->GetActiveWebContents();
-
-  const bool is_dark_mode_state =
-      ui::NativeTheme::GetInstanceForNativeUi()->ShouldUseDarkColors();
-  // Wait for original background color to load.
-  {
-    content::BackgroundColorChangeWaiter waiter(web_contents);
-    waiter.Wait();
-    EXPECT_EQ(app_browser->app_controller()->GetBackgroundColor().value(),
-              is_dark_mode_state ? SK_ColorBLACK : SK_ColorWHITE);
-  }
-  content::AwaitDocumentOnLoadCompleted(web_contents);
-
-  // Changing background color should update the active tab color unless a
-  // system web app prefers manifest background colors over web contents
-  // background colors.
-  {
-    content::BackgroundColorChangeWaiter waiter(web_contents);
-    EXPECT_TRUE(content::ExecJs(
-        web_contents, "document.body.style.backgroundColor = 'cyan';"));
-    waiter.Wait();
-    if (PreferManifestBackgroundColor()) {
-      EXPECT_EQ(app_browser->app_controller()->GetBackgroundColor().value(),
-                (is_dark_mode_state ? SK_ColorBLACK : SK_ColorWHITE));
-    } else {
-      auto background_opt = app_browser->app_controller()->GetBackgroundColor();
-      ASSERT_TRUE(background_opt);
-      EXPECT_EQ(background_opt.value(), SK_ColorCYAN);
-    }
-    SkColor active_tab_color;
-    app_browser->app_controller()->GetThemeSupplier()->GetColor(
-        ThemeProperties::COLOR_TAB_BACKGROUND_ACTIVE_FRAME_ACTIVE,
-        &active_tab_color);
-    EXPECT_EQ(active_tab_color,
-              PreferManifestBackgroundColor()
-                  ? (is_dark_mode_state ? SK_ColorBLACK : SK_ColorWHITE)
-                  : SK_ColorCYAN);
-  }
-}
 
 INSTANTIATE_TEST_SUITE_P(All,
                          DynamicColorSystemWebAppBrowserTest,
@@ -1354,7 +1276,16 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, NoOpenInAppForBrowserTabPwa) {
 
   NavigateViaLinkClickToURLAndWait(browser(), app_url);
   EXPECT_EQ(GetAppMenuCommandState(IDC_CREATE_SHORTCUT, browser()), kEnabled);
-  EXPECT_EQ(GetAppMenuCommandState(IDC_INSTALL_PWA, browser()), kNotPresent);
+
+  // Even though the app doesn't meet promotability criteria (manifest has
+  // display:browser), the installation option should still show up as `Install
+  // Page as App`.
+  AppMenuCommandState install_pwa_state =
+      base::FeatureList::IsEnabled(features::kWebAppUniversalInstall)
+          ? kEnabled
+          : kNotPresent;
+  EXPECT_EQ(GetAppMenuCommandState(IDC_INSTALL_PWA, browser()),
+            install_pwa_state);
   EXPECT_EQ(GetAppMenuCommandState(IDC_OPEN_IN_PWA_WINDOW, browser()),
             kNotPresent);
 }
@@ -2110,8 +2041,13 @@ IN_PROC_BROWSER_TEST_F(WebAppBrowserTest, PopupLocationBar) {
       https_server()->GetURL("app.com", "/ssl/page_with_subresource.html");
   const webapps::AppId app_id = InstallPWA(app_url);
 
-  Browser* const popup_browser = web_app::CreateWebApplicationWindow(
-      profile(), app_id, WindowOpenDisposition::NEW_POPUP, /*restore_id=*/0);
+  Browser::CreateParams params = web_app::CreateParamsForApp(
+      app_id,
+      /*is_popup*/ true,
+      /*trusted_source=*/true, /*window_bounds=*/gfx::Rect(), profile(),
+      /*user_gesture=*/true);
+  Browser* popup_browser =
+      web_app::CreateWebAppWindowMaybeWithHomeTab(app_id, params);
   BrowserActivationWaiter activation_waiter(popup_browser);
   popup_browser->window()->Show();
   activation_waiter.WaitForActivation();

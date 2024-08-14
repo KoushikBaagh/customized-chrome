@@ -167,6 +167,7 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   void WheelEventAck(const blink::WebMouseWheelEvent& event,
                      blink::mojom::InputEventResultState ack_result) override;
   void GestureEventAck(const blink::WebGestureEvent& event,
+                       blink::mojom::InputEventResultSource ack_source,
                        blink::mojom::InputEventResultState ack_result) override;
   void DidOverscroll(const ui::DidOverscrollParams& params) override;
   void ProcessAckedTouchEvent(
@@ -219,6 +220,7 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   viz::SurfaceId GetFallbackSurfaceIdForTesting() const override;
 
   // Overridden from ui::TextInputClient:
+  base::WeakPtr<ui::TextInputClient> AsWeakPtr() override;
   void SetCompositionText(const ui::CompositionText& composition) override;
   size_t ConfirmCompositionText(bool keep_selection) override;
   void ClearCompositionText() override;

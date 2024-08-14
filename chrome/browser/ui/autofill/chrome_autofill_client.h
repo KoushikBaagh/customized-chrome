@@ -25,6 +25,7 @@
 #include "components/autofill/core/browser/autofill_ablation_study.h"
 #include "components/autofill/core/browser/autofill_driver.h"
 #include "components/autofill/core/browser/autofill_plus_address_delegate.h"
+#include "components/autofill/core/browser/autofill_prediction_improvements_delegate.h"
 #include "components/autofill/core/browser/country_type.h"
 #include "components/autofill/core/browser/crowdsourcing/autofill_crowdsourcing_manager.h"
 #include "components/autofill/core/browser/filling_product.h"
@@ -35,7 +36,6 @@
 #include "content/public/browser/web_contents_observer.h"
 
 #if BUILDFLAG(IS_ANDROID)
-#include "chrome/browser/touch_to_fill/autofill/android/touch_to_fill_payment_method_controller.h"
 #include "chrome/browser/ui/android/autofill/save_update_address_profile_flow_manager.h"
 #include "components/autofill/core/browser/ui/fast_checkout_client.h"
 #else
@@ -98,6 +98,8 @@ class ChromeAutofillClient : public ContentAutofillClient,
   AutocompleteHistoryManager* GetAutocompleteHistoryManager() override;
   AutofillComposeDelegate* GetComposeDelegate() override;
   AutofillPlusAddressDelegate* GetPlusAddressDelegate() override;
+  AutofillPredictionImprovementsDelegate*
+  GetAutofillPredictionImprovementsDelegate() override;
   void OfferPlusAddressCreation(const url::Origin& main_frame_origin,
                                 PlusAddressCallback callback) override;
   PrefService* GetPrefs() override;
@@ -110,7 +112,6 @@ class ChromeAutofillClient : public ContentAutofillClient,
   ukm::UkmRecorder* GetUkmRecorder() override;
   ukm::SourceId GetUkmSourceId() override;
   AddressNormalizer* GetAddressNormalizer() override;
-  AutofillOfferManager* GetAutofillOfferManager() override;
   const GURL& GetLastCommittedPrimaryMainFrameURL() const override;
   url::Origin GetLastCommittedPrimaryMainFrameOrigin() const override;
   security_state::SecurityLevel GetSecurityLevelForUmaHistograms() override;
@@ -133,16 +134,8 @@ class ChromeAutofillClient : public ContentAutofillClient,
   void ConfirmSaveAddressProfile(
       const AutofillProfile& profile,
       const AutofillProfile* original_profile,
-      SaveAddressProfilePromptOptions options,
+      bool is_migration_to_account,
       AddressProfileSavePromptCallback callback) override;
-  bool ShowTouchToFillCreditCard(
-      base::WeakPtr<TouchToFillDelegate> delegate,
-      base::span<const autofill::CreditCard> cards_to_suggest,
-      const std::vector<bool>& card_acceptabilities) override;
-  bool ShowTouchToFillIban(
-      base::WeakPtr<TouchToFillDelegate> delegate,
-      base::span<const autofill::Iban> ibans_to_suggest) override;
-  void HideTouchToFillCreditCard() override;
   void ShowAutofillSuggestions(
       const PopupOpenArgs& open_args,
       base::WeakPtr<AutofillSuggestionDelegate> delegate) override;
@@ -176,7 +169,7 @@ class ChromeAutofillClient : public ContentAutofillClient,
   void NotifyAutofillManualFallbackUsed() override;
   void set_test_addresses(std::vector<AutofillProfile> test_addresses) override;
   base::span<const AutofillProfile> GetTestAddresses() const override;
-  PasswordFormType ClassifyAsPasswordForm(
+  PasswordFormClassification ClassifyAsPasswordForm(
       AutofillManager& manager,
       FormGlobalId form_id,
       FieldGlobalId field_id) const override;
@@ -236,8 +229,6 @@ class ChromeAutofillClient : public ContentAutofillClient,
   bool keep_popup_open_for_testing_ = false;
 #if BUILDFLAG(IS_ANDROID)
   SaveUpdateAddressProfileFlowManager save_update_address_profile_flow_manager_;
-  TouchToFillPaymentMethodController touch_to_fill_payment_method_controller_{
-      this};
   std::unique_ptr<FastCheckoutClient> fast_checkout_client_;
 #endif
   std::unique_ptr<AutofillFieldPromoController>

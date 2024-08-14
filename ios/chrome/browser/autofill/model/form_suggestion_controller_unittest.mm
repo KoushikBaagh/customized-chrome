@@ -9,6 +9,7 @@
 
 #import "base/apple/foundation_util.h"
 #import "base/path_service.h"
+#import "base/strings/sys_string_conversions.h"
 #import "base/test/scoped_feature_list.h"
 #import "components/autofill/core/browser/filling_product.h"
 #import "components/autofill/ios/browser/form_suggestion.h"
@@ -16,6 +17,7 @@
 #import "components/autofill/ios/form_util/form_activity_observer_bridge.h"
 #import "components/autofill/ios/form_util/form_activity_params.h"
 #import "components/autofill/ios/form_util/test_form_activity_tab_helper.h"
+#import "components/feature_engagement/public/feature_constants.h"
 #import "components/plus_addresses/features.h"
 #import "ios/chrome/app/application_delegate/app_state.h"
 #import "ios/chrome/browser/autofill/ui_bundled/form_input_accessory/form_input_accessory_consumer.h"
@@ -23,9 +25,8 @@
 #import "ios/chrome/browser/autofill/ui_bundled/form_input_accessory/form_input_accessory_mediator_handler.h"
 #import "ios/chrome/browser/autofill/ui_bundled/form_input_accessory/form_suggestion_view.h"
 #import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state.h"
-#import "ios/chrome/browser/shared/model/browser_state/test_chrome_browser_state_manager.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
-#import "ios/chrome/test/testing_application_context.h"
+#import "ios/chrome/test/ios_chrome_scoped_testing_local_state.h"
 #import "ios/web/public/navigation/navigation_manager.h"
 #import "ios/web/public/test/fakes/fake_navigation_context.h"
 #import "ios/web/public/test/fakes/fake_web_frame.h"
@@ -170,12 +171,6 @@ class FormSuggestionControllerTest : public PlatformTest {
   void SetUp() override {
     PlatformTest::SetUp();
 
-    TestChromeBrowserState::Builder test_cbs_builder;
-    browser_state_manager_ = std::make_unique<TestChromeBrowserStateManager>(
-        test_cbs_builder.Build());
-    TestingApplicationContext::GetGlobal()->SetChromeBrowserStateManager(
-        browser_state_manager_.get());
-
     fake_web_state_.SetWebViewProxy(mock_web_view_proxy_);
   }
 
@@ -230,7 +225,16 @@ class FormSuggestionControllerTest : public PlatformTest {
     [accessory_mediator_ injectProvider:suggestion_controller_];
   }
 
-  std::unique_ptr<TestChromeBrowserStateManager> browser_state_manager_;
+  // The scoped feature list to enable/disable features. This needs to be placed
+  // before task_environment_, as per
+  // https://source.chromium.org/chromium/chromium/src/+/main:base/test/scoped_feature_list.h;l=37-41;drc=fe05104cfedb627fa99f218d7d1af6862871566c.
+  base::test::ScopedFeatureList scoped_feature_list_;
+
+  // The associated test Web Threads.
+  web::WebTaskEnvironment task_environment_;
+
+  // Installs the local state in ApplicationContext.
+  IOSChromeScopedTestingLocalState scoped_testing_local_state_;
 
   // The FormSuggestionController under test.
   FormSuggestionController* suggestion_controller_;
@@ -243,14 +247,6 @@ class FormSuggestionControllerTest : public PlatformTest {
 
   // Accessory view controller.
   FormInputAccessoryMediator* accessory_mediator_;
-
-  // The scoped feature list to enable/disable features. This needs to be placed
-  // before task_environment_, as per
-  // https://source.chromium.org/chromium/chromium/src/+/main:base/test/scoped_feature_list.h;l=37-41;drc=fe05104cfedb627fa99f218d7d1af6862871566c.
-  base::test::ScopedFeatureList scoped_feature_list_;
-
-  // The associated test Web Threads.
-  web::WebTaskEnvironment task_environment_;
 
   // The fake WebState to simulate navigation and JavaScript events.
   web::FakeWebState fake_web_state_;
@@ -493,17 +489,20 @@ TEST_F(FormSuggestionControllerTest, AutofillSuggestionIPH) {
                      type:autofill::SuggestionType::kAutocompleteEntry
         backendIdentifier:nil
            requiresReauth:NO];
-  suggestion.featureForIPH = @"YES";
+  suggestion.featureForIPH =
+      SuggestionFeatureForIPH::kAutofillExternalAccountProfile;
   NSArray* suggestions = @[ suggestion ];
   TestSuggestionProvider* provider =
       [[TestSuggestionProvider alloc] initWithSuggestions:suggestions];
+  provider.type = SuggestionProviderTypeAutofill;
   SetUpController(@[ provider ]);
   GURL url("http://foo.com");
   fake_web_state_.SetCurrentURL(url);
   auto main_frame = web::FakeWebFrame::CreateMainWebFrame(url);
   autofill::FormActivityParams params;
 
-  OCMExpect([mock_handler_ showAutofillSuggestionIPHIfNeeded]);
+  OCMExpect([mock_handler_
+      showAutofillSuggestionIPHIfNeededFor:suggestion.featureForIPH]);
   test_form_activity_tab_helper_.FormActivityRegistered(main_frame.get(),
                                                         params);
   [mock_handler_ verify];

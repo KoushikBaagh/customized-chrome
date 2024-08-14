@@ -56,14 +56,6 @@ base::flat_map<ui::ElementIdentifier, int> CalculateFlexOrder(
 
   return id_to_order_map;
 }
-
-void AddModelToParent(ui::MenuModel* model, views::MenuItemView* parent) {
-  for (size_t i = 0, max = model->GetItemCount(); i < max; ++i) {
-    views::MenuModelAdapter::AppendMenuItemFromModel(model, i, parent,
-                                                     model->GetCommandIdAt(i));
-  }
-}
-
 }  // namespace
 
 ToolbarController::PopOutState::PopOutState() = default;
@@ -298,10 +290,12 @@ std::string ToolbarController::GetActionNameFromElementIdentifier(
           {kToolbarNewTabButtonElementId, "NewTabButton"},
           {kToolbarSidePanelButtonElementId, "SidePanelButton"},
           {kActionClearBrowsingData, "PinnedClearBrowsingDataButton"},
+          {kActionCopyUrl, "PinnedCopyLinkButton"},
           {kActionDevTools, "PinnedDeveloperToolsButton"},
           {kActionNewIncognitoWindow, "PinnedNewIncognitoWindowButton"},
           {kActionPrint, "PinnedPrintButton"},
           {kActionQrCodeGenerator, "PinnedQrCodeGeneratorButton"},
+          {kActionRouteMedia, "PinnedCastButton"},
           {kActionSendTabToSelf, "PinnedSendTabToSelfButton"},
           {kActionShowAddressesBubbleOrPage,
            "PinnedShowAddressesBubbleOrPageButton"},
@@ -621,9 +615,8 @@ void ToolbarController::ShowStatusIndicator() {
     // Layout of the status indicator.
     PinnedToolbarButtonStatusIndicator* status_indicator =
         PinnedToolbarButtonStatusIndicator::Install(menu_item->icon_view());
-    status_indicator->SetColor(
-        menu_item->icon_view()->GetColorProvider()->GetColor(
-            kColorToolbarActionItemEngaged));
+    status_indicator->SetColorId(kColorToolbarActionItemEngaged,
+                                 kColorToolbarButtonIconInactive);
 
     gfx::Rect status_rect = kStatusRect;
     const gfx::Rect image_container_bounds =
@@ -741,7 +734,18 @@ void ToolbarController::PopulateMenu(views::MenuItemView* parent) {
   menu_model_ = CreateOverflowMenuModel();
   CHECK(menu_model_);
 
-  AddModelToParent(menu_model_.get(), parent);
+  for (size_t i = 0; i < menu_model_->GetItemCount(); ++i) {
+    views::MenuItemView* menu_item =
+        views::MenuModelAdapter::AppendMenuItemFromModel(
+            menu_model_.get(), i, parent, menu_model_->GetCommandIdAt(i));
+
+    // `menu_item` can be nullptr if it is a separator.
+    if (menu_item &&
+        menu_item->GetType() == views::MenuItemView::Type::kNormal) {
+      menu_item->SetEnabled(IsCommandIdEnabled(menu_item->GetCommand()));
+    }
+  }
+
   parent->GetSubmenu()->InvalidateLayout();
 }
 

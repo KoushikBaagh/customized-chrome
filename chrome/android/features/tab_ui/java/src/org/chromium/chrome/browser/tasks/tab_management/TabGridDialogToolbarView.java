@@ -4,6 +4,7 @@
 
 package org.chromium.chrome.browser.tasks.tab_management;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.Resources;
@@ -11,6 +12,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.view.TouchDelegate;
 import android.view.View;
 import android.widget.EditText;
@@ -44,6 +46,7 @@ public class TabGridDialogToolbarView extends FrameLayout {
     private ImageView mColorIcon;
     private @Nullable FrameLayout mShareButtonContainer;
     private @Nullable ButtonCompat mShareButton;
+    private @Nullable FrameLayout mImageTilesContainer;
 
     public TabGridDialogToolbarView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -62,6 +65,15 @@ public class TabGridDialogToolbarView extends FrameLayout {
         mColorIcon = findViewById(R.id.tab_group_color_icon);
         mShareButtonContainer = findViewById(R.id.share_button_container);
         mShareButton = findViewById(R.id.share_button);
+        mImageTilesContainer = findViewById(R.id.image_tiles_container);
+    }
+
+    @Override
+    @SuppressLint("ClickableViewAccessibility")
+    public boolean onTouchEvent(MotionEvent motionEvent) {
+        super.onTouchEvent(motionEvent);
+        // Prevent touch events from "falling through" to views below.
+        return true;
     }
 
     void setLeftButtonOnClickListener(OnClickListener listener) {
@@ -177,6 +189,12 @@ public class TabGridDialogToolbarView extends FrameLayout {
         mRightButton.setContentDescription(string);
     }
 
+    void setImageTilesVisibility(boolean isVisible) {
+        if (mImageTilesContainer == null) return;
+
+        mImageTilesContainer.setVisibility(isVisible ? View.VISIBLE : View.GONE);
+    }
+
     void setShareButtonVisibility(boolean isVisible) {
         if (mShareButtonContainer == null || mShareButton == null) return;
         mShareButtonContainer.setVisibility(isVisible ? View.VISIBLE : View.GONE);
@@ -205,6 +223,11 @@ public class TabGridDialogToolbarView extends FrameLayout {
     void setShareButtonClickListener(OnClickListener listener) {
         if (mShareButton == null) return;
         mShareButton.setOnClickListener(listener);
+    }
+
+    void setImageTilesClickListener(OnClickListener listener) {
+        if (mImageTilesContainer == null) return;
+        mImageTilesContainer.setOnClickListener(listener);
     }
 
     /** Set the color icon of type {@link TabGroupColorId} on the tab group card view. */

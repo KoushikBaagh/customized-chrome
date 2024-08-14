@@ -31,8 +31,8 @@ import {
   ScreenStateMonitorCallbackRouter,
   StorageMonitorCallbackRouter,
   StorageMonitorStatus,
+  SWPrivacySwitchMonitorCallbackRouter,
   TabletModeMonitorCallbackRouter,
-  ToteMetricFormat,
   WifiConfig,
 } from './type.js';
 import {wrapEndpoint} from './util.js';
@@ -221,11 +221,6 @@ export abstract class ChromeHelper {
       void;
 
   /**
-   * Notifies Tote client when a photo/pdf/video/gif is captured.
-   */
-  abstract notifyTote(format: ToteMetricFormat, name: string): void;
-
-  /**
    * Monitors for the file deletion of the file given by its `name` and
    * triggers `callback` when the file is deleted. Note that a previous
    * monitor request will be canceled once another monitor request is sent.
@@ -277,6 +272,9 @@ export abstract class ChromeHelper {
 
   abstract initLidStateMonitor(onChange: (lidStatus: LidState) => void):
       Promise<LidState>;
+
+  abstract initSWPrivacySwitchMonitor(
+      onChange: (is_sw_privacy_switch_on: boolean) => void): Promise<boolean>;
 
   abstract getEventsSender(): Promise<EventsSenderRemote>;
 
@@ -427,10 +425,6 @@ class ChromeHelperImpl extends ChromeHelper {
     this.remote.sendNewCaptureBroadcast(isVideo, name);
   }
 
-  override notifyTote(format: ToteMetricFormat, name: string): void {
-    this.remote.notifyTote(format, name);
-  }
-
   override async monitorFileDeletion(name: string, callback: () => void):
       Promise<void> {
     const {result} = await this.remote.monitorFileDeletion(name);
@@ -528,6 +522,17 @@ class ChromeHelperImpl extends ChromeHelper {
     const {lidStatus} = await this.remote.setLidStateMonitor(
         monitorCallbackRouter.$.bindNewPipeAndPassRemote());
     return lidStatus;
+  }
+
+  override async initSWPrivacySwitchMonitor(
+      onChange: (is_sw_privacy_switch_on: boolean) => void): Promise<boolean> {
+    const monitorCallbackRouter =
+        wrapEndpoint(new SWPrivacySwitchMonitorCallbackRouter());
+    monitorCallbackRouter.update.addListener(onChange);
+
+    const {isSwPrivacySwitchOn} = await this.remote.setSWPrivacySwitchMonitor(
+        monitorCallbackRouter.$.bindNewPipeAndPassRemote());
+    return isSwPrivacySwitchOn;
   }
 
   override async getEventsSender(): Promise<EventsSenderRemote> {

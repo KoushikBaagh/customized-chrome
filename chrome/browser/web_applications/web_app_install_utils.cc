@@ -38,7 +38,7 @@
 #include "build/buildflag.h"
 #include "chrome/browser/favicon/favicon_utils.h"
 #include "chrome/browser/shortcuts/shortcut_icon_generator.h"
-#include "chrome/browser/ssl/security_state_tab_helper.h"
+#include "chrome/browser/ssl/chrome_security_state_tab_helper.h"
 #include "chrome/browser/web_applications/os_integration/os_integration_manager.h"
 #include "chrome/browser/web_applications/os_integration/web_app_file_handler_manager.h"
 #include "chrome/browser/web_applications/policy/pre_redirection_url_observer.h"
@@ -729,7 +729,6 @@ void PopulateHomeTabIconsFromHomeTabManifestParams(
 }
 
 void UpdateWebAppInfoFromManifest(const blink::mojom::Manifest& manifest,
-                                  const GURL& manifest_url,
                                   WebAppInstallInfo* web_app_info) {
   // The manifest parser guarantees these are valid/invalid together and
   // same-origin.
@@ -801,8 +800,9 @@ void UpdateWebAppInfoFromManifest(const blink::mojom::Manifest& manifest,
 
   web_app_info->capture_links = manifest.capture_links;
 
-  if (manifest_url.is_valid())
-    web_app_info->manifest_url = manifest_url;
+  if (manifest.manifest_url.is_valid()) {
+    web_app_info->manifest_url = manifest.manifest_url;
+  }
 
   web_app_info->launch_handler = manifest.launch_handler;
   if (manifest.description.has_value()) {
@@ -831,10 +831,9 @@ void UpdateWebAppInfoFromManifest(const blink::mojom::Manifest& manifest,
 }
 
 WebAppInstallInfo CreateWebAppInfoFromManifest(
-    const blink::mojom::Manifest& manifest,
-    const GURL& manifest_url) {
+    const blink::mojom::Manifest& manifest) {
   WebAppInstallInfo info(manifest.id, manifest.start_url);
-  UpdateWebAppInfoFromManifest(manifest, manifest_url, &info);
+  UpdateWebAppInfoFromManifest(manifest, &info);
   return info;
 }
 
@@ -1093,7 +1092,7 @@ WebAppManagement::Type ConvertInstallSurfaceToWebAppSource(
 
 void CreateWebAppInstallTabHelpers(content::WebContents* web_contents) {
   webapps::InstallableManager::CreateForWebContents(web_contents);
-  SecurityStateTabHelper::CreateForWebContents(web_contents);
+  ChromeSecurityStateTabHelper::CreateForWebContents(web_contents);
   favicon::CreateContentFaviconDriverForWebContents(web_contents);
   webapps::PreRedirectionURLObserver::CreateForWebContents(web_contents);
 }

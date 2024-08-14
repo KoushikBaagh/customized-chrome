@@ -40,8 +40,6 @@ GPU_EXPORT BASE_DECLARE_FEATURE(kDefaultEnableGpuRasterization);
 GPU_EXPORT BASE_DECLARE_FEATURE(kCanvasOopRasterization);
 #endif
 
-GPU_EXPORT BASE_DECLARE_FEATURE(kCanvasOopWithoutGpuTileRaster);
-
 GPU_EXPORT BASE_DECLARE_FEATURE(kEnableMSAAOnNewIntelGPUs);
 
 GPU_EXPORT BASE_DECLARE_FEATURE(kDawnSIRepsUseClientProvidedInternalUsages);
@@ -56,8 +54,6 @@ GPU_EXPORT BASE_DECLARE_FEATURE(kNoUndamagedOverlayPromotion);
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_IOS)
 GPU_EXPORT BASE_DECLARE_FEATURE(kAdjustGpuProcessPriority);
 #endif
-
-GPU_EXPORT BASE_DECLARE_FEATURE(kGenGpuDiskCacheKeyPrefixInGpuService);
 
 GPU_EXPORT BASE_DECLARE_FEATURE(kClearGrShaderDiskCacheOnInvalidPrefix);
 

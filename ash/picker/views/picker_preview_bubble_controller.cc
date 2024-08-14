@@ -4,10 +4,18 @@
 
 #include "ash/picker/views/picker_preview_bubble_controller.h"
 
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+
 #include "ash/picker/views/picker_preview_bubble.h"
 #include "ash/public/cpp/holding_space/holding_space_image.h"
 #include "base/check.h"
-#include "base/location.h"
+#include "base/files/file.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
+#include "base/observer_list.h"
 #include "base/time/time.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
@@ -28,8 +36,11 @@ PickerPreviewBubbleController::~PickerPreviewBubbleController() {
 
 void PickerPreviewBubbleController::ShowBubbleAfterDelay(
     HoldingSpaceImage* async_preview_image,
+    const base::FilePath& path,
     views::View* anchor_view) {
-  CreateBubbleWidget(async_preview_image, anchor_view);
+  CreateBubbleWidget(
+      async_preview_image,
+      anchor_view);
   show_bubble_timer_.Start(
       FROM_HERE, kShowBubbleDelay,
       base::BindOnce(&PickerPreviewBubbleController::ShowBubble,
@@ -42,6 +53,34 @@ void PickerPreviewBubbleController::CloseBubble() {
   }
   bubble_view_->Close();
   OnWidgetDestroying(bubble_view_->GetWidget());
+  for (auto& observer : observers_) {
+    observer.OnPreviewBubbleVisibilityChanged(false);
+  }
+}
+
+bool PickerPreviewBubbleController::IsBubbleVisible() const {
+  return bubble_view_ != nullptr;
+}
+
+void PickerPreviewBubbleController::AddObserver(Observer* observer) {
+  observers_.AddObserver(observer);
+}
+
+void PickerPreviewBubbleController::RemoveObserver(Observer* observer) {
+  observers_.RemoveObserver(observer);
+}
+
+void PickerPreviewBubbleController::SetBubbleMainText(
+    const std::u16string& text) {
+  if (bubble_view_ == nullptr) {
+    return;
+  }
+
+  if (text.empty()) {
+    bubble_view_->ClearText();
+  } else {
+    bubble_view_->SetText(text);
+  }
 }
 
 void PickerPreviewBubbleController::OnWidgetDestroying(views::Widget* widget) {
@@ -89,12 +128,18 @@ void PickerPreviewBubbleController::CreateBubbleWidget(
   image_subscription_ = async_preview_image_->AddImageSkiaChangedCallback(
       base::BindRepeating(&PickerPreviewBubbleController::UpdateBubbleImage,
                           base::Unretained(this)));
+
   widget_observation_.Observe(bubble_view_->GetWidget());
 }
 
 void PickerPreviewBubbleController::ShowBubble() {
-  if (bubble_view_ != nullptr) {
-    bubble_view_->GetWidget()->Show();
+  if (bubble_view_ == nullptr) {
+    return;
+  }
+
+  bubble_view_->GetWidget()->Show();
+  for (auto& observer : observers_) {
+    observer.OnPreviewBubbleVisibilityChanged(true);
   }
 }
 

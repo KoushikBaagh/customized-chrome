@@ -60,6 +60,9 @@ inline constexpr char kEventGroupDismissalParam[] =
     "name:ChromeOSAshGrowthCampaigns_Group%d_Dismissed;comparator:<%d;"
     "window:3650;storage:3650";
 
+inline constexpr char kUserPrefName[] = "name";
+inline constexpr char kUserPrefValue[] = "value";
+
 bool MatchPref(const base::Value::List* criterias,
                std::string_view pref_path,
                const PrefService* pref_service) {
@@ -160,6 +163,127 @@ bool MatchExperimentTags(const base::Value::List* experiment_tags,
   // Campaign is matched if the tag from field trail param matches any of the
   // tag in the targeting criteria.
   return base::Contains(*experiment_tags, exp_tag);
+}
+
+// Match if the target values and the user pref has any overlap entries.
+bool HasOverlapEntries(const base::Value::List& pref_values,
+                       const base::Value::List& target_values) {
+  for (auto& value : target_values) {
+    if (base::Contains(pref_values, value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Match if any value in the target is found in user pref.
+bool MatchUserPref(const PrefService& pref_service,
+                   const std::string* pref_name,
+                   const base::Value::List* target_values) {
+  if (!pref_name || pref_name->empty()) {
+    growth::RecordCampaignsManagerError(
+        growth::CampaignsManagerError::kTargetingUserPrefParsingFail);
+    LOG(ERROR) << "Targeting user pref name missing.";
+    return false;
+  }
+
+  if (!target_values || target_values->empty()) {
+    growth::RecordCampaignsManagerError(
+        growth::CampaignsManagerError::kTargetingUserPrefParsingFail);
+    LOG(ERROR) << "Targeting user pref value missing.";
+    return false;
+  }
+
+  auto* pref = pref_service.FindPreference(*pref_name);
+  if (!pref) {
+    growth::RecordCampaignsManagerError(
+        growth::CampaignsManagerError::kTargetingUserPrefNotFound);
+    LOG(ERROR) << "Targeting user pref not found: " << pref_name;
+    return false;
+  }
+
+  auto* pref_value = pref->GetValue();
+  CHECK(pref_value);
+
+  if (pref_value->is_none() || pref_value->is_dict()) {
+    LOG(ERROR) << "User pref type is not supported: " << pref_name;
+    return false;
+  }
+
+  // If the user pref is a list, match if any entry in target values is in user
+  // pref.
+  if (pref_value->is_list()) {
+    return HasOverlapEntries(pref_value->GetList(), *target_values);
+  }
+
+  // If the user pref is not a list, match if any entry in target values is the
+  // pref value.
+  return base::Contains(*target_values, *pref_value);
+}
+
+// TODO: b/354060160 - Add more data type to pref targeting.
+// Match a user pref condition if any criterion matched.
+//   [ // These criteria are logic OR.
+//     {"name": "prefA", "value": ["A1", "A2"]},
+//     {"name": "prefB", "value": ["B1"]}
+//   ],
+// conditions_met = A1 || A2 || B1
+bool MatchUserPrefCriteria(const PrefService& pref_service,
+                           const base::Value::List& criteria) {
+  for (auto& criterion : criteria) {
+    if (!criterion.is_dict()) {
+      growth::RecordCampaignsManagerError(
+          growth::CampaignsManagerError::kTargetingUserPrefParsingFail);
+      LOG(ERROR) << "Fail to parse user pref targeting.";
+      continue;
+    }
+
+    if (MatchUserPref(pref_service,
+                      criterion.GetDict().FindString(kUserPrefName),
+                      criterion.GetDict().FindList(kUserPrefValue))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Match the user preference. The structure looks like:
+// "userPrefs": [ // These two conditions are logic AND.
+//   [ // These criteria are logic OR.
+//     {"name": "prefA", "value": ["A1", "A2"]},
+//     {"name": "prefB", "value": ["B1"]}
+//   ],
+//   [
+//     {"name": "prefC", "value": ["C1"]}
+//   ]
+// ]
+// conditions_met = (A1 || A2 || B1) && C1;
+bool MatchUserPrefs(const PrefService* pref_service,
+                    const base::Value::List* user_pref_targettings) {
+  if (!user_pref_targettings || user_pref_targettings->empty()) {
+    return true;
+  }
+
+  if (!pref_service) {
+    RecordCampaignsManagerError(
+        CampaignsManagerError::kUserPrefUnavailableAtMatching);
+    LOG(ERROR) << "Matching user pref before user pref service is available";
+    return false;
+  }
+
+  // If all conditions are matched, the campaign will be selected.
+  for (auto& targeting : *user_pref_targettings) {
+    if (!targeting.is_list()) {
+      growth::RecordCampaignsManagerError(
+          growth::CampaignsManagerError::kTargetingUserPrefParsingFail);
+      LOG(ERROR) << "Invalid user pref targeting set.";
+      return false;
+    }
+    if (!MatchUserPrefCriteria(*pref_service, targeting.GetList())) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool MatchVersion(const base::Version& current_version,
@@ -721,7 +845,8 @@ bool CampaignsMatcher::MatchRuntimeTargeting(
          MatchSchedulings(targeting.GetSchedulings()) &&
          MatchOpenedApp(targeting.GetAppsOpened()) &&
          MatchActiveUrlRegexes(targeting.GetActiveUrlRegexes()) &&
-         MatchEvents(targeting.GetEventsConfig(), campaign_id, group_id);
+         MatchEvents(targeting.GetEventsConfig(), campaign_id, group_id) &&
+         MatchUserPrefs(prefs_, targeting.GetUserPrefTargetings());
 }
 
 bool CampaignsMatcher::Matched(const Targeting* targeting,

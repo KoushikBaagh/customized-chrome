@@ -233,6 +233,8 @@ COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kForestFeatureKey[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kFormFactor[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kGrowthCampaigns[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kGrowthCampaignsPath[];
+COMPONENT_EXPORT(ASH_CONSTANTS)
+extern const char kGrowthCampaignsRegisteredTimeSecondsSinceUnixEpoch[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kGuestSession[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kGuestWallpaperLarge[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kGuestWallpaperSmall[];
@@ -275,8 +277,11 @@ COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kLoginProfile[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kLoginUser[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kDisallowLacros[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kDisableDisallowLacros[];
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kEnableLacrosForTesting[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kMahiFeatureKey[];
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kMahiRestrictionsOverride[];
 COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kSparkyFeatureKey[];
+COMPONENT_EXPORT(ASH_CONSTANTS) extern const char kSparkyServerUrl[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
 extern const char kBrowserDataMigrationForUser[];
 COMPONENT_EXPORT(ASH_CONSTANTS)
@@ -524,6 +529,9 @@ bool IsSparkySecretKeyMatched();
 
 COMPONENT_EXPORT(ASH_CONSTANTS)
 base::AutoReset<bool> SetIgnoreSparkySecretKeyForTest();
+
+COMPONENT_EXPORT(ASH_CONSTANTS)
+std::optional<std::string> ObtainSparkyServerUrl();
 
 COMPONENT_EXPORT(ASH_CONSTANTS)
 bool IsModifierSplitSecretKeyMatched();

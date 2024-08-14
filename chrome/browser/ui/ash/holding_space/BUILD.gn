@@ -30,6 +30,8 @@ static_library("holding_space") {
     "holding_space_util.h",
   ]
 
+  public_deps = [ "//chrome/browser:browser_public_dependencies" ]
+
   deps = [
     "//ash",
     "//ash/components/arc",
@@ -49,6 +51,7 @@ static_library("holding_space") {
     "//chrome/browser/ash/file_suggest",
     "//chrome/browser/ash/fileapi",
     "//chrome/browser/ash/login/session",
+    "//chrome/browser/ash/phonehub",
     "//chrome/browser/ash/profiles",
     "//chrome/browser/ash/system_web_apps/apps/camera_app",
     "//chrome/browser/profiles:profile",
@@ -70,6 +73,7 @@ static_library("holding_space") {
     "//chrome/browser/ash/extensions/autotest_private",
     "//chrome/browser/ash/extensions/file_manager",
     "//chrome/browser/ash/login/session",
+    "//chrome/browser/ash/phonehub",
     "//chrome/browser/ash/system_web_apps/apps/camera_app",
   ]
 }
@@ -134,10 +138,11 @@ source_set("browser_tests") {
     "//base/test:test_support",
     "//chrome/browser",
     "//chrome/browser/ash",
-    "//chrome/browser/ash:test_support",
     "//chrome/browser/ash/crosapi",
+    "//chrome/browser/ash/drive:test_support",
     "//chrome/browser/ash/file_manager",
     "//chrome/browser/ash/file_suggest",
+    "//chrome/browser/ash/profiles",
     "//chrome/browser/extensions",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui",
@@ -177,8 +182,8 @@ static_library("test_support") {
     "//base/test:test_support",
     "//chrome/browser",
     "//chrome/browser/ash",
-    "//chrome/browser/ash:test_support",
     "//chrome/browser/ash/file_manager",
+    "//chrome/browser/ash/login/test:test_support",
     "//chrome/browser/ash/system_web_apps/test_support:test_support_ui",
     "//chrome/browser/extensions",
     "//chrome/browser/ui",

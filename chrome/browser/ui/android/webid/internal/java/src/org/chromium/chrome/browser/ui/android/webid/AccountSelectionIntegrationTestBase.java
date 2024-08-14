@@ -18,14 +18,17 @@ import org.mockito.MockitoAnnotations;
 
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.ScalableTimeout;
+import org.chromium.blink.mojom.RpContext;
 import org.chromium.blink.mojom.RpMode;
 import org.chromium.chrome.browser.ui.android.webid.data.Account;
 import org.chromium.chrome.browser.ui.android.webid.data.ClientIdMetadata;
+import org.chromium.chrome.browser.ui.android.webid.data.IdentityProviderData;
 import org.chromium.chrome.browser.ui.android.webid.data.IdentityProviderMetadata;
 import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController.SheetState;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetControllerProvider;
+import org.chromium.components.image_fetcher.ImageFetcher;
 import org.chromium.url.GURL;
 import org.chromium.url.JUnitTestGURLs;
 
@@ -37,15 +40,31 @@ public class AccountSelectionIntegrationTestBase {
     protected static final GURL TEST_URL = JUnitTestGURLs.URL_1;
 
     protected static final Account RETURNING_ANA =
-            new Account("Ana", "ana@one.test", "Ana Doe", "Ana", TEST_PROFILE_PIC, null, true);
+            new Account(
+                    "Ana",
+                    "ana@one.test",
+                    "Ana Doe",
+                    "Ana",
+                    TEST_PROFILE_PIC,
+                    null,
+                    /* isSignIn= */ true,
+                    /* isBrowserTrustedSignIn= */ true);
     protected static final Account NEW_BOB =
-            new Account("Bob", "", "Bob", "", TEST_PROFILE_PIC, null, false);
+            new Account(
+                    "Bob",
+                    "",
+                    "Bob",
+                    "",
+                    TEST_PROFILE_PIC,
+                    null,
+                    /* isSignIn= */ false,
+                    /* isBrowserTrustedSignIn= */ false);
 
     protected static final IdentityProviderMetadata IDP_METADATA =
             new IdentityProviderMetadata(
                     /* brandTextColor= */ Color.WHITE,
                     /* brandBackgroundColor= */ Color.BLACK,
-                    /* brandIconUrl= */ null,
+                    /* brandIconUrl= */ EXAMPLE_ETLD_PLUS_ONE,
                     /* configUrl= */ null,
                     /* loginUrl= */ null,
                     /* supportsAddAccount= */ false);
@@ -53,7 +72,7 @@ public class AccountSelectionIntegrationTestBase {
             new IdentityProviderMetadata(
                     /* brandTextColor= */ Color.WHITE,
                     /* brandBackgroundColor= */ Color.BLACK,
-                    /* brandIconUrl= */ null,
+                    /* brandIconUrl= */ EXAMPLE_ETLD_PLUS_ONE,
                     /* configUrl= */ null,
                     /* loginUrl= */ null,
                     /* supportsAddAccount= */ true);
@@ -61,6 +80,7 @@ public class AccountSelectionIntegrationTestBase {
     AccountSelectionCoordinator mAccountSelection;
 
     @Mock AccountSelectionComponent.Delegate mMockBridge;
+    @Mock ImageFetcher mMockImageFetcher;
 
     @Rule
     public ChromeTabbedActivityTestRule mActivityTestRule = new ChromeTabbedActivityTestRule();
@@ -70,6 +90,8 @@ public class AccountSelectionIntegrationTestBase {
     String mTestUrlTermsOfService;
     String mTestUrlPrivacyPolicy;
     ClientIdMetadata mClientIdMetadata;
+    IdentityProviderData mNewAccountsIdpReturningAna;
+    IdentityProviderData mNewAccountsIdpNewBob;
     @RpMode.EnumType int mRpMode;
 
     @Before
@@ -83,7 +105,27 @@ public class AccountSelectionIntegrationTestBase {
                 mActivityTestRule.getTestServer().getURL("/chrome/test/data/title2.html");
         mClientIdMetadata =
                 new ClientIdMetadata(
-                        new GURL(mTestUrlTermsOfService), new GURL(mTestUrlPrivacyPolicy));
+                        new GURL(mTestUrlTermsOfService),
+                        new GURL(mTestUrlPrivacyPolicy),
+                        EXAMPLE_ETLD_PLUS_ONE);
+        mNewAccountsIdpReturningAna =
+                new IdentityProviderData(
+                        EXAMPLE_ETLD_PLUS_ONE,
+                        new Account[] {RETURNING_ANA},
+                        IDP_METADATA_WITH_ADD_ACCOUNT,
+                        mClientIdMetadata,
+                        RpContext.SIGN_IN,
+                        /* requestPermission= */ true,
+                        /* hasLoginStatusMismatch= */ false);
+        mNewAccountsIdpNewBob =
+                new IdentityProviderData(
+                        EXAMPLE_ETLD_PLUS_ONE,
+                        new Account[] {NEW_BOB},
+                        IDP_METADATA_WITH_ADD_ACCOUNT,
+                        mClientIdMetadata,
+                        RpContext.SIGN_IN,
+                        /* requestPermission= */ true,
+                        /* hasLoginStatusMismatch= */ false);
 
         runOnUiThreadBlocking(
                 () -> {
@@ -97,6 +139,7 @@ public class AccountSelectionIntegrationTestBase {
                                     mBottomSheetController,
                                     mRpMode,
                                     mMockBridge);
+                    mAccountSelection.getMediator().setImageFetcher(mMockImageFetcher);
                 });
     }
 

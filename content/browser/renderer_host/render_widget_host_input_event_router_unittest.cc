@@ -725,6 +725,74 @@ TEST_F(RenderWidgetHostInputEventRouterTest,
             view_root_->last_gesture_seen());
 }
 
+// Ensure filtered scroll events while a scroll bubble is in progress don't
+// affect the scroll bubbling state.
+TEST_F(RenderWidgetHostInputEventRouterTest,
+       FilteredGestureDoesntInterruptBubbling) {
+  gfx::Vector2dF delta(0.f, 10.f);
+  blink::WebGestureEvent scroll_begin =
+      blink::SyntheticWebGestureEventBuilder::BuildScrollBegin(
+          delta.x(), delta.y(), blink::WebGestureDevice::kTouchscreen);
+  blink::WebGestureEvent scroll_end =
+      blink::SyntheticWebGestureEventBuilder::BuildScrollEnd(
+          blink::WebGestureDevice::kTouchscreen);
+
+  ChildViewState child = MakeChildView(view_root_.get());
+
+  // Start a scroll that gets bubbled up from the child view.
+  {
+    ASSERT_FALSE(child.view.get()->is_scroll_sequence_bubbling_);
+
+    child.view->GestureEventAck(
+        scroll_begin, blink::mojom::InputEventResultSource::kCompositorThread,
+        blink::mojom::InputEventResultState::kNotConsumed);
+
+    EXPECT_EQ(child.view.get(), bubbling_gesture_scroll_origin());
+    EXPECT_EQ(view_root_.get(), bubbling_gesture_scroll_target());
+    ASSERT_TRUE(child.view->is_scroll_sequence_bubbling_);
+  }
+
+  // Simulate a debounce filtered GSE/GSB pair which looks like an ACK consumed
+  // by the browser.
+  {
+    child.view->GestureEventAck(scroll_end,
+                                blink::mojom::InputEventResultSource::kBrowser,
+                                blink::mojom::InputEventResultState::kConsumed);
+    child.view->GestureEventAck(scroll_begin,
+                                blink::mojom::InputEventResultSource::kBrowser,
+                                blink::mojom::InputEventResultState::kConsumed);
+
+    EXPECT_EQ(child.view.get(), bubbling_gesture_scroll_origin());
+    EXPECT_EQ(view_root_.get(), bubbling_gesture_scroll_target());
+    EXPECT_TRUE(child.view->is_scroll_sequence_bubbling_);
+  }
+
+  // An unfiltered GSE should now clear state.
+  {
+    // Note: scroll end is always sent non-blocking which means the ACK comes
+    // from the browser.
+    child.view->GestureEventAck(scroll_end,
+                                blink::mojom::InputEventResultSource::kBrowser,
+                                blink::mojom::InputEventResultState::kIgnored);
+    EXPECT_FALSE(child.view->is_scroll_sequence_bubbling_);
+    EXPECT_EQ(bubbling_gesture_scroll_origin(), nullptr);
+    EXPECT_EQ(bubbling_gesture_scroll_target(), nullptr);
+  }
+
+  // A new scroll should once again establish bubbling.
+  {
+    ASSERT_FALSE(child.view.get()->is_scroll_sequence_bubbling_);
+
+    child.view->GestureEventAck(
+        scroll_begin, blink::mojom::InputEventResultSource::kCompositorThread,
+        blink::mojom::InputEventResultState::kNotConsumed);
+
+    EXPECT_EQ(child.view.get(), bubbling_gesture_scroll_origin());
+    EXPECT_EQ(view_root_.get(), bubbling_gesture_scroll_target());
+    ASSERT_TRUE(child.view->is_scroll_sequence_bubbling_);
+  }
+}
+
 void RenderWidgetHostInputEventRouterTest::TestSendNewGestureWhileBubbling(
     TestRenderWidgetHostViewChildFrame* bubbling_origin,
     RenderWidgetHostViewBase* gesture_target,
@@ -1215,8 +1283,8 @@ class DelegatedInkPointTest
     DCHECK(!(use_enter_event && use_exit_event));
 
     // Hovering creates and sends ui::MouseEvents with
-    // ET_MOUSE_{MOVED,ENTERED,EXITED} types, so do the same here in hovering
-    // scenarios.
+    // EventType::kMouse{Moved,Entered,Exited} types, so do the same here in
+    // hovering scenarios.
     if (GetEventParam() == TestEvent::kTouchEvent &&
         !Hovering(match_test_hovering_state)) {
       blink::WebInputEvent::Type event_type =

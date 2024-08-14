@@ -45,7 +45,6 @@ class Rect;
 
 namespace blink {
 
-class GraphicsContext;
 class LayoutObject;
 class ScrollableArea;
 class ScrollbarTheme;
@@ -119,8 +118,6 @@ class CORE_EXPORT Scrollbar : public GarbageCollected<Scrollbar>,
   void SetProportion(int visible_size, int total_size);
   void SetPressedPos(int p) { pressed_pos_ = p; }
 
-  void Paint(GraphicsContext&, const gfx::Vector2d& paint_offset) const;
-
   virtual bool IsSolidColor() const;
 
   // Returns true if the scrollbar is a overlay scrollbar. This doesn't include
@@ -128,7 +125,6 @@ class CORE_EXPORT Scrollbar : public GarbageCollected<Scrollbar>,
   // IsPlatformOverlayScrollbar() but we don't bother it because
   // overflow:overlay might be deprecated soon.
   virtual bool IsOverlayScrollbar() const;
-  virtual bool IsFluentScrollbar() const;
   virtual bool IsFluentOverlayScrollbarMinimalMode() const;
 
   // Returns `true` if the scrollbar bounds are larger than the canvas'. In
@@ -175,10 +171,13 @@ class CORE_EXPORT Scrollbar : public GarbageCollected<Scrollbar>,
   }
 
   // Use SetNeedsPaintInvalidation to cause the scrollbar (or parts thereof)
-  // to repaint. Here "track" includes track, buttons and tickmarks, i.e. all
-  // things except the thumb.
-  bool TrackNeedsRepaint() const { return track_needs_repaint_; }
-  void ClearTrackNeedsRepaint() { track_needs_repaint_ = false; }
+  // to repaint.
+  bool TrackAndButtonsNeedRepaint() const {
+    return track_and_buttons_need_repaint_;
+  }
+  void ClearTrackAndButtonsNeedRepaint() {
+    track_and_buttons_need_repaint_ = false;
+  }
   bool ThumbNeedsRepaint() const { return thumb_needs_repaint_; }
   void ClearThumbNeedsRepaint() { thumb_needs_repaint_ = false; }
 
@@ -193,9 +192,6 @@ class CORE_EXPORT Scrollbar : public GarbageCollected<Scrollbar>,
     return orientation_ == kHorizontalScrollbar ? "HorizontalScrollbar"
                                                 : "VerticalScrollbar";
   }
-
-  bool UsesNinePatchTrackAndButtonsResource() const;
-  void SetUsesNinePatchTrackAndButtonsResource(bool supports);
 
   // Marks the scrollbar as needing to be redrawn.
   //
@@ -282,10 +278,9 @@ class CORE_EXPORT Scrollbar : public GarbageCollected<Scrollbar>,
   bool ThumbWillBeUnderMouse() const;
   bool DeltaWillScroll(ScrollOffset delta) const;
 
-  bool track_needs_repaint_ = true;
+  bool track_and_buttons_need_repaint_ = true;
   bool thumb_needs_repaint_ = true;
   bool needs_update_display_ = true;
-  bool uses_nine_patch_track_and_buttons_ = false;
 
   bool injected_gesture_scroll_begin_;
 

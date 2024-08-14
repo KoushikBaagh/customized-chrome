@@ -205,11 +205,9 @@ ShoppingService::ShoppingService(
   if (opt_guide_) {
     std::vector<optimization_guide::proto::OptimizationType> types;
 
-    // Don't register for info unless we're allowed to by an experiment.
-    if (IsProductInfoApiEnabled() || IsPDPMetricsRecordingEnabled()) {
       types.push_back(
           optimization_guide::proto::OptimizationType::PRICE_TRACKING);
-    }
+
     if (IsMerchantViewerEnabled()) {
       types.push_back(optimization_guide::proto::OptimizationType::
                           MERCHANT_TRUST_SIGNALS_V2);
@@ -238,7 +236,7 @@ ShoppingService::ShoppingService(
   }
 
   if (identity_manager && account_checker_) {
-    if (IsProductInfoApiEnabled() && subscription_proto_db) {
+    if (subscription_proto_db) {
       subscriptions_manager_ = std::make_unique<SubscriptionsManager>(
           identity_manager, url_loader_factory, subscription_proto_db,
           account_checker_.get());
@@ -255,7 +253,7 @@ ShoppingService::ShoppingService(
         std::make_unique<ShoppingBookmarkModelObserver>(
             bookmark_model, this, subscriptions_manager_.get());
 
-    if (power_bookmark_service_ && IsProductInfoApiEnabled()) {
+    if (power_bookmark_service_) {
       shopping_power_bookmark_data_provider_ =
           std::make_unique<ShoppingPowerBookmarkDataProvider>(
               power_bookmark_service_, this);
@@ -295,7 +293,7 @@ ShoppingService::ShoppingService(
             &commerce_info_cache_, product_specifications_service_);
 
     if (identity_manager &&
-        IsProductSpecificationsEnabled(account_checker_.get())) {
+        CanLoadProductSpecificationsFullPageUi(account_checker_.get())) {
       cluster_manager_ = std::make_unique<ClusterManager>(
           product_specifications_service_,
           std::make_unique<ClusterServerProxy>(identity_manager,
@@ -305,6 +303,10 @@ ShoppingService::ShoppingService(
           base::BindRepeating(&ShoppingService::GetUrlInfosForActiveWebWrappers,
                               base::Unretained(this)));
     }
+  }
+
+  if (history_service) {
+    history_service_observation_.Observe(history_service);
   }
 }
 
@@ -328,13 +330,12 @@ void ShoppingService::HandleDidNavigatePrimaryMainFrameForProductInfo(
     WebWrapper* web) {
   // We need optimization guide and one of the features that depend on the
   // price tracking signal to be enabled to do any of this.
-  if (!opt_guide_ ||
-      (!IsProductInfoApiEnabled() && !IsPDPMetricsRecordingEnabled())) {
+  if (!opt_guide_) {
     return;
   }
 
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (IsProductInfoApiEnabled()) {
+
     commerce_info_cache_.AddRef(web->GetLastCommittedURL());
 
     CommerceInfoCache::CacheEntry* entry =
@@ -344,7 +345,6 @@ void ShoppingService::HandleDidNavigatePrimaryMainFrameForProductInfo(
     // When info is loaded as the result of a navigation, there's no reason to
     // require it be loaded on-demand.
     entry->run_product_info_on_demand = false;
-  }
 
   opt_guide_->CanApplyOptimization(
       web->GetLastCommittedURL(),
@@ -385,10 +385,6 @@ void ShoppingService::DidStopLoading(WebWrapper* web) {
 
 void ShoppingService::ScheduleProductInfoLocalExtraction(WebWrapper* web) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-
-  if (!IsProductInfoApiEnabled()) {
-    return;
-  }
 
   // If we weren't provided a web wrapper or the page hasn't finished loading
   // for the navigation, do nothing. This will be called when the page has a
@@ -432,35 +428,11 @@ void ShoppingService::DidFinishLoad(WebWrapper* web) {
 }
 
 void ShoppingService::OnWebWrapperSwitched(WebWrapper* web) {
-  bool already_exists_in_recents = false;
-  for (auto it = recently_visited_tabs_.begin();
-       it != recently_visited_tabs_.end(); ++it) {
-    if (it->url == web->GetLastCommittedURL()) {
-      recently_visited_tabs_.erase(it);
+  UpdateRecentlyViewedURL(web);
+}
 
-      // Don't remove the item from the cache here in case it's the only
-      // reference to a particular URL (causing deletion from the cache) since
-      // we're only shifting it to the head of the list.
-      already_exists_in_recents = true;
-      break;
-    }
-  }
-
-  UrlInfo info;
-  info.url = web->GetLastCommittedURL();
-  info.title = web->GetTitle();
-
-  if (!already_exists_in_recents) {
-    commerce_info_cache_.AddRef(info.url);
-  }
-
-  recently_visited_tabs_.insert(recently_visited_tabs_.begin(),
-                                std::move(info));
-
-  if (recently_visited_tabs_.size() > kRecentTabsMaxSize) {
-    commerce_info_cache_.RemoveRef(recently_visited_tabs_.back().url);
-    recently_visited_tabs_.pop_back();
-  }
+void ShoppingService::OnWebWrapperViewed(WebWrapper* web) {
+  UpdateRecentlyViewedURL(web);
 }
 
 void ShoppingService::TryRunningLocalExtractionForProductInfo(
@@ -473,10 +445,6 @@ void ShoppingService::TryRunningLocalExtractionForProductInfo(
   CommerceInfoCache::CacheEntry* entry =
       commerce_info_cache_.GetEntryForUrl(web->GetLastCommittedURL());
   if (!entry || !entry->needs_local_extraction_run) {
-    return;
-  }
-
-  if (!IsProductInfoApiEnabled()) {
     return;
   }
 
@@ -630,8 +598,10 @@ void ShoppingService::PDPMetricsCallback(
     optimization_guide::OptimizationGuideDecision decision,
     const optimization_guide::OptimizationMetadata& metadata,
     const GURL& url) {
-  if (!IsPDPMetricsRecordingEnabled())
+  if (!IsRegionLockedFeatureEnabled(kShoppingPDPMetrics,
+                                    kShoppingPDPMetricsRegionLaunched)) {
     return;
+  }
 
   metrics::RecordPDPMetrics(decision, metadata, pref_service_,
                             is_off_the_record, IsShoppingListEligible(), url);
@@ -645,7 +615,7 @@ void ShoppingService::PDPMetricsCallback(
 
 void ShoppingService::GetProductInfoForUrl(const GURL& url,
                                            ProductInfoCallback callback) {
-  if (!opt_guide_ || !IsProductInfoApiEnabled()) {
+  if (!opt_guide_) {
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE, base::BindOnce(std::move(callback), url, std::nullopt));
     return;
@@ -773,14 +743,6 @@ void ShoppingService::GetDiscountInfoForUrls(const std::vector<GURL>& urls,
   }
 }
 
-bool ShoppingService::HasDiscountShownBefore(uint64_t discount_id) {
-  return shown_discount_ids_.contains(discount_id);
-}
-
-void ShoppingService::ShownDiscount(uint64_t discount_id) {
-  shown_discount_ids_.insert(discount_id);
-}
-
 void ShoppingService::GetProductSpecificationsForUrls(
     const std::vector<GURL>& urls,
     ProductSpecificationsCallback callback) {
@@ -832,20 +794,6 @@ bool ShoppingService::IsRegionLockedFeatureEnabled(
   return commerce::IsRegionLockedFeatureEnabled(
       feature, region_specific_feature, country_on_startup_,
       locale_on_startup_);
-}
-
-bool ShoppingService::IsProductInfoApiEnabled() {
-  return IsRegionLockedFeatureEnabled(kShoppingList,
-                                      kShoppingListRegionLaunched) ||
-         (base::FeatureList::IsEnabled(ntp_features::kNtpChromeCartModule) &&
-          IsEnabledForCountryAndLocale(ntp_features::kNtpChromeCartModule,
-                                       country_on_startup_,
-                                       locale_on_startup_));
-}
-
-bool ShoppingService::IsPDPMetricsRecordingEnabled() {
-  return IsRegionLockedFeatureEnabled(kShoppingPDPMetrics,
-                                      kShoppingPDPMetricsRegionLaunched);
 }
 
 bool ShoppingService::IsMerchantViewerEnabled() {
@@ -979,29 +927,41 @@ void ShoppingService::HandleOptGuideProductInfoResponse(
     // the information available, it doesn't mean the backend doesn't know. If
     // the cache wasn't populated by a page load event, we should be allowed to
     // fetch on demand (assuming the URL is referenced by some other feature).
-    if (commerce_info_cache_.IsUrlReferenced(url) && entry &&
-        entry->run_product_info_on_demand) {
-      entry->run_product_info_on_demand = false;
+    if (commerce_info_cache_.IsUrlReferenced(url) && entry) {
+      if (entry->run_product_info_on_demand) {
+        DCHECK(!base::Contains(on_demand_product_info_callbacks_, url));
+        entry->run_product_info_on_demand = false;
+        on_demand_product_info_callbacks_[url].push_back(std::move(callback));
 
-      // We're wrapping this in a repeating callback but it should only ever be
-      // called once. This is necessary because the on-demand api requires a
-      // repeating callback but we primarily use once callbacks in the shopping
-      // service.
-      RepeatingProductInfoCallback repeating = base::BindRepeating(
-          [](ProductInfoCallback& callback, const GURL& url,
-             const std::optional<const ProductInfo>& info) {
-            // THIS SHOULD ONLY EVER BE CALLED ONCE (see above).
-            CHECK(callback);
-            std::move(callback).Run(url, info);
-          },
-          base::OwnedRef(std::move(callback)));
+        // We're wrapping this in a repeating callback but it should only ever
+        // be
+        // called once. This is necessary because the on-demand api requires a
+        // repeating callback but we primarily use once callbacks in the
+        // shopping service.
+        RepeatingProductInfoCallback repeating = base::BindRepeating(
+            [](ProductInfoCallback& callback, const GURL& url,
+               const std::optional<const ProductInfo>& info) {
+              // THIS SHOULD ONLY EVER BE CALLED ONCE (see above).
+              CHECK(callback);
+              std::move(callback).Run(url, info);
+            },
+            base::OwnedRef(std::move(callback)));
 
-      opt_guide_->CanApplyOptimizationOnDemand(
-          {url}, {optimization_guide::proto::OptimizationType::PRICE_TRACKING},
-          optimization_guide::proto::RequestContext::CONTEXT_SHOPPING,
-          base::BindRepeating(
-              &ShoppingService::HandleOnDemandProductInfoResponse,
-              weak_ptr_factory_.GetWeakPtr(), std::move(repeating)));
+        opt_guide_->CanApplyOptimizationOnDemand(
+            {url},
+            {optimization_guide::proto::OptimizationType::PRICE_TRACKING},
+            optimization_guide::proto::RequestContext::CONTEXT_SHOPPING,
+            base::BindRepeating(
+                &ShoppingService::HandleOnDemandProductInfoResponse,
+                AsWeakPtr(),
+                base::BindRepeating(&ShoppingService::OnGetOnDemandProductInfo,
+                                    AsWeakPtr())));
+      } else if (base::Contains(on_demand_product_info_callbacks_, url)) {
+        // If there is a on demand call running, add callback to the queue.
+        on_demand_product_info_callbacks_[url].push_back(std::move(callback));
+      } else {
+        std::move(callback).Run(url, std::nullopt);
+      }
     } else {
       std::move(callback).Run(url, std::nullopt);
     }
@@ -1606,7 +1566,8 @@ std::vector<DiscountInfo> ShoppingService::OptGuideResultToDiscountInfos(
 
       if (discount.has_offer_id()) {
         info.offer_id = discount.offer_id();
-      } else {
+      } else if (!commerce::kDiscountOnShoppyPage.Get()) {
+        // If kDiscountOnShoppyPage is on, offer_id is optional.
         continue;
       }
 
@@ -1623,15 +1584,20 @@ void ShoppingService::OnGetAllDiscountsFromOptGuide(
     const std::vector<DiscountsPair>& results) {
   DiscountsMap map;
   std::vector<std::string> urls_to_check_in_db;
-  for (auto res : results) {
-    if (res.second.size() > 0) {
-      map.insert(res);
+
+  for (const auto& discount_pair : results) {
+    const GURL& url = discount_pair.first;
+    const std::vector<DiscountInfo>& discount_infos = discount_pair.second;
+
+    if (discount_infos.empty()) {
+      urls_to_check_in_db.push_back(url.spec());
+    } else {
+      map.insert(discount_pair);
       base::UmaHistogramEnumeration(kDiscountsFetchResultHistogramName,
                                     DiscountsFetchResult::kInfoFromOptGuide);
-    } else {
-      urls_to_check_in_db.push_back(res.first.spec());
     }
   }
+
   if (discounts_storage_) {
     discounts_storage_->HandleServerDiscounts(
         urls_to_check_in_db, std::move(map), std::move(callback));
@@ -1837,12 +1803,73 @@ void ShoppingService::GetProductIdentifierForUrl(
           std::move(callback)));
 }
 
+void ShoppingService::UpdateRecentlyViewedURL(WebWrapper* web) {
+  bool already_exists_in_recents = false;
+  for (auto it = recently_visited_tabs_.begin();
+       it != recently_visited_tabs_.end(); ++it) {
+    if (it->url == web->GetLastCommittedURL()) {
+      recently_visited_tabs_.erase(it);
+
+      // Don't remove the item from the cache here in case it's the only
+      // reference to a particular URL (causing deletion from the cache) since
+      // we're only shifting it to the head of the list.
+      already_exists_in_recents = true;
+      break;
+    }
+  }
+
+  UrlInfo info;
+  info.url = web->GetLastCommittedURL();
+  info.title = web->GetTitle();
+
+  if (!already_exists_in_recents) {
+    commerce_info_cache_.AddRef(info.url);
+  }
+
+  recently_visited_tabs_.insert(recently_visited_tabs_.begin(),
+                                std::move(info));
+
+  if (recently_visited_tabs_.size() > kRecentTabsMaxSize) {
+    commerce_info_cache_.RemoveRef(recently_visited_tabs_.back().url);
+    recently_visited_tabs_.pop_back();
+  }
+}
+
 const std::vector<ProductSpecificationsSet>
 ShoppingService::GetAllProductSpecificationSets() {
   if (!product_specifications_service_) {
     return {};
   }
   return product_specifications_service_->GetAllProductSpecifications();
+}
+
+void ShoppingService::OnGetOnDemandProductInfo(
+    const GURL& url,
+    const std::optional<const ProductInfo>& info) {
+  auto it = on_demand_product_info_callbacks_.find(url);
+  if (it == on_demand_product_info_callbacks_.end()) {
+    return;
+  }
+
+  for (auto& callback : it->second) {
+    // Make a copy based on the cached value.
+    std::optional<ProductInfo> clone;
+    if (info) {
+      clone.emplace(info.value());
+    }
+    std::move(callback).Run(url, clone);
+  }
+
+  on_demand_product_info_callbacks_.erase(url);
+}
+
+void ShoppingService::OnHistoryDeletions(
+    history::HistoryService* history_service,
+    const history::DeletionInfo& deletion_info) {
+  // Since history deals with "visits" rather than "views", we don't have a
+  // reliable way to clear entries from the revently viewed list. If a user is
+  // deleting items from history, clear the whole list.
+  recently_visited_tabs_.clear();
 }
 
 base::WeakPtr<ShoppingService> ShoppingService::AsWeakPtr() {

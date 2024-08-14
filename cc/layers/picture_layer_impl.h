@@ -81,7 +81,7 @@ class CC_EXPORT PictureLayerImpl
   bool HasValidTilePriorities() const override;
   bool RequiresHighResToDraw() const override;
   const PaintWorkletRecordMap& GetPaintWorkletRecords() const override;
-  void OnTilesAdded() override;
+  void OnAllTilesDoneCleared() override;
   std::vector<const DrawImage*> GetDiscardableImagesInRect(
       const gfx::Rect& rect) const override;
   ScrollOffsetMap GetRasterInducingScrollOffsets() const override;
@@ -100,7 +100,7 @@ class CC_EXPORT PictureLayerImpl
   void UpdateRasterSource(scoped_refptr<RasterSource> raster_source,
                           Region* new_invalidation);
   void RegenerateDiscardableImageMapIfNeeded();
-  bool UpdateTiles();
+  bool UpdateTiles(TileMemoryLimitPolicy memory_limit_policy);
 
   // Mask-related functions.
   void GetContentsResourceId(viz::ResourceId* resource_id,

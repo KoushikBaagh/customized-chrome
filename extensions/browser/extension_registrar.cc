@@ -28,6 +28,7 @@
 #include "extensions/browser/task_queue_util.h"
 #include "extensions/common/manifest_handlers/background_info.h"
 #include "extensions/common/permissions/permissions_data.h"
+#include "third_party/blink/public/common/service_worker/service_worker_status_code.h"
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
 #include "chrome/browser/ash/crosapi/browser_util.h"
@@ -536,18 +537,26 @@ void ExtensionRegistrar::UnregisterServiceWorkerWithRootScope(
 
 void ExtensionRegistrar::NotifyServiceWorkerUnregistered(
     const ExtensionId& extension_id,
-    bool success) {
+    blink::ServiceWorkerStatusCode status) {
+  bool success = status == blink::ServiceWorkerStatusCode::kOk;
   base::UmaHistogramBoolean(
-      "Extensions.ServiceWorkerBackground.WorkerUnregistrationState", success);
+      "Extensions.ServiceWorkerBackground.WorkerUnregistrationState2", success);
   base::UmaHistogramBoolean(
       "Extensions.ServiceWorkerBackground.WorkerUnregistrationState_"
-      "AddExtension",
+      "AddExtension2",
       success);
 
   if (!success) {
     // TODO(crbug.com/346732739): Handle this case.
     LOG(ERROR) << "Failed to unregister service worker for extension "
                << extension_id;
+    base::UmaHistogramEnumeration(
+        "Extensions.ServiceWorkerBackground.WorkerUnregistrationFailureStatus3",
+        status);
+    base::UmaHistogramEnumeration(
+        "Extensions.ServiceWorkerBackground.WorkerUnregistrationFailureStatus_"
+        "AddExtension3",
+        status);
   }
 }
 
@@ -624,7 +633,8 @@ void ExtensionRegistrar::MaybeSpinUpLazyContext(const Extension* extension,
   context_id.GetTaskQueue()->AddPendingTask(context_id, base::DoNothing());
 }
 
-void ExtensionRegistrar::OnServiceWorkerRegistered(const WorkerId& worker_id) {
+void ExtensionRegistrar::OnStartedTrackingServiceWorkerInstance(
+    const WorkerId& worker_id) {
   // Just release the host. We only get here when the new worker has been
   // attached and resumed by the DevTools, and all we need in case of service
   // worker-based extensions is to keep the host around for the target

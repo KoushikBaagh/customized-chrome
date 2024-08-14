@@ -30,7 +30,6 @@
 #include "components/signin/public/base/signin_pref_names.h"
 #include "components/signin/public/base/signin_switches.h"
 #include "components/signin/public/identity_manager/account_info.h"
-#include "components/supervised_user/core/common/supervised_user_constants.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
@@ -148,9 +147,9 @@ void ProfileAttributesEntry::RegisterLocalStatePrefs(
 
 ProfileAttributesEntry::ProfileAttributesEntry() = default;
 
-ProfileManagementOicdTokens::ProfileManagementOicdTokens() {}
+ProfileManagementOidcTokens::ProfileManagementOidcTokens() {}
 
-ProfileManagementOicdTokens::ProfileManagementOicdTokens(
+ProfileManagementOidcTokens::ProfileManagementOidcTokens(
     const std::string& auth_token,
     const std::string& id_token,
     const std::u16string& identity_name)
@@ -158,23 +157,23 @@ ProfileManagementOicdTokens::ProfileManagementOicdTokens(
       id_token(id_token),
       identity_name(identity_name) {}
 
-ProfileManagementOicdTokens::ProfileManagementOicdTokens(
+ProfileManagementOidcTokens::ProfileManagementOidcTokens(
     const std::string& auth_token,
     const std::string& id_token,
     const std::string& state)
     : auth_token(auth_token), id_token(id_token), state(state) {}
 
-ProfileManagementOicdTokens::ProfileManagementOicdTokens(
-    ProfileManagementOicdTokens&& other) = default;
-ProfileManagementOicdTokens& ProfileManagementOicdTokens::operator=(
-    ProfileManagementOicdTokens&& other) = default;
+ProfileManagementOidcTokens::ProfileManagementOidcTokens(
+    ProfileManagementOidcTokens&& other) = default;
+ProfileManagementOidcTokens& ProfileManagementOidcTokens::operator=(
+    ProfileManagementOidcTokens&& other) = default;
 
-ProfileManagementOicdTokens::ProfileManagementOicdTokens(
-    const ProfileManagementOicdTokens& other) = default;
-ProfileManagementOicdTokens& ProfileManagementOicdTokens::operator=(
-    const ProfileManagementOicdTokens& other) = default;
+ProfileManagementOidcTokens::ProfileManagementOidcTokens(
+    const ProfileManagementOidcTokens& other) = default;
+ProfileManagementOidcTokens& ProfileManagementOidcTokens::operator=(
+    const ProfileManagementOidcTokens& other) = default;
 
-ProfileManagementOicdTokens::~ProfileManagementOicdTokens() = default;
+ProfileManagementOidcTokens::~ProfileManagementOidcTokens() = default;
 
 void ProfileAttributesEntry::Initialize(ProfileAttributesStorage* storage,
                                         const base::FilePath& path,
@@ -211,16 +210,6 @@ void ProfileAttributesEntry::Initialize(ProfileAttributesStorage* storage,
     // Reset the locked state to avoid a profile being locked after the force
     // signin policy has been disabled.
     SetBool(kForceSigninProfileLockedKey, false);
-  }
-
-  // If the kOutlineSilhouetteIcon feature state has changed, notify that the
-  // avatar icon has changed once so that cached avatar images will be updated
-  // (e.g. the application badge icon on Windows).
-  if (base::FeatureList::IsEnabled(kOutlineSilhouetteIcon) !=
-      GetBool(kIsUsingNewPlaceholderAvatarIcon)) {
-    SetBool(kIsUsingNewPlaceholderAvatarIcon,
-            base::FeatureList::IsEnabled(kOutlineSilhouetteIcon));
-    profile_attributes_storage_->NotifyOnProfileAvatarChanged(profile_path_);
   }
 }
 
@@ -462,10 +451,6 @@ bool ProfileAttributesEntry::IsSupervised() const {
   return !GetSupervisedUserId().empty();
 }
 
-bool ProfileAttributesEntry::IsChild() const {
-  return GetSupervisedUserId() == supervised_user::kChildAccountSUID;
-}
-
 bool ProfileAttributesEntry::IsOmitted() const {
   return is_omitted_;
 }
@@ -596,9 +581,9 @@ std::string ProfileAttributesEntry::GetProfileManagementEnrollmentToken()
   return GetString(kProfileManagementEnrollmentToken);
 }
 
-ProfileManagementOicdTokens
+ProfileManagementOidcTokens
 ProfileAttributesEntry::GetProfileManagementOidcTokens() const {
-  return ProfileManagementOicdTokens(GetString(kProfileManagementOidcAuthToken),
+  return ProfileManagementOidcTokens(GetString(kProfileManagementOidcAuthToken),
                                      GetString(kProfileManagementOidcIdToken),
                                      GetString(kProfileManagementOidcState));
 }
@@ -796,8 +781,22 @@ void ProfileAttributesEntry::SetProfileThemeColors(
 
   if (changed) {
     profile_attributes_storage_->NotifyProfileThemeColorsChanged(GetPath());
-    if (GetAvatarIconIndex() == profiles::GetPlaceholderAvatarIndex())
-      profile_attributes_storage_->NotifyOnProfileAvatarChanged(GetPath());
+  }
+
+  // If the kOutlineSilhouetteIcon feature state has changed, notify that the
+  // avatar icon has changed once so that cached avatar images will be updated
+  // (e.g. the application badge icon on Windows).
+  if (base::FeatureList::IsEnabled(kOutlineSilhouetteIcon) !=
+      GetBool(kIsUsingNewPlaceholderAvatarIcon)) {
+    SetBool(kIsUsingNewPlaceholderAvatarIcon,
+            base::FeatureList::IsEnabled(kOutlineSilhouetteIcon));
+    changed = true;
+  }
+
+  // Only notify if the profile uses the placeholder avatar.
+  if (changed &&
+      GetAvatarIconIndex() == profiles::GetPlaceholderAvatarIndex()) {
+    profile_attributes_storage_->NotifyOnProfileAvatarChanged(GetPath());
   }
 }
 
@@ -815,7 +814,7 @@ void ProfileAttributesEntry::SetProfileManagementEnrollmentToken(
 }
 
 void ProfileAttributesEntry::SetProfileManagementOidcTokens(
-    const ProfileManagementOicdTokens& oidc_tokens) {
+    const ProfileManagementOidcTokens& oidc_tokens) {
   SetString(kProfileManagementOidcAuthToken, oidc_tokens.auth_token);
   SetString(kProfileManagementOidcIdToken, oidc_tokens.id_token);
   SetString(kProfileManagementOidcState, oidc_tokens.state);

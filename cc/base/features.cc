@@ -66,10 +66,6 @@ BASE_FEATURE(kRenderSurfaceCommonAncestorClip,
              "RenderSurfaceCommonAncestorClip",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kFluentScrollbarUsesNinePatchTrack,
-             "FluentScrollbarUsesNinePatchTrack",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kNonBlockingCommit,
              "NonBlockingCommit",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -211,6 +207,13 @@ BASE_FEATURE(kDontAlwaysPushPictureLayerImpls,
 BASE_FEATURE(kWarmUpCompositor,
              "WarmUpCompositor",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kCCSlimming, "CCSlimming", base::FEATURE_ENABLED_BY_DEFAULT);
+
+bool IsCCSlimmingEnabled() {
+  static const bool enabled = base::FeatureList::IsEnabled(kCCSlimming);
+  return enabled;
+}
 
 const base::FeatureParam<std::string> kScrollEventDispatchMode(
     &kWaitForLateScrollEvents,

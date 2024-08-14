@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "ash/constants/ash_features.h"
+#include "ash/constants/ash_switches.h"
 #include "ash/test/ash_test_base.h"
 #include "ash/test/ash_test_helper.h"
 #include "base/containers/extend.h"
@@ -21,6 +22,7 @@
 #include "base/strings/strcat.h"
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
+#include "base/test/scoped_command_line.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/scoped_run_loop_timeout.h"
 #include "base/test/task_environment.h"
@@ -248,6 +250,8 @@ class AppPlatformMetricsServiceTest
     if (IsLacrosEnabled()) {
       feature_list_.InitWithFeatures(
           /*enabled_features=*/ash::standalone_browser::GetFeatureRefs(), {});
+      scoped_command_line_.GetProcessCommandLine()->AppendSwitch(
+          ash::switches::kEnableLacrosForTesting);
     } else {
       feature_list_.InitWithFeatures(
           {}, /*disabled_features=*/ash::standalone_browser::GetFeatureRefs());
@@ -836,6 +840,7 @@ class AppPlatformMetricsServiceTest
 
  protected:
   base::test::ScopedFeatureList feature_list_;
+  base::test::ScopedCommandLine scoped_command_line_;
 
  private:
   std::unique_ptr<TestBrowserWindowAura> browser_window1_;
@@ -2306,7 +2311,7 @@ class AppPlatformInputMetricsTest : public AppPlatformMetricsServiceTest {
       case InputEventSource::kUnknown:
         break;
       case InputEventSource::kMouse: {
-        ui::MouseEvent mouse_event(ui::ET_MOUSE_RELEASED, gfx::Point(),
+        ui::MouseEvent mouse_event(ui::EventType::kMouseReleased, gfx::Point(),
                                    gfx::Point(), base::TimeTicks(), 0, 0);
         ui::Event::DispatcherApi(&mouse_event).set_target(window());
         app_platform_input_metrics()->OnMouseEvent(&mouse_event);
@@ -2314,7 +2319,7 @@ class AppPlatformInputMetricsTest : public AppPlatformMetricsServiceTest {
       }
       case InputEventSource::kStylus: {
         ui::TouchEvent touch_event(
-            ui::ET_TOUCH_RELEASED, gfx::Point(), base::TimeTicks(),
+            ui::EventType::kTouchReleased, gfx::Point(), base::TimeTicks(),
             ui::PointerDetails(ui::EventPointerType::kPen, 0));
         ui::Event::DispatcherApi(&touch_event).set_target(window());
         app_platform_input_metrics()->OnTouchEvent(&touch_event);
@@ -2322,14 +2327,14 @@ class AppPlatformInputMetricsTest : public AppPlatformMetricsServiceTest {
       }
       case InputEventSource::kTouch: {
         ui::TouchEvent touch_event(
-            ui::ET_TOUCH_RELEASED, gfx::Point(), base::TimeTicks(),
+            ui::EventType::kTouchReleased, gfx::Point(), base::TimeTicks(),
             ui::PointerDetails(ui::EventPointerType::kTouch, 0));
         ui::Event::DispatcherApi(&touch_event).set_target(window());
         app_platform_input_metrics()->OnTouchEvent(&touch_event);
         break;
       }
       case InputEventSource::kKeyboard: {
-        ui::KeyEvent key_event(ui::ET_KEY_RELEASED, ui::VKEY_MENU,
+        ui::KeyEvent key_event(ui::EventType::kKeyReleased, ui::VKEY_MENU,
                                ui::EF_ALT_DOWN);
         ui::Event::DispatcherApi(&key_event).set_target(window());
         app_platform_input_metrics()->OnKeyEvent(&key_event);
@@ -2943,6 +2948,8 @@ class AppDiscoveryMetricsTest : public AppPlatformMetricsServiceTest {
     std::vector<base::test::FeatureRef> disabled;
     if (IsLacrosEnabled()) {
       base::Extend(enabled, ash::standalone_browser::GetFeatureRefs());
+      scoped_command_line_.GetProcessCommandLine()->AppendSwitch(
+          ash::switches::kEnableLacrosForTesting);
     } else {
       base::Extend(disabled, ash::standalone_browser::GetFeatureRefs());
     }
@@ -3391,6 +3398,8 @@ class AppPlatformMetricsServiceObserverTest
     if (IsLacrosEnabled()) {
       feature_list_.InitWithFeatures(
           /*enabled_features=*/ash::standalone_browser::GetFeatureRefs(), {});
+      scoped_command_line_.GetProcessCommandLine()->AppendSwitch(
+          ash::switches::kEnableLacrosForTesting);
     } else {
       feature_list_.InitWithFeatures(
           {}, /*disabled_features=*/ash::standalone_browser::GetFeatureRefs());
@@ -3408,6 +3417,7 @@ class AppPlatformMetricsServiceObserverTest
 
  private:
   base::test::ScopedFeatureList feature_list_;
+  base::test::ScopedCommandLine scoped_command_line_;
 
   // Mock observer for the `AppPlatformMetricsService` component. Needs to
   // outlive the lifetime of the component for testing purposes.

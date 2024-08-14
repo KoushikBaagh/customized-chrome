@@ -178,13 +178,6 @@ BASE_FEATURE(kCanvasOopRasterization,
 );
 #endif
 
-// Enables the use of out of process rasterization for canvas even when GPU tile
-// rasterization is disabled. CanvasOopRasterization is still required to be
-// enabled to use OOP-C path with this flag.
-BASE_FEATURE(kCanvasOopWithoutGpuTileRaster,
-             "CanvasOopWithoutGpuTileRaster",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables the use of MSAA in skia on Ice Lake and later intel architectures.
 BASE_FEATURE(kEnableMSAAOnNewIntelGPUs,
              "EnableMSAAOnNewIntelGPUs",
@@ -217,12 +210,6 @@ BASE_FEATURE(kAdjustGpuProcessPriority,
              "AdjustGpuProcessPriority",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
-
-// Fix to move cache key prefix generation from host to gpu service side in
-// order to avoid race in GpuInfo. crbug.com/1506660.
-BASE_FEATURE(kGenGpuDiskCacheKeyPrefixInGpuService,
-             "GenGpuDiskCacheKeyPrefixInGpuService",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // When enabled, Grshader disk cache will be cleared on startup if any cache
 // entry prefix does not match with the current prefix. prefix is made up of
@@ -448,11 +435,7 @@ BASE_FEATURE(kD3DBackingUploadWithUpdateSubresource,
 // restarting a gpu service.
 BASE_FEATURE(kHandleOverlaysSwapFailure,
              "HandleOverlaysSwapFailure",
-#if BUILDFLAG(IS_CHROMEOS_ASH)
-             base::FEATURE_ENABLED_BY_DEFAULT);
-#else
              base::FEATURE_DISABLED_BY_DEFAULT);
-#endif
 
 bool UseGles2ForOopR() {
 #if BUILDFLAG(IS_ANDROID) && defined(ARCH_CPU_X86_FAMILY)
@@ -607,11 +590,6 @@ bool IsSkiaGraphiteSupportedByDevice(const base::CommandLine* command_line) {
   }
 #if BUILDFLAG(IS_MAC)
   // The following code tries to match angle::IsMetalRendererAvailable().
-  // ANGLE requires at least macOS 10.13 for Metal 2.0.
-  const int macos_version = base::mac::MacOSVersion();
-  if (macos_version < 10'13'00) {
-    return false;
-  }
   auto model_name_split = base::SysInfo::SplitHardwareModelNameDoNotUse(
       base::SysInfo::HardwareModelName());
   if (model_name_split.has_value()) {

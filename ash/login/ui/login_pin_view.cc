@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "ash/login/ui/login_pin_view.h"
 
 #include <memory>
@@ -170,11 +175,11 @@ class BasePinButton : public views::View {
   }
 
   void OnEvent(ui::Event* event) override {
-    bool is_key_press = event->type() == ui::ET_KEY_PRESSED &&
+    bool is_key_press = event->type() == ui::EventType::kKeyPressed &&
                         (event->AsKeyEvent()->code() == ui::DomCode::ENTER ||
                          event->AsKeyEvent()->code() == ui::DomCode::SPACE);
-    bool is_mouse_press = event->type() == ui::ET_MOUSE_PRESSED;
-    bool is_gesture_tap = event->type() == ui::ET_GESTURE_TAP_DOWN;
+    bool is_mouse_press = event->type() == ui::EventType::kMousePressed;
+    bool is_gesture_tap = event->type() == ui::EventType::kGestureTapDown;
 
     if (is_key_press || is_mouse_press || is_gesture_tap) {
       DispatchPress(event);
@@ -316,9 +321,9 @@ class LoginPinView::BackspacePinButton : public BasePinButton {
       return;
     }
     // If this is a button release style event cancel any repeat.
-    if (event->type() == ui::ET_GESTURE_TAP_CANCEL ||
-        event->type() == ui::ET_GESTURE_END ||
-        event->type() == ui::ET_MOUSE_RELEASED) {
+    if (event->type() == ui::EventType::kGestureTapCancel ||
+        event->type() == ui::EventType::kGestureEnd ||
+        event->type() == ui::EventType::kMouseReleased) {
       CancelRepeat();
     }
   }
@@ -477,7 +482,7 @@ void LoginPinView::TestApi::SetBackspaceTimers(
 }
 
 void LoginPinView::TestApi::ClickOnDigit(int number) const {
-  ui::MouseEvent event(ui::ET_MOUSE_PRESSED, gfx::Point(), gfx::Point(),
+  ui::MouseEvent event(ui::EventType::kMousePressed, gfx::Point(), gfx::Point(),
                        ui::EventTimeForNow(), 0, 0);
   GetButton(number)->OnEvent(&event);
 }

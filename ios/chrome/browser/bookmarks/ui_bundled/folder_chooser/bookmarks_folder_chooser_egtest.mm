@@ -481,6 +481,9 @@ BookmarkStorageType kindOfTestToStorageType(KindOfTest kind) {
   [BookmarkEarlGrey
       removeBookmarkWithTitle:@"Folder 2"
                     inStorage:kindOfTestToStorageType(kindOfTest)];
+  // TODO(crbug.com/354761339): This shouldn't be necessary, needs more
+  // investigation.
+  [ChromeEarlGreyUI waitForAppToIdle];
   [BookmarkEarlGrey
       removeBookmarkWithTitle:@"Folder 1"
                     inStorage:kindOfTestToStorageType(kindOfTest)];
@@ -929,8 +932,9 @@ BookmarkStorageType kindOfTestToStorageType(KindOfTest kind) {
   [[EarlGrey selectElementWithMatcher:TappableBookmarkNodeWithLabel(
                                           @"Title For New Folder")]
       performAction:grey_tap()];
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityID(@"Folder 1.1")]
-      assertWithMatcher:grey_sufficientlyVisible()];
+  [ChromeEarlGrey
+      waitForSufficientlyVisibleElementWithMatcher:grey_accessibilityID(
+                                                       @"Folder 1.1")];
 }
 
 // Verify Move functionality on multiple folder selection.
@@ -1418,9 +1422,9 @@ BookmarkStorageType kindOfTestToStorageType(KindOfTest kind) {
   }
 
   // Verify the snackbar title.
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityLabel(
-                                          base::SysUTF16ToNSString(label))]
-      assertWithMatcher:grey_notNil()];
+  [ChromeEarlGrey
+      waitForUIElementToAppearWithMatcher:grey_accessibilityLabel(
+                                              base::SysUTF16ToNSString(label))];
 
   // Tap on the snackbar.
   NSString* snackbarLabel =

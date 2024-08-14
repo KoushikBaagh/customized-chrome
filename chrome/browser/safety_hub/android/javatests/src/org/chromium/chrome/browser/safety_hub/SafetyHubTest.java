@@ -29,6 +29,9 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 
+import static org.chromium.chrome.browser.safety_hub.SafetyHubMetricUtils.DASHBOARD_INTERACTIONS_HISTOGRAM_NAME;
+import static org.chromium.chrome.browser.safety_hub.SafetyHubMetricUtils.NOTIFICATIONS_INTERACTIONS_HISTOGRAM_NAME;
+import static org.chromium.chrome.browser.safety_hub.SafetyHubMetricUtils.PERMISSIONS_INTERACTIONS_HISTOGRAM_NAME;
 import static org.chromium.ui.test.util.ViewUtils.onViewWaiting;
 
 import android.app.Activity;
@@ -59,9 +62,9 @@ import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Features;
+import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.base.test.util.JniMocker;
 import org.chromium.build.BuildConfig;
 import org.chromium.chrome.browser.customtabs.CustomTabActivity;
@@ -70,6 +73,9 @@ import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.profiles.ProfileManager;
 import org.chromium.chrome.browser.safe_browsing.SafeBrowsingBridge;
 import org.chromium.chrome.browser.safe_browsing.SafeBrowsingState;
+import org.chromium.chrome.browser.safety_hub.SafetyHubMetricUtils.DashboardInteractions;
+import org.chromium.chrome.browser.safety_hub.SafetyHubMetricUtils.NotificationsModuleInteractions;
+import org.chromium.chrome.browser.safety_hub.SafetyHubMetricUtils.PermissionsModuleInteractions;
 import org.chromium.chrome.browser.settings.SettingsActivity;
 import org.chromium.chrome.browser.settings.SettingsActivityTestRule;
 import org.chromium.chrome.browser.tab.Tab;
@@ -218,6 +224,13 @@ public final class SafetyHubTest {
         mUnusedPermissionsBridge.setPermissionsDataForReview(
                 new PermissionsData[] {PERMISSIONS_DATA_1});
         mPermissionsFragmentTestRule.startSettingsActivity();
+        var histogramWatcher =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords(
+                                PERMISSIONS_INTERACTIONS_HISTOGRAM_NAME,
+                                PermissionsModuleInteractions.ALLOW_AGAIN,
+                                PermissionsModuleInteractions.UNDO_ALLOW_AGAIN)
+                        .build();
 
         // Regrant the permissions by clicking the corresponding action button.
         clickOnButtonNextToText(PERMISSIONS_DATA_1.getOrigin());
@@ -226,6 +239,8 @@ public final class SafetyHubTest {
         // Click on the action button of the snackbar to undo the above action.
         onViewWaiting(withText(R.string.undo)).perform(click());
         onViewWaiting(withText(PERMISSIONS_DATA_1.getOrigin())).check(matches(isDisplayed()));
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -235,6 +250,14 @@ public final class SafetyHubTest {
         mUnusedPermissionsBridge.setPermissionsDataForReview(
                 new PermissionsData[] {PERMISSIONS_DATA_1, PERMISSIONS_DATA_2});
         mSafetyHubFragmentTestRule.startSettingsActivity();
+        var histogramWatcher =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords(
+                                PERMISSIONS_INTERACTIONS_HISTOGRAM_NAME,
+                                PermissionsModuleInteractions.OPEN_REVIEW_UI,
+                                PermissionsModuleInteractions.ACKNOWLEDGE_ALL,
+                                PermissionsModuleInteractions.UNDO_ACKNOWLEDGE_ALL)
+                        .build();
 
         // Verify the permissions module is displaying the info state.
         String permissionsTitle =
@@ -269,6 +292,8 @@ public final class SafetyHubTest {
         // again.
         onViewWaiting(withText(R.string.undo)).perform(click());
         onViewWaiting(withText(permissionsTitle)).check(matches(isDisplayed()));
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -317,9 +342,16 @@ public final class SafetyHubTest {
     @Feature({"SafetyHubPermissions"})
     public void testPermissionsToSiteSettings() {
         SettingsActivity activity = mPermissionsFragmentTestRule.startSettingsActivity();
+        var histogramWatcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        PERMISSIONS_INTERACTIONS_HISTOGRAM_NAME,
+                        PermissionsModuleInteractions.GO_TO_SETTINGS);
+
         openActionBarOverflowOrOptionsMenu(activity);
         onViewWaiting(withText(R.string.safety_hub_go_to_site_settings_button)).perform(click());
         onViewWaiting(withText(R.string.prefs_site_settings)).check(matches(isDisplayed()));
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -329,6 +361,13 @@ public final class SafetyHubTest {
         mNotificationPermissionReviewBridge.setNotificationPermissionsForReview(
                 new NotificationPermissions[] {NOTIFICATION_PERMISSIONS_1});
         mNotificationsFragmentTestRule.startSettingsActivity();
+        var histogramWatcher =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords(
+                                NOTIFICATIONS_INTERACTIONS_HISTOGRAM_NAME,
+                                NotificationsModuleInteractions.IGNORE,
+                                NotificationsModuleInteractions.UNDO_IGNORE)
+                        .build();
 
         // Always allow the notification by clicking the corresponding menu button.
         clickOnButtonNextToText(NOTIFICATION_PERMISSIONS_1.getPrimaryPattern());
@@ -339,6 +378,8 @@ public final class SafetyHubTest {
         onViewWaiting(withText(R.string.undo)).perform(click());
         onViewWaiting(withText(NOTIFICATION_PERMISSIONS_1.getPrimaryPattern()))
                 .check(matches(isDisplayed()));
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -348,6 +389,13 @@ public final class SafetyHubTest {
         mNotificationPermissionReviewBridge.setNotificationPermissionsForReview(
                 new NotificationPermissions[] {NOTIFICATION_PERMISSIONS_1});
         mNotificationsFragmentTestRule.startSettingsActivity();
+        var histogramWatcher =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords(
+                                NOTIFICATIONS_INTERACTIONS_HISTOGRAM_NAME,
+                                NotificationsModuleInteractions.RESET,
+                                NotificationsModuleInteractions.UNDO_RESET)
+                        .build();
 
         // Reset the notification by clicking the corresponding menu button.
         clickOnButtonNextToText(NOTIFICATION_PERMISSIONS_1.getPrimaryPattern());
@@ -358,6 +406,8 @@ public final class SafetyHubTest {
         onViewWaiting(withText(R.string.undo)).perform(click());
         onViewWaiting(withText(NOTIFICATION_PERMISSIONS_1.getPrimaryPattern()))
                 .check(matches(isDisplayed()));
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -369,6 +419,14 @@ public final class SafetyHubTest {
                     NOTIFICATION_PERMISSIONS_1, NOTIFICATION_PERMISSIONS_2
                 });
         mSafetyHubFragmentTestRule.startSettingsActivity();
+        var histogramWatcher =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords(
+                                NOTIFICATIONS_INTERACTIONS_HISTOGRAM_NAME,
+                                NotificationsModuleInteractions.OPEN_UI_REVIEW,
+                                NotificationsModuleInteractions.BLOCK_ALL,
+                                NotificationsModuleInteractions.UNDO_BLOCK_ALL)
+                        .build();
 
         // Verify the notifications module is displaying the info state.
         String notificationsTitle =
@@ -406,6 +464,8 @@ public final class SafetyHubTest {
         // again.
         onViewWaiting(withText(R.string.undo)).perform(click());
         onViewWaiting(withText(notificationsTitle)).check(matches(isDisplayed()));
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -459,6 +519,11 @@ public final class SafetyHubTest {
     @Feature({"SafetyHubNotifications"})
     public void testNotificationsToNotificationSettings() {
         SettingsActivity activity = mNotificationsFragmentTestRule.startSettingsActivity();
+        var histogramWatcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        NOTIFICATIONS_INTERACTIONS_HISTOGRAM_NAME,
+                        NotificationsModuleInteractions.GO_TO_SETTINGS);
+
         openActionBarOverflowOrOptionsMenu(activity);
         onViewWaiting(withText(R.string.safety_hub_go_to_notification_settings_button))
                 .perform(click());
@@ -467,6 +532,8 @@ public final class SafetyHubTest {
                                 withText(R.string.push_notifications_permission_title),
                                 withParent(withId(R.id.action_bar))))
                 .check(matches(isDisplayed()));
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -477,6 +544,10 @@ public final class SafetyHubTest {
 
         mSafetyHubFragmentTestRule.startSettingsActivity();
         SafetyHubFragment safetyHubFragment = mSafetyHubFragmentTestRule.getFragment();
+        var histogramWatcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        DASHBOARD_INTERACTIONS_HISTOGRAM_NAME,
+                        DashboardInteractions.GO_TO_SAFE_BROWSING_SETTINGS);
 
         // Verify the safe browsing module is displaying the enhanced protection state.
         String safeBrowsingTitle =
@@ -495,6 +566,8 @@ public final class SafetyHubTest {
         scrollToExpandedPreference(safeBrowsingTitle);
         clickOnSecondaryButtonNextToText(safeBrowsingTitle);
         onViewWaiting(withText(R.string.prefs_safe_browsing_title)).check(matches(isDisplayed()));
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -503,7 +576,6 @@ public final class SafetyHubTest {
     @CommandLineFlags.Add({
         ChromeSwitches.FORCE_UPDATE_MENU_UPDATE_TYPE + "=update_available",
     })
-    @DisabledTest(message = "b/354050691")
     public void testUpdateCheckModule() {
         // TODO(crbug.com/324562205): Move the initialization of the SafetyHubFetchService so
         // that there is no dependency on ChromeTabbedActivity.
@@ -520,6 +592,10 @@ public final class SafetyHubTest {
         verifyButtonsNextToTextVisibility(updateCheckTitle, true);
 
         if (BuildConfig.IS_CHROME_BRANDED) {
+            var histogramWatcher =
+                    HistogramWatcher.newSingleRecordWatcher(
+                            DASHBOARD_INTERACTIONS_HISTOGRAM_NAME,
+                            DashboardInteractions.OPEN_PLAY_STORE);
             executeWhileCapturingIntents(
                     () -> {
                         // Open the Play Store.
@@ -531,6 +607,7 @@ public final class SafetyHubTest {
                                                 ContentUrlConstants.PLAY_STORE_URL_PREFIX
                                                         + getPackageName())));
                     });
+            histogramWatcher.assertExpected();
         }
     }
 
@@ -571,6 +648,13 @@ public final class SafetyHubTest {
                 new PermissionsData[] {PERMISSIONS_DATA_1, PERMISSIONS_DATA_2});
         mSafetyHubFragmentTestRule.startSettingsActivity();
         SafetyHubFragment safetyHubFragment = mSafetyHubFragmentTestRule.getFragment();
+        var histogramWatcher =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords(
+                                PERMISSIONS_INTERACTIONS_HISTOGRAM_NAME,
+                                PermissionsModuleInteractions.ACKNOWLEDGE_ALL,
+                                PermissionsModuleInteractions.UNDO_ACKNOWLEDGE_ALL)
+                        .build();
 
         // Verify the permissions module is displaying the info state.
         String permissionsTitle =
@@ -603,6 +687,8 @@ public final class SafetyHubTest {
                                 safetyHubFragment.getProfile()));
         assertEquals(2, permissionsList.size());
         assertThat(permissionsList, containsInAnyOrder(PERMISSIONS_DATA_1, PERMISSIONS_DATA_2));
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -611,6 +697,10 @@ public final class SafetyHubTest {
     public void testPermissionsModule_SafeState() {
         mUnusedPermissionsBridge.setPermissionsDataForReview(new PermissionsData[] {});
         mSafetyHubFragmentTestRule.startSettingsActivity();
+        var histogramWatcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        PERMISSIONS_INTERACTIONS_HISTOGRAM_NAME,
+                        PermissionsModuleInteractions.GO_TO_SETTINGS);
 
         // Verify the permissions module is displaying the safe state.
         String permissionsTitle =
@@ -629,6 +719,8 @@ public final class SafetyHubTest {
         scrollToExpandedPreference(permissionsTitle);
         clickOnSecondaryButtonNextToText(permissionsTitle);
         onViewWaiting(withText(R.string.prefs_site_settings)).check(matches(isDisplayed()));
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -641,6 +733,13 @@ public final class SafetyHubTest {
                 });
         mSafetyHubFragmentTestRule.startSettingsActivity();
         SafetyHubFragment safetyHubFragment = mSafetyHubFragmentTestRule.getFragment();
+        var histogramWatcher =
+                HistogramWatcher.newBuilder()
+                        .expectIntRecords(
+                                NOTIFICATIONS_INTERACTIONS_HISTOGRAM_NAME,
+                                NotificationsModuleInteractions.BLOCK_ALL,
+                                NotificationsModuleInteractions.UNDO_BLOCK_ALL)
+                        .build();
 
         // Verify the notifications module is displaying the info state.
         String notificationsTitle =
@@ -676,6 +775,8 @@ public final class SafetyHubTest {
         assertThat(
                 notificationPermissions,
                 containsInAnyOrder(NOTIFICATION_PERMISSIONS_1, NOTIFICATION_PERMISSIONS_2));
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -685,6 +786,10 @@ public final class SafetyHubTest {
         mNotificationPermissionReviewBridge.setNotificationPermissionsForReview(
                 new NotificationPermissions[] {});
         mSafetyHubFragmentTestRule.startSettingsActivity();
+        var histogramWatcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        NOTIFICATIONS_INTERACTIONS_HISTOGRAM_NAME,
+                        NotificationsModuleInteractions.GO_TO_SETTINGS);
 
         // Verify the notifications module is displaying the safe state.
         String notificationsTitle =
@@ -708,6 +813,8 @@ public final class SafetyHubTest {
                                 withText(R.string.push_notifications_permission_title),
                                 withParent(withId(R.id.action_bar))))
                 .check(matches(isDisplayed()));
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -748,6 +855,10 @@ public final class SafetyHubTest {
     public void testSafetyToolsLearnMoreLink_OpensInCCT() {
         mSafetyHubFragmentTestRule.startSettingsActivity();
         SafetyHubFragment safetyHubFragment = mSafetyHubFragmentTestRule.getFragment();
+        var histogramWatcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        DASHBOARD_INTERACTIONS_HISTOGRAM_NAME,
+                        DashboardInteractions.OPEN_SAFETY_TOOLS_INFO);
         scrollToLastPosition();
 
         String safetyTipsTitle =
@@ -770,6 +881,8 @@ public final class SafetyHubTest {
         clickOnPreferenceWithTextAndWaitForActivity(
                 withText(safetyToolsTitle), SafetyHubFragment.SAFETY_TOOLS_LEARN_MORE_URL);
         pressBack();
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -778,6 +891,10 @@ public final class SafetyHubTest {
     public void testIncognitoLearnMoreLink_OpensInCCT() {
         mSafetyHubFragmentTestRule.startSettingsActivity();
         SafetyHubFragment safetyHubFragment = mSafetyHubFragmentTestRule.getFragment();
+        var histogramWatcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        DASHBOARD_INTERACTIONS_HISTOGRAM_NAME,
+                        DashboardInteractions.OPEN_INCOGNITO_INFO);
         scrollToLastPosition();
 
         String safetyTipsTitle =
@@ -800,6 +917,8 @@ public final class SafetyHubTest {
         clickOnPreferenceWithTextAndWaitForActivity(
                 withText(incognitoTitle), SafetyHubFragment.INCOGNITO_LEARN_MORE_URL);
         pressBack();
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
@@ -808,6 +927,10 @@ public final class SafetyHubTest {
     public void testSafeBrowsingLearnMoreLink_OpensInCCT() {
         mSafetyHubFragmentTestRule.startSettingsActivity();
         SafetyHubFragment safetyHubFragment = mSafetyHubFragmentTestRule.getFragment();
+        var histogramWatcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        DASHBOARD_INTERACTIONS_HISTOGRAM_NAME,
+                        DashboardInteractions.OPEN_SAFE_BROWSING_INFO);
         scrollToLastPosition();
 
         String safetyTipsTitle =
@@ -829,12 +952,18 @@ public final class SafetyHubTest {
         clickOnPreferenceWithTextAndWaitForActivity(
                 withText(safeBrowsingTitle), SafetyHubFragment.SAFE_BROWSING_LEARN_MORE_URL);
         pressBack();
+
+        histogramWatcher.assertExpected();
     }
 
     @Test
     @MediumTest
     public void testHelpCenterArticle() {
         mSafetyHubFragmentTestRule.startSettingsActivity();
+        var histogramWatcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        DASHBOARD_INTERACTIONS_HISTOGRAM_NAME,
+                        DashboardInteractions.OPEN_HELP_CENTER);
 
         // Verify the help center info button is displayed and clicking on it opens the correct
         // link in CCT.
@@ -842,6 +971,8 @@ public final class SafetyHubTest {
         clickOnPreferenceWithTextAndWaitForActivity(
                 withId(R.id.menu_id_targeted_help), SafetyHubFragment.HELP_CENTER_URL);
         pressBack();
+
+        histogramWatcher.assertExpected();
     }
 
     private void clickOnPreferenceWithTextAndWaitForActivity(

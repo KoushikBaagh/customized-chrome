@@ -84,9 +84,6 @@ AXMediaAppUntrustedHandler::AXMediaAppUntrustedHandler(
     : browser_context_(context),
       native_window_(native_window),
       media_app_page_(std::move(page)) {
-  if (!base::FeatureList::IsEnabled(ash::features::kMediaAppPdfA11yOcr)) {
-    return;
-  }
   auto* profile =
       Profile::FromBrowserContext(base::to_address(browser_context_));
   ocr_ = screen_ai::OpticalCharacterRecognizer::CreateWithStatusCallback(
@@ -161,8 +158,7 @@ void AXMediaAppUntrustedHandler::OnOCRServiceInitialized(bool successful) {
 }
 
 bool AXMediaAppUntrustedHandler::IsAccessibilityEnabled() const {
-  return base::FeatureList::IsEnabled(ash::features::kMediaAppPdfA11yOcr) &&
-         accessibility_state_utils::IsScreenReaderEnabled();
+  return accessibility_state_utils::IsScreenReaderEnabled();
 }
 
 #if BUILDFLAG(IS_CHROMEOS_ASH)
@@ -1091,8 +1087,9 @@ bool AXMediaAppUntrustedHandler::HasRendererTerminatedDueToBadPageId(
     const std::string& method_name,
     const std::string& page_id) {
   if (!page_metadata_.contains(page_id)) {
-    const std::string error_str = std::format(
-        "`{}` called with previously non-existent page ID", method_name);
+    const std::string error_str =
+        base::StringPrintf("`%s` called with previously non-existent page ID",
+                           method_name.c_str());
     if (bad_message_callback_ && !(*bad_message_callback_).is_null()) {
       std::move(*bad_message_callback_).Run(error_str);
     } else {

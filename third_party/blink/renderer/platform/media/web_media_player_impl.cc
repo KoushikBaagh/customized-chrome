@@ -48,6 +48,7 @@
 #include "media/base/media_switches.h"
 #include "media/base/media_url_demuxer.h"
 #include "media/base/memory_dump_provider_proxy.h"
+#include "media/base/remoting_constants.h"
 #include "media/base/renderer.h"
 #include "media/base/routing_token_callback.h"
 #include "media/base/supported_types.h"
@@ -61,7 +62,6 @@
 #include "media/learning/common/media_learning_tasks.h"
 #include "media/learning/mojo/public/cpp/mojo_learning_task_controller.h"
 #include "media/media_buildflags.h"
-#include "media/remoting/remoting_constants.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "net/base/data_url.h"
@@ -2607,6 +2607,18 @@ void WebMediaPlayerImpl::OnIdleTimeout() {
   }
 
   UpdatePlayState();
+}
+
+void WebMediaPlayerImpl::OnFrameShown() {
+  DCHECK(main_task_runner_->BelongsToCurrentThread());
+  // TODO(crbug.com/351354996): This method should be implemented in a follow-up
+  // CL.
+}
+
+void WebMediaPlayerImpl::OnFrameHidden() {
+  DCHECK(main_task_runner_->BelongsToCurrentThread());
+  // TODO(crbug.com/351354996): This method should be implemented in a follow-up
+  // CL.
 }
 
 void WebMediaPlayerImpl::SetVolumeMultiplier(double multiplier) {

@@ -158,7 +158,9 @@ class TestReportingContext : public ReportingContext {
       base::Clock* clock,
       const base::TickClock* tick_clock,
       const ReportingPolicy& policy,
-      ReportingCache::PersistentReportingStore* store = nullptr);
+      ReportingCache::PersistentReportingStore* store = nullptr,
+      const base::flat_map<std::string, GURL>& enterprise_reporting_endpoints =
+          {});
 
   TestReportingContext(const TestReportingContext&) = delete;
   TestReportingContext& operator=(const TestReportingContext&) = delete;
@@ -223,6 +225,11 @@ class ReportingTestBase : public TestWithTaskEnvironment {
                             const base::UnguessableToken& reporting_source,
                             const IsolationInfo& isolation_info,
                             const GURL& url);
+
+  // Sets an enterprise endpoint with the given group_key and url as origin in
+  // the enterprise endpoints vector.
+  void SetEnterpriseEndpointInCache(const ReportingEndpointGroupKey& group_key,
+                                    const GURL& url);
 
   // Returns whether an endpoint with the given properties exists in the cache.
   bool EndpointExistsInCache(const ReportingEndpointGroupKey& group_key,
@@ -339,6 +346,9 @@ class TestReportingService : public ReportingService {
       const url::Origin& origin,
       const IsolationInfo& isolation_info,
       const base::flat_map<std::string, std::string>& endpoints) override {}
+
+  void SetEnterpriseReportingEndpoints(
+      const base::flat_map<std::string, GURL>& endpoints) override {}
 
   void SendReportsAndRemoveSource(
       const base::UnguessableToken& reporting_source) override {}

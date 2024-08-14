@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #ifndef MEDIA_BASE_VIDEO_FRAME_H_
 #define MEDIA_BASE_VIDEO_FRAME_H_
 
@@ -916,6 +921,10 @@ class MEDIA_EXPORT VideoFrame : public base::RefCountedThreadSafe<VideoFrame> {
   // Set by WrapVideoFrame to soft-apply a new set of format, visible rectangle,
   // and natural size on |wrapped_frame_|
   scoped_refptr<VideoFrame> wrapped_frame_;
+  // This is set when WrapVideoFrame() was given an already wrapped frame,
+  // and it needs to be preserved for proper destruction later
+  // (e.g. calling |done_callbacks_|).
+  scoped_refptr<VideoFrame> intermediate_wrapped_frame_;
 
   // Storage type for the different planes.
   StorageType storage_type_;  // TODO(mcasas): make const

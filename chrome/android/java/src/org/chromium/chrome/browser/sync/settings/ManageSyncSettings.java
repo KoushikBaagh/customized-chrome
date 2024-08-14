@@ -42,6 +42,7 @@ import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.search_engines.TemplateUrlServiceFactory;
 import org.chromium.chrome.browser.settings.ChromeBaseSettingsFragment;
 import org.chromium.chrome.browser.settings.ChromeManagedPreferenceDelegate;
+import org.chromium.chrome.browser.settings.SettingsLauncherFactory;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.signin.services.ProfileDataCache;
 import org.chromium.chrome.browser.signin.services.SigninManager;
@@ -61,13 +62,9 @@ import org.chromium.chrome.browser.ui.theme.ChromeSemanticColorUtils;
 import org.chromium.components.browser_ui.settings.ChromeBaseCheckBoxPreference;
 import org.chromium.components.browser_ui.settings.ChromeBasePreference;
 import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
-import org.chromium.components.browser_ui.settings.FragmentSettingsLauncher;
-import org.chromium.components.browser_ui.settings.SettingsLauncher;
 import org.chromium.components.browser_ui.settings.SettingsUtils;
 import org.chromium.components.search_engines.TemplateUrlService;
 import org.chromium.components.signin.AccountManagerFacadeProvider;
-import org.chromium.components.signin.Tribool;
-import org.chromium.components.signin.base.AccountInfo;
 import org.chromium.components.signin.base.CoreAccountInfo;
 import org.chromium.components.signin.identitymanager.ConsentLevel;
 import org.chromium.components.signin.identitymanager.IdentityManager;
@@ -101,7 +98,6 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
                 SyncService.SyncStateChangedListener,
                 IdentityManager.Observer,
                 SyncErrorCardPreference.SyncErrorCardPreferenceListener,
-                FragmentSettingsLauncher,
                 IdentityErrorCardPreference.Listener {
     private static final String IS_FROM_SIGNIN_SCREEN = "ManageSyncSettings.isFromSigninScreen";
 
@@ -139,6 +135,9 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
     @VisibleForTesting
     private static final String PREF_SETTINGS_SYNC_DISABLED_BY_ADMINISTRATOR =
             "settings_sync_disabled_by_administrator";
+
+    @VisibleForTesting
+    public static final String PREF_BATCH_UPLOAD_CARD_PREFERENCE = "batch_upload_card";
 
     @VisibleForTesting
     public static final String PREF_ACCOUNT_SECTION_HISTORY_TOGGLE =
@@ -194,8 +193,8 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
     private static final int REQUEST_CODE_TRUSTED_VAULT_KEY_RETRIEVAL = 1;
     private static final int REQUEST_CODE_TRUSTED_VAULT_RECOVERABILITY_DEGRADED = 2;
 
+    private BatchUploadCardPreference mBatchUploadCardPreference;
     private SyncService mSyncService;
-    private SettingsLauncher mSettingsLauncher;
     private SnackbarManager mSnackbarManager;
 
     private boolean mIsFromSigninScreen;
@@ -265,6 +264,16 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
                             findPreference(PREF_IDENTITY_ERROR_CARD_PREFERENCE);
             identityErrorCardPreference.initialize(profile, this);
 
+            if (ChromeFeatureList.isEnabled(ChromeFeatureList.ENABLE_BATCH_UPLOAD_FROM_SETTINGS)) {
+                mBatchUploadCardPreference =
+                        (BatchUploadCardPreference)
+                                findPreference(PREF_BATCH_UPLOAD_CARD_PREFERENCE);
+                mBatchUploadCardPreference.initialize(
+                        getActivity(),
+                        profile,
+                        ((ModalDialogManagerHolder) getActivity()).getModalDialogManager());
+            }
+
             if (mSyncService.isSyncDisabledByEnterprisePolicy()) {
                 ChromeBasePreference settingsSyncDisabledByAdministrator =
                         (ChromeBasePreference)
@@ -328,7 +337,7 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
                             this, () -> SigninUtils.openSettingsForAllAccounts(getActivity())));
 
             mSignOutPreference = (SignoutButtonPreference) findPreference(PREF_SIGN_OUT);
-            if (isSupervisedUser()) {
+            if (getProfile().isChild()) {
                 mSignOutPreference.setVisible(false);
             } else {
                 mSignOutPreference.initialize(
@@ -532,6 +541,13 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
     @Override
     public void onResume() {
         super.onResume();
+        // This is necessary to refresh the batch upload card if the user leaves Chrome open on the
+        // settings screen, changes their screen lock settings, and then returns to Chrome.
+        if (shouldReplaceSyncSettingsWithAccountSettings()
+                && ChromeFeatureList.isEnabled(
+                        ChromeFeatureList.ENABLE_BATCH_UPLOAD_FROM_SETTINGS)) {
+            mBatchUploadCardPreference.hideBatchUploadCardAndUpdate();
+        }
         updateSyncPreferences();
     }
 
@@ -663,10 +679,15 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
             // error.
             closeDialogIfOpen(FRAGMENT_CUSTOM_PASSPHRASE);
             closeDialogIfOpen(FRAGMENT_ENTER_PASSPHRASE);
-            setEncryptionErrorSummary(
-                    mSyncService.isEncryptEverythingEnabled()
-                            ? R.string.sync_error_card_title
-                            : R.string.password_sync_error_summary);
+            if (shouldReplaceSyncSettingsWithAccountSettings()) {
+                // Show the same text as the error card button.
+                setEncryptionErrorSummary(R.string.identity_error_card_button_verify);
+            } else {
+                setEncryptionErrorSummary(
+                        mSyncService.isEncryptEverythingEnabled()
+                                ? R.string.sync_error_card_title
+                                : R.string.password_sync_error_summary);
+            }
             return;
         }
 
@@ -790,14 +811,17 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
         mSnackbarManager = snackbarManager;
         if (shouldReplaceSyncSettingsWithAccountSettings()) {
             mSignOutPreference.setSnackbarManager(snackbarManager);
+            if (ChromeFeatureList.isEnabled(ChromeFeatureList.ENABLE_BATCH_UPLOAD_FROM_SETTINGS)) {
+                mBatchUploadCardPreference.setSnackbarManager(snackbarManager);
+            }
         }
     }
 
     private void onGoogleActivityControlsClicked(String signedInAccountName) {
         if (ChromeFeatureList.isEnabled(ChromeFeatureList.LINKED_SERVICES_SETTING)
                 && isEeaChoiceCountry()) {
-            mSettingsLauncher.launchSettingsActivity(
-                    getContext(), PersonalizeGoogleServicesSettings.class);
+            SettingsLauncherFactory.createSettingsLauncher()
+                    .launchSettingsActivity(getContext(), PersonalizeGoogleServicesSettings.class);
             RecordUserAction.record("Signin_AccountSettings_PersonalizeGoogleServicesClicked");
         } else {
             AppHooks.get()
@@ -999,16 +1023,6 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
         }
     }
 
-    /**
-     * Overrides FragmentSettingsLauncher.setSettingsLauncher to inject the App SettingsLauncher.
-     *
-     * @param settingsLauncher App SettingsLauncher instance.
-     */
-    @Override
-    public void setSettingsLauncher(SettingsLauncher settingsLauncher) {
-        mSettingsLauncher = settingsLauncher;
-    }
-
     // SyncErrorCardPreferenceListener implementation:
     @Override
     public boolean shouldSuppressSyncSetupIncomplete() {
@@ -1151,29 +1165,5 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
         TemplateUrlService templateUrlService =
                 TemplateUrlServiceFactory.getForProfile(getProfile());
         return templateUrlService.isEeaChoiceCountry();
-    }
-
-    private boolean isSupervisedUser() {
-        if (ChromeFeatureList.isEnabled(
-                ChromeFeatureList.REPLACE_PROFILE_IS_CHILD_WITH_ACCOUNT_CAPABILITIES_ON_ANDROID)) {
-            IdentityManager identityManager =
-                    IdentityServicesProvider.get().getIdentityManager(getProfile());
-
-            // SEED_ACCOUNTS_REVAMP is needed for using capabilities, otherwise
-            // findExtendedAccountInfoByEmailAddress is not guaranteed to have the needed account
-            assert ChromeFeatureList.isEnabled(ChromeFeatureList.SEED_ACCOUNTS_REVAMP);
-
-            CoreAccountInfo corePrimaryAccountInfo =
-                    identityManager.getPrimaryAccountInfo(ConsentLevel.SIGNIN);
-            if (corePrimaryAccountInfo != null) {
-                AccountInfo extendedAccountInfo =
-                        identityManager.findExtendedAccountInfoByEmailAddress(
-                                corePrimaryAccountInfo.getEmail());
-                return extendedAccountInfo.getAccountCapabilities().isSubjectToParentalControls()
-                        == Tribool.TRUE;
-            }
-            return false;
-        }
-        return getProfile().isChild();
     }
 }

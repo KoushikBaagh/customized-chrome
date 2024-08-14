@@ -100,10 +100,6 @@ BASE_DECLARE_FEATURE(kWebAuthnRelatedOrigin);
 COMPONENT_EXPORT(DEVICE_FIDO)
 BASE_DECLARE_FEATURE(kAllowExtensionsToSetWebAuthnRpIds);
 
-// Send and receive JSON from Play Services.
-COMPONENT_EXPORT(DEVICE_FIDO)
-BASE_DECLARE_FEATURE(kWebAuthnAndroidFidoJson);
-
 // Prefer dispatching to a platform (i.e. internal transport) virtual
 // authenticator if available.
 COMPONENT_EXPORT(DEVICE_FIDO)
@@ -148,6 +144,10 @@ BASE_DECLARE_FEATURE(kWebAuthnAndroidOpenAccessory);
 // Send enclave requests with 5 seconds delay. For development purposes only.
 COMPONENT_EXPORT(DEVICE_FIDO)
 BASE_DECLARE_FEATURE(kWebAuthnEnclaveAuthenticatorDelay);
+
+// Enable non-autofill sign-in UI for conditional mediation.
+COMPONENT_EXPORT(DEVICE_FIDO)
+BASE_DECLARE_FEATURE(kWebAuthnAmbientSignin);
 
 }  // namespace device
 

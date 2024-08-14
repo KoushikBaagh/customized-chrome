@@ -643,8 +643,6 @@ public final class ChromePreferenceKeys {
      */
     public static final String PWA_RESTORE_PROMO_STAGE = "Chrome.PwaRestore.PromoStage";
 
-    public static final String REGULAR_TAB_COUNT = "Chrome.StartSurface.RegularTabCount";
-    public static final String INCOGNITO_TAB_COUNT = "Chrome.StartSurface.IncognitoTabCount";
     public static final String IS_LAST_VISITED_TAB_SRP = "Chrome.StartSurface.IsLastVisitedTabSRP";
 
     /** Key used to store user actions for collapsing search resumption module on NTP. */
@@ -714,6 +712,10 @@ public final class ChromePreferenceKeys {
 
     public static final String SHARING_LAST_SHARED_COMPONENT_NAME =
             "Chrome.Sharing.LastSharedComponentName";
+
+    /** Stores whether the tab group creation dialog should be shown. */
+    public static final String SHOW_TAB_GROUP_CREATION_DIALOG =
+            "Chrome.Tab.ShowTabGroupCreationDialog";
 
     public static final String SIGNIN_ACCOUNTS_CHANGED = "prefs_sync_accounts_changed";
 
@@ -803,6 +805,7 @@ public final class ChromePreferenceKeys {
     public static final String TAB_DECLUTTER_AUTO_DELETE_TIME_DELTA_HOURS =
             "Chrome.Tab.ArchiveAutoDeleteTimeDeltaHours";
     public static final String TAB_DECLUTTER_DIALOG_IPH = "Chrome.Tab.ShowArchiveTabDialogIPH";
+    public static final String TAB_DECLUTTER_IPH_SHOWING = "Chrome.Tab.ArchiveIphShowing";
     public static final String TAB_ID_MANAGER_NEXT_ID =
             "org.chromium.chrome.browser.tab.TabIdManager.NEXT_ID";
 
@@ -962,7 +965,6 @@ public final class ChromePreferenceKeys {
                 IMAGE_DESCRIPTIONS_DONT_ASK_AGAIN,
                 INCOGNITO_REAUTH_PROMO_CARD_ENABLED,
                 INCOGNITO_REAUTH_PROMO_SHOW_COUNT,
-                INCOGNITO_TAB_COUNT,
                 IS_CHROME_DEFAULT_SEARCH_ENGINE_GOOGLE,
                 IS_EEA_CHOICE_COUNTRY,
                 IS_LAST_VISITED_TAB_SRP,
@@ -1021,12 +1023,12 @@ public final class ChromePreferenceKeys {
                 PROMO_TIMES_SEEN.pattern(),
                 PWA_RESTORE_APPS_AVAILABLE,
                 PWA_RESTORE_PROMO_STAGE,
-                REGULAR_TAB_COUNT,
                 SEARCH_ENGINE_CHOICE_OS_CHOICE_APPLIED_TIMESTAMP,
                 SEGMENTATION_FEED_ACTIVE_USER,
                 SETTINGS_SAFETY_CHECK_LAST_RUN_TIMESTAMP,
                 SETTINGS_SAFETY_CHECK_RUN_COUNTER,
                 SHARING_LAST_SHARED_COMPONENT_NAME,
+                SHOW_TAB_GROUP_CREATION_DIALOG,
                 SYNC_PROMO_SHOW_COUNT.pattern(),
                 SIGNIN_PROMO_NTP_FIRST_SHOWN_TIME,
                 SIGNIN_PROMO_NTP_LAST_SHOWN_TIME,
@@ -1040,6 +1042,7 @@ public final class ChromePreferenceKeys {
                 TAB_DECLUTTER_AUTO_DELETE_ENABLED,
                 TAB_DECLUTTER_AUTO_DELETE_TIME_DELTA_HOURS,
                 TAB_DECLUTTER_DIALOG_IPH,
+                TAB_DECLUTTER_IPH_SHOWING,
                 TAB_TEARING_MAX_INSTANCES_FAILURE_START_TIME_MS,
                 TAB_TEARING_MAX_INSTANCES_FAILURE_COUNT,
                 TWA_DISCLOSURE_SEEN_PACKAGES,

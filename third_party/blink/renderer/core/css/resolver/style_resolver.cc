@@ -137,6 +137,11 @@ bool ShouldStoreOldStyle(const StyleRecalcContext& style_recalc_context,
   // inside a size query container, or doing multiple style resolutions for
   // position-try-fallbacks.
   //
+  // For anchored elements that generate pseudo elements, we also need to store
+  // the old style for animating pseudo elements because style recalc for the
+  // originating anchored elements will always update its pseudo elements,
+  // causing the pseudo element styling to also have multiple passes.
+  //
   // If we are not inside a size query container or an element with
   // position-try-fallbacks, we can fall back to the default behavior (in
   // CSSAnimations) of using the current style on Element as the old style.
@@ -149,6 +154,9 @@ bool ShouldStoreOldStyle(const StyleRecalcContext& style_recalc_context,
   return (style_recalc_context.container ||
           state.StyleBuilder().HasAnchorFunctions() ||
           state.StyleBuilder().PositionAnchor() ||
+          (state.IsForPseudoElement() &&
+           (state.ParentStyle()->HasAnchorFunctions() ||
+            state.ParentStyle()->PositionAnchor())) ||
           state.StyleBuilder().GetPositionTryFallbacks() != nullptr) &&
          state.CanAffectAnimations();
 }
@@ -876,7 +884,7 @@ void StyleResolver::ForEachUARulesForElement(const Element& element,
   CSSDefaultStyleSheets& default_style_sheets =
       CSSDefaultStyleSheets::Instance();
   if (!print_media_type_) {
-    if (LIKELY(element.IsHTMLElement() || element.IsVTTElement())) {
+    if (element.IsHTMLElement() || element.IsVTTElement()) [[likely]] {
       func(default_style_sheets.DefaultHtmlStyle());
     } else if (element.IsSVGElement()) {
       func(default_style_sheets.DefaultSVGStyle());
@@ -1541,7 +1549,7 @@ void StyleResolver::ApplyBaseStyleNoCache(
 
   if (!cache_success.IsFullCacheHit()) {
     ApplyPropertiesFromCascade(state, cascade, cache_success);
-    MaybeAddToMatchedPropertiesCache(state, cache_success, result);
+    MaybeAddToMatchedPropertiesCache(state, cache_success);
   }
 
   // TODO(crbug.com/1024156): do this for CustomHighlightNames too, so we
@@ -2463,8 +2471,7 @@ StyleResolver::CacheSuccess StyleResolver::ApplyMatchedCache(
 
 void StyleResolver::MaybeAddToMatchedPropertiesCache(
     StyleResolverState& state,
-    const CacheSuccess& cache_success,
-    const MatchResult& match_result) {
+    const CacheSuccess& cache_success) {
   state.LoadPendingResources();
 
   // NOTE: We replace everything that isn't a full cache hit. There are cases
@@ -3156,10 +3163,8 @@ void StyleResolver::PropagateStyleToViewport() {
                    nullptr);
     PROPAGATE_FROM(document_element_style, ForcedColorAdjust,
                    SetForcedColorAdjust, EForcedColorAdjust::kAuto);
-    if (RuntimeEnabledFeatures::UsedColorSchemeRootScrollbarsEnabled()) {
-      PROPAGATE_FROM(document_element_style, ColorSchemeFlagsIsNormal,
-                     SetColorSchemeFlagsIsNormal, false);
-    }
+    PROPAGATE_FROM(document_element_style, ColorSchemeFlagsIsNormal,
+                   SetColorSchemeFlagsIsNormal, false);
   }
 
   // scroll-start

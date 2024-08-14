@@ -132,6 +132,12 @@ const NSTextAlignment kDefaultTextAlignment = NSTextAlignmentCenter;
     };
   }
 
+  if (self.buttonAccessibilityLabel) {
+    cell.button.accessibilityLabel = self.buttonAccessibilityLabel;
+  } else {
+    cell.button.accessibilityLabel = nil;
+  }
+
   cell.button.configuration = buttonConfiguration;
 
   [cell disableButtonIntrinsicWidth:self.disableButtonIntrinsicWidth];

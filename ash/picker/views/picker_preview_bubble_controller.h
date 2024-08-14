@@ -5,13 +5,22 @@
 #ifndef ASH_PICKER_VIEWS_PICKER_PREVIEW_BUBBLE_CONTROLLER_H_
 #define ASH_PICKER_VIEWS_PICKER_PREVIEW_BUBBLE_CONTROLLER_H_
 
+#include <optional>
+
 #include "ash/ash_export.h"
 #include "ash/public/cpp/holding_space/holding_space_image.h"
 #include "base/callback_list.h"
+#include "base/files/file.h"
+#include "base/functional/callback_forward.h"
 #include "base/memory/weak_ptr.h"
+#include "base/observer_list.h"
 #include "base/scoped_observation.h"
 #include "base/timer/timer.h"
 #include "ui/views/widget/widget_observer.h"
+
+namespace base {
+class FilePath;
+}
 
 namespace views {
 class View;
@@ -24,6 +33,12 @@ class PickerPreviewBubbleView;
 
 class ASH_EXPORT PickerPreviewBubbleController : public views::WidgetObserver {
  public:
+  class Observer : public base::CheckedObserver {
+   public:
+    // Called when the bubble is shown or hidden.
+    virtual void OnPreviewBubbleVisibilityChanged(bool visible) = 0;
+  };
+
   PickerPreviewBubbleController();
   PickerPreviewBubbleController(const PickerPreviewBubbleController&) = delete;
   PickerPreviewBubbleController& operator=(
@@ -37,25 +52,38 @@ class ASH_EXPORT PickerPreviewBubbleController : public views::WidgetObserver {
   // `anchor_view` must not be `nullptr`.
   // Destroying `anchor_view` closes the bubble if it's shown.
   void ShowBubbleAfterDelay(HoldingSpaceImage* async_preview_image,
+                            const base::FilePath& path,
                             views::View* anchor_view);
 
   // TODO: b/322899032 - Take in an `anchor_view` to avoid accidentally closing
   // the bubble view shown by a different anchor view.
   void CloseBubble();
 
+  bool IsBubbleVisible() const;
+
+  void AddObserver(Observer* observer);
+  void RemoveObserver(Observer* observer);
+
+  // Updates the bubble view labels for the currently open bubble.
+  // If the bubble is not shown, this does nothing.
+  // If `text` is empty, then the bubble view labels are hidden.
+  void SetBubbleMainText(const std::u16string& text);
+
   // views::WidgetObserver:
   void OnWidgetDestroying(views::Widget* widget) override;
 
-  void ShowBubbleImmediatelyForTesting(HoldingSpaceImage* async_preview_image,
-                                       views::View* anchor_view);
+  void ShowBubbleImmediatelyForTesting(
+      HoldingSpaceImage* async_preview_image,
+      views::View* anchor_view);
 
   PickerPreviewBubbleView* bubble_view_for_testing() const;
 
  private:
   void UpdateBubbleImage();
 
-  void CreateBubbleWidget(HoldingSpaceImage* async_preview_image,
-                          views::View* anchor_view);
+  void CreateBubbleWidget(
+      HoldingSpaceImage* async_preview_image,
+      views::View* anchor_view);
 
   // Shows the bubble if one has been created. Does nothing if the bubble is
   // already being shown.
@@ -68,6 +96,8 @@ class ASH_EXPORT PickerPreviewBubbleController : public views::WidgetObserver {
 
   // Owned by the bubble widget.
   raw_ptr<PickerPreviewBubbleView> bubble_view_;
+
+  base::ObserverList<Observer> observers_;
 
   base::CallbackListSubscription image_subscription_;
   base::ScopedObservation<views::Widget, views::WidgetObserver>

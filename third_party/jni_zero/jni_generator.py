@@ -209,7 +209,8 @@ class JniObject:
 
     # These are different only for legacy reasons.
     if from_javap:
-      self.jni_namespace = options.namespace or 'JNI_' + self.java_class.name
+      self.jni_namespace = options.namespace or 'JNI_' + self.java_class.name.replace(
+          '$', '__')
     else:
       self.jni_namespace = parsed_file.jni_namespace or options.namespace
 
@@ -228,6 +229,7 @@ class JniObject:
     self.natives = natives
 
     called_by_natives = []
+    print(self.filename + f' {len(parsed_file.called_by_natives)}')
     for parsed_called_by_native in parsed_file.called_by_natives:
       called_by_natives.append(
           CalledByNative(parsed_called_by_native,

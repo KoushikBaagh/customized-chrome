@@ -647,7 +647,14 @@ class MODULES_EXPORT AXObjectCacheImpl
     return plugin_included_node_count_;
   }
   HeapHashMap<AXID, Member<AXObject>>& GetObjects() { return objects_; }
-#endif
+
+  // Used to turn on accessibility checks for internal Web UI, e.g. history,
+  // preferences, etc. Will trigger DCHECKS so that WebUI with basic a11y errors
+  // fail tests.
+  // TODO(accessibility) Use for more things that have 0% false positives, such
+  // as focusable objects requiring a name.
+  bool IsInternalUICheckerOn(const AXObject& obj) const;
+#endif  // DCHECK_IS_ON()
 
   // Used to turn on accessibility checks for internal Web UI, e.g. history,
   // preferences, etc. Will trigger DCHECKS so that WebUI with basic a11y errors
@@ -1238,6 +1245,9 @@ class MODULES_EXPORT AXObjectCacheImpl
   // changes remaining to be serialized.
   blink::WeakCellFactory<AXObjectCacheImpl>
       weak_factory_for_loc_updates_pipeline_{this};
+
+  // Whether or not the load event was sent in a previous serialization.
+  bool load_sent_ = false;
 };
 
 // This is the only subclass of AXObjectCache.

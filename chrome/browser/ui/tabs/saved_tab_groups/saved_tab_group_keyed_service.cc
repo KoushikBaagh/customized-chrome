@@ -20,8 +20,8 @@
 #include "base/uuid.h"
 #include "chrome/browser/bookmarks/url_and_id.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/sync/data_type_store_service_factory.h"
 #include "chrome/browser/sync/device_info_sync_service_factory.h"
-#include "chrome/browser/sync/model_type_store_service_factory.h"
 #include "chrome/browser/sync/sync_service_factory.h"
 #include "chrome/browser/ui/bookmarks/bookmark_utils_desktop.h"
 #include "chrome/browser/ui/browser.h"
@@ -41,12 +41,13 @@
 #include "components/saved_tab_groups/stats.h"
 #include "components/saved_tab_groups/sync_data_type_configuration.h"
 #include "components/saved_tab_groups/tab_group_sync_metrics_logger.h"
+#include "components/saved_tab_groups/tab_group_sync_service.h"
 #include "components/saved_tab_groups/types.h"
-#include "components/sync/base/model_type.h"
+#include "components/sync/base/data_type.h"
 #include "components/sync/base/report_unrecoverable_error.h"
-#include "components/sync/model/client_tag_based_model_type_processor.h"
-#include "components/sync/model/model_type_change_processor.h"
-#include "components/sync/model/model_type_store_service.h"
+#include "components/sync/model/client_tag_based_data_type_processor.h"
+#include "components/sync/model/data_type_local_change_processor.h"
+#include "components/sync/model/data_type_store_service.h"
 #include "components/sync/service/sync_service.h"
 #include "components/sync/service/sync_user_settings.h"
 #include "components/sync_device_info/device_info_sync_service.h"
@@ -58,19 +59,45 @@
 namespace tab_groups {
 namespace {
 
+class ScopedLocalObservationPauserImpl : public ScopedLocalObservationPauser {
+ public:
+  explicit ScopedLocalObservationPauserImpl(
+      SavedTabGroupModelListener* listener);
+  ~ScopedLocalObservationPauserImpl() override;
+
+  // Disallow copy/assign.
+  ScopedLocalObservationPauserImpl(const ScopedLocalObservationPauserImpl&) =
+      delete;
+  ScopedLocalObservationPauserImpl& operator=(
+      const ScopedLocalObservationPauserImpl&) = delete;
+
+ private:
+  raw_ptr<SavedTabGroupModelListener> listener_;
+};
+
+ScopedLocalObservationPauserImpl::ScopedLocalObservationPauserImpl(
+    SavedTabGroupModelListener* listener)
+    : listener_(listener) {
+  listener_->PauseLocalObservation();
+}
+
+ScopedLocalObservationPauserImpl::~ScopedLocalObservationPauserImpl() {
+  listener_->ResumeLocalObservation();
+}
+
 constexpr base::TimeDelta kDelayBeforeMetricsLogged = base::Hours(1);
 
-std::unique_ptr<syncer::ModelTypeChangeProcessor>
+std::unique_ptr<syncer::DataTypeLocalChangeProcessor>
 CreateSavedTabGroupChangeProcessor() {
-  return std::make_unique<syncer::ClientTagBasedModelTypeProcessor>(
+  return std::make_unique<syncer::ClientTagBasedDataTypeProcessor>(
       syncer::SAVED_TAB_GROUP,
       base::BindRepeating(&syncer::ReportUnrecoverableError,
                           chrome::GetChannel()));
 }
 
-std::unique_ptr<syncer::ModelTypeChangeProcessor>
+std::unique_ptr<syncer::DataTypeLocalChangeProcessor>
 CreateSharedTabGroupDataChangeProcessor() {
-  return std::make_unique<syncer::ClientTagBasedModelTypeProcessor>(
+  return std::make_unique<syncer::ClientTagBasedDataTypeProcessor>(
       syncer::SHARED_TAB_GROUP_DATA,
       base::BindRepeating(&syncer::ReportUnrecoverableError,
                           chrome::GetChannel()));
@@ -78,7 +105,7 @@ CreateSharedTabGroupDataChangeProcessor() {
 
 std::unique_ptr<SyncDataTypeConfiguration>
 MaybeCreateSyncConfigurationForSharedTabGroupData(
-    syncer::OnceModelTypeStoreFactory store_factory) {
+    syncer::OnceDataTypeStoreFactory store_factory) {
   if (!base::FeatureList::IsEnabled(
           data_sharing::features::kDataSharingFeature)) {
     return nullptr;
@@ -132,18 +159,18 @@ bool SavedTabGroupKeyedService::AreSavedTabGroupsSynced() {
       syncer::UserSelectableType::kSavedTabGroups);
 }
 
-syncer::OnceModelTypeStoreFactory SavedTabGroupKeyedService::GetStoreFactory() {
-  DCHECK(ModelTypeStoreServiceFactory::GetForProfile(profile()));
-  return ModelTypeStoreServiceFactory::GetForProfile(profile())
+syncer::OnceDataTypeStoreFactory SavedTabGroupKeyedService::GetStoreFactory() {
+  DCHECK(DataTypeStoreServiceFactory::GetForProfile(profile()));
+  return DataTypeStoreServiceFactory::GetForProfile(profile())
       ->GetStoreFactory();
 }
 
-base::WeakPtr<syncer::ModelTypeControllerDelegate>
+base::WeakPtr<syncer::DataTypeControllerDelegate>
 SavedTabGroupKeyedService::GetSavedTabGroupControllerDelegate() {
   return sync_bridge_mediator_.GetSavedTabGroupControllerDelegate();
 }
 
-base::WeakPtr<syncer::ModelTypeControllerDelegate>
+base::WeakPtr<syncer::DataTypeControllerDelegate>
 SavedTabGroupKeyedService::GetSharedTabGroupControllerDelegate() {
   return sync_bridge_mediator_.GetSharedTabGroupControllerDelegate();
 }
@@ -193,6 +220,11 @@ void SavedTabGroupKeyedService::UpdateAttributions(
 std::optional<std::string> SavedTabGroupKeyedService::GetLocalCacheGuid()
     const {
   return sync_bridge_mediator_.GetLocalCacheGuidForSavedBridge();
+}
+
+std::unique_ptr<ScopedLocalObservationPauser>
+SavedTabGroupKeyedService::CreateScopedLocalObserverPauser() {
+  return std::make_unique<ScopedLocalObservationPauserImpl>(&listener_);
 }
 
 void SavedTabGroupKeyedService::OnTabAddedToGroupLocally(
@@ -631,8 +663,9 @@ void SavedTabGroupKeyedService::UpdateGroupVisualData(
   CHECK(saved_group);
 
   // Update the group to use the saved title and color.
-  TabGroupVisualData visual_data(saved_group->title(), saved_group->color(),
-                                 /*is_collapsed=*/false);
+  TabGroupVisualData visual_data(
+      saved_group->title(), saved_group->color(),
+      /*is_collapsed=*/tab_group->visual_data()->is_collapsed());
   tab_group->SetVisualData(visual_data, /*is_customized=*/true);
 }
 

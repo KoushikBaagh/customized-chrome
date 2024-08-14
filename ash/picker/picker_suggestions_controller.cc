@@ -6,7 +6,8 @@
 
 #include "ash/picker/model/picker_mode_type.h"
 #include "ash/picker/model/picker_model.h"
-#include "ash/picker/picker_clipboard_provider.h"
+#include "ash/picker/picker_clipboard_history_provider.h"
+#include "ash/picker/picker_shortcuts.h"
 #include "ash/picker/search/picker_date_search.h"
 #include "ash/picker/search/picker_math_search.h"
 #include "ash/public/cpp/picker/picker_category.h"
@@ -50,7 +51,8 @@ void PickerSuggestionsController::GetSuggestions(const PickerModel& model,
 
   if (model.GetMode() == PickerModeType::kUnfocused ||
       model.GetMode() == PickerModeType::kNoSelection) {
-    callback.Run({PickerSearchResult::CapsLock(!model.is_caps_lock_enabled())});
+    callback.Run({PickerSearchResult::CapsLock(
+        !model.is_caps_lock_enabled(), GetPickerShortcutForCapsLock())});
   }
 
   if (base::Contains(model.GetAvailableCategories(),
@@ -64,7 +66,6 @@ void PickerSuggestionsController::GetSuggestions(const PickerModel& model,
              PickerSearchResult::CaseTransformData::Type::kUpperCase,
              PickerSearchResult::CaseTransformData::Type::kLowerCase,
              PickerSearchResult::CaseTransformData::Type::kTitleCase,
-             PickerSearchResult::CaseTransformData::Type::kSentenceCase,
          }) {
       case_transform_results.push_back(PickerSearchResult::CaseTransform(type));
     }
@@ -91,7 +92,8 @@ void PickerSuggestionsController::GetSuggestionsForCategory(
     case PickerCategory::kLinks:
       client_->GetSuggestedLinkResults(std::move(callback));
       return;
-    case PickerCategory::kExpressions:
+    case PickerCategory::kEmojisGifs:
+    case PickerCategory::kEmojis:
       NOTREACHED_NORETURN();
     case PickerCategory::kDriveFiles:
       client_->GetRecentDriveFileResults(kMaxRecentFiles, std::move(callback));

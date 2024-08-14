@@ -107,7 +107,6 @@
 #include "ui/views/widget/widget.h"
 #include "ui/wm/core/capture_controller.h"
 #include "ui/wm/core/coordinate_conversion.h"
-#include "ui/wm/core/scoped_animation_disabler.h"
 #include "ui/wm/core/visibility_controller.h"
 #include "ui/wm/core/window_properties.h"
 #include "ui/wm/core/window_util.h"
@@ -238,15 +237,16 @@ void ReparentWindow(aura::Window* window, aura::Window* new_parent) {
 void ReparentAllWindows(aura::Window* src, aura::Window* dst) {
   // Set of windows to move.
   constexpr int kContainerIdsToMove[] = {
+      kShellWindowId_UnparentedContainer,
       kShellWindowId_AlwaysOnTopContainer,
       kShellWindowId_FloatContainer,
       kShellWindowId_PipContainer,
       kShellWindowId_SystemModalContainer,
-      kShellWindowId_LockSystemModalContainer,
-      kShellWindowId_UnparentedContainer,
-      kShellWindowId_OverlayContainer,
       kShellWindowId_LockActionHandlerContainer,
+      kShellWindowId_LockSystemModalContainer,
       kShellWindowId_MenuContainer,
+      kShellWindowId_LiveCaptionContainer,
+      kShellWindowId_OverlayContainer,
   };
   constexpr int kExtraContainerIdsToMoveInUnifiedMode[] = {
       kShellWindowId_LockScreenContainer,
@@ -396,18 +396,18 @@ class RootWindowTargeter : public aura::WindowTargeter {
   // Returns true if the mouse event should be constrainted.
   bool ShouldConstrainMouseClick(ui::LocatedEvent* event,
                                  bool has_capture_target) {
-    if (event->type() == ui::ET_MOUSE_PRESSED && !has_capture_target) {
-      last_mouse_event_type_ = ui::ET_MOUSE_PRESSED;
+    if (event->type() == ui::EventType::kMousePressed && !has_capture_target) {
+      last_mouse_event_type_ = ui::EventType::kMousePressed;
       return true;
     }
-    if (last_mouse_event_type_ == ui::ET_MOUSE_PRESSED &&
-        event->type() == ui::ET_MOUSE_RELEASED && has_capture_target) {
-      last_mouse_event_type_ = ui::ET_UNKNOWN;
+    if (last_mouse_event_type_ == ui::EventType::kMousePressed &&
+        event->type() == ui::EventType::kMouseReleased && has_capture_target) {
+      last_mouse_event_type_ = ui::EventType::kUnknown;
       return true;
     }
     // For other cases, reset the state
-    if (event->type() != ui::ET_MOUSE_CAPTURE_CHANGED) {
-      last_mouse_event_type_ = ui::ET_UNKNOWN;
+    if (event->type() != ui::EventType::kMouseCaptureChanged) {
+      last_mouse_event_type_ = ui::EventType::kUnknown;
     }
     return false;
   }
@@ -417,7 +417,7 @@ class RootWindowTargeter : public aura::WindowTargeter {
                       std::clamp(p.y(), bounds.y(), bounds.bottom() - 1));
   }
 
-  ui::EventType last_mouse_event_type_ = ui::ET_UNKNOWN;
+  ui::EventType last_mouse_event_type_ = ui::EventType::kUnknown;
 };
 
 class ShelfMenuModelAdapter : public AppMenuModelAdapter {
@@ -650,7 +650,7 @@ aura::Window* RootWindowController::FindEventTarget(
   gfx::Point location_in_root(location_in_screen);
   aura::Window* root_window = GetRootWindow();
   ::wm::ConvertPointFromScreen(root_window, &location_in_root);
-  ui::MouseEvent test_event(ui::ET_MOUSE_MOVED, location_in_root,
+  ui::MouseEvent test_event(ui::EventType::kMouseMoved, location_in_root,
                             location_in_root, ui::EventTimeForNow(),
                             ui::EF_NONE, ui::EF_NONE);
   ui::EventTarget* event_handler =
@@ -859,29 +859,6 @@ void RootWindowController::ShowContextMenu(const gfx::Point& location_in_screen,
           views::MenuRunner::FIXED_ANCHOR);
 }
 
-void RootWindowController::HideContextMenu() {
-  if (root_window_menu_model_adapter_) {
-    root_window_menu_model_adapter_->Cancel();
-  }
-}
-
-void RootWindowController::HideContextMenuNoAnimation() {
-  if (!IsContextMenuShown()) {
-    return;
-  }
-
-  views::Widget* submenu_widget =
-      root_window_menu_model_adapter_->GetSubmenuWidget();
-  DCHECK(submenu_widget);
-  wm::ScopedAnimationDisabler disable(submenu_widget->GetNativeWindow());
-  root_window_menu_model_adapter_->Cancel();
-}
-
-bool RootWindowController::IsContextMenuShown() const {
-  return root_window_menu_model_adapter_ &&
-         root_window_menu_model_adapter_->IsShowingMenu();
-}
-
 void RootWindowController::UpdateAfterLoginStatusChange(LoginStatus status) {
   StatusAreaWidget* status_area_widget =
       shelf_->shelf_widget()->status_area_widget();
@@ -973,6 +950,11 @@ void RootWindowController::EndSplitViewOverviewSession(
 void RootWindowController::SetScreenRotationAnimatorForTest(
     std::unique_ptr<ScreenRotationAnimator> animator) {
   screen_rotation_animator_ = std::move(animator);
+}
+
+bool RootWindowController::IsContextMenuShownForTest() const {
+  return root_window_menu_model_adapter_ &&
+         root_window_menu_model_adapter_->IsShowingMenu();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1315,6 +1297,11 @@ void RootWindowController::CreateContainers() {
   ::wm::SetChildWindowVisibilityChangesAnimated(settings_bubble_container);
   settings_bubble_container->SetProperty(::wm::kUsesScreenCoordinatesKey, true);
   settings_bubble_container->SetProperty(kLockedToRootKey, true);
+
+  aura::Window* live_caption_container =
+      CreateContainer(kShellWindowId_LiveCaptionContainer,
+                      "LiveCaptionContainer", lock_screen_related_containers);
+  live_caption_container->SetProperty(wm::kUsesScreenCoordinatesKey, true);
 
   aura::Window* help_bubble_container =
       CreateContainer(kShellWindowId_HelpBubbleContainer, "HelpBubbleContainer",

@@ -257,10 +257,7 @@ LockScreenMediaControlsView::LockScreenMediaControlsView(
 
   contents_view_->SetPaintToLayer();  // Needed for opacity animation.
   contents_view_->layer()->SetFillsBoundsOpaquely(false);
-  ui::ColorId background_color_id =
-      chromeos::features::IsJellyEnabled()
-          ? static_cast<ui::ColorId>(cros_tokens::kCrosSysScrim2)
-          : kColorAshShieldAndBase80;
+  ui::ColorId background_color_id = cros_tokens::kCrosSysScrim2;
   contents_view_->SetBackground(views::CreateThemedRoundedRectBackground(
       background_color_id, kMediaControlsCornerRadius));
 
@@ -668,8 +665,8 @@ void LockScreenMediaControlsView::OnGestureEvent(ui::GestureEvent* event) {
   ConvertPointToScreen(this, &point_in_screen);
 
   switch (event->type()) {
-    case ui::ET_SCROLL_FLING_START:
-    case ui::ET_GESTURE_SCROLL_BEGIN: {
+    case ui::EventType::kScrollFlingStart:
+    case ui::EventType::kGestureScrollBegin: {
       if (is_in_drag_) {
         break;
       }
@@ -679,13 +676,13 @@ void LockScreenMediaControlsView::OnGestureEvent(ui::GestureEvent* event) {
       event->SetHandled();
       break;
     }
-    case ui::ET_GESTURE_SCROLL_UPDATE: {
+    case ui::EventType::kGestureScrollUpdate: {
       last_fling_velocity_ = event->details().scroll_x();
       UpdateDrag(point_in_screen);
       event->SetHandled();
       break;
     }
-    case ui::ET_GESTURE_END: {
+    case ui::EventType::kGestureEnd: {
       if (!is_in_drag_) {
         break;
       }

@@ -5,10 +5,10 @@
 
 load("//lib/branches.star", "branches")
 load("//lib/builder_config.star", "builder_config")
-load("//lib/builder_url.star", "linkify_builder")
 load("//lib/builders.star", "os", "siso")
 load("//lib/consoles.star", "consoles")
 load("//lib/gn_args.star", "gn_args")
+load("//lib/html.star", "linkify_builder")
 load("//lib/try.star", "try_")
 load("//project.star", "settings")
 
@@ -90,21 +90,6 @@ try_.builder(
             "no_symbols",
         ],
     ),
-    siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CQ,
-)
-
-try_.builder(
-    name = "linux-arm64-cast-rel",
-    branch_selector = branches.selector.MAIN,
-    mirrors = [
-        "ci/linux-arm64-cast-rel",
-    ],
-    gn_args = gn_args.config(
-        configs = [
-            "ci/linux-arm64-cast-rel",
-        ],
-    ),
-    contact_team_email = "cast-eng@google.com",
     siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CQ,
 )
 
@@ -231,24 +216,6 @@ try_.builder(
 )
 
 try_.builder(
-    name = "linux-mbi-mode-per-render-process-host-rel",
-    mirrors = builder_config.copy_from("linux-rel"),
-    gn_args = gn_args.config(
-        configs = [
-            "gpu_tests",
-            "release_builder",
-            "remoteexec",
-            "no_symbols",
-            "dcheck_always_on",
-            "mbi_mode_per_render_process_host",
-            "linux",
-            "x64",
-        ],
-    ),
-    siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CQ,
-)
-
-try_.builder(
     name = "linux-multiscreen-fyi-rel",
     mirrors = [
         "ci/linux-multiscreen-fyi-rel",
@@ -368,7 +335,7 @@ try_.orchestrator_builder(
         # crbug/940930
         "chromium.enable_cleandead": 100,
         # b/346598710
-        "chromium.luci_analysis_v2": 50,
+        "chromium.luci_analysis_v2": 100,
     },
     main_list_view = "try",
     # TODO(crbug.com/40241638): Use orchestrator pool once overloaded test pools
@@ -482,21 +449,6 @@ try_.builder(
 )
 
 try_.builder(
-    name = "linux-x64-cast-dbg",
-    branch_selector = branches.selector.MAIN,
-    mirrors = [
-        "ci/linux-x64-cast-dbg",
-    ],
-    gn_args = gn_args.config(
-        configs = [
-            "ci/linux-x64-cast-dbg",
-        ],
-    ),
-    contact_team_email = "cast-eng@google.com",
-    siso_remote_jobs = siso.remote_jobs.LOW_JOBS_FOR_CQ,
-)
-
-try_.builder(
     name = "linux_chromium_archive_rel_ng",
     mirrors = [
         "ci/linux-archive-rel",
@@ -528,7 +480,7 @@ try_.orchestrator_builder(
         # crbug/940930
         "chromium.enable_cleandead": 100,
         # b/346598710
-        "chromium.luci_analysis_v2": 50,
+        "chromium.luci_analysis_v2": 100,
     },
     main_list_view = "try",
     # TODO (crbug.com/1372179): Use orchestrator pool once overloaded test pools
@@ -748,7 +700,7 @@ try_.orchestrator_builder(
         # crbug/940930
         "chromium.enable_cleandead": 100,
         # b/346598710
-        "chromium.luci_analysis_v2": 50,
+        "chromium.luci_analysis_v2": 100,
     },
     main_list_view = "try",
     # TODO (crbug.com/1372179): Use orchestrator pool once overloaded test pools
@@ -885,6 +837,7 @@ try_.gpu.optional_tests_builder(
             # Inclusion filters.
             cq.location_filter(path_regexp = "chrome/browser/vr/.+"),
             cq.location_filter(path_regexp = "content/browser/xr/.+"),
+            cq.location_filter(path_regexp = "content/test/data/gpu/.+"),
             cq.location_filter(path_regexp = "content/test/gpu/.+"),
             cq.location_filter(path_regexp = "gpu/.+"),
             cq.location_filter(path_regexp = "media/audio/.+"),

@@ -95,7 +95,7 @@ IN_PROC_BROWSER_TEST_F(ManagePasswordsIconViewTest, ManageState) {
 IN_PROC_BROWSER_TEST_F(ManagePasswordsIconViewTest, CloseOnClick) {
   SetupPendingPassword();
   EXPECT_TRUE(GetView()->GetVisible());
-  ui::MouseEvent mouse_down(ui::ET_MOUSE_PRESSED, gfx::Point(10, 10),
+  ui::MouseEvent mouse_down(ui::EventType::kMousePressed, gfx::Point(10, 10),
                             gfx::Point(900, 60), ui::EventTimeForNow(),
                             ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON);
   GetView()->OnMousePressed(mouse_down);
@@ -109,13 +109,19 @@ IN_PROC_BROWSER_TEST_F(ManagePasswordsIconViewTestToolbarPinningOnly,
   PinnedToolbarActionsModel::Get(browser()->profile())
       ->UpdatePinnedState(kActionShowPasswordsBubbleOrPage, true);
   BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser());
-  views::Button* button =
+  PinnedActionToolbarButton* button =
       browser_view->toolbar()->pinned_toolbar_actions_container()->GetButtonFor(
           kActionShowPasswordsBubbleOrPage);
   ASSERT_NE(button, nullptr);
 
+  // Underline should not be visible here.
+  EXPECT_EQ(button->GetStatusIndicatorForTesting()->GetVisible(), false);
+
   SetupManagingPasswords();
   ASSERT_FALSE(IsBubbleShowing());
+
+  // Underline should show in this case.
+  EXPECT_EQ(button->GetStatusIndicatorForTesting()->GetVisible(), true);
 
   views::test::InteractionTestUtilSimulatorViews::PressButton(
       button, ui::test::InteractionTestUtil::InputType::kDontCare);

@@ -1045,6 +1045,8 @@ void FetchLoaderBase::PerformHTTPFetch(ExceptionState& exception_state) {
   request.SetAdAuctionHeaders(fetch_request_data_->AdAuctionHeaders());
   request.SetAttributionReportingEligibility(
       fetch_request_data_->AttributionReportingEligibility());
+  request.SetAttributionReportingSupport(
+      fetch_request_data_->AttributionSupport());
   request.SetSharedStorageWritableOptedIn(
       fetch_request_data_->SharedStorageWritable());
 
@@ -1470,8 +1472,8 @@ ScriptPromise<Response> FetchManager::Fetch(ScriptState* script_state,
                                             ExceptionState& exception_state) {
   DCHECK(signal);
   if (signal->aborted()) {
-    exception_state.RethrowV8Exception(signal->reason(script_state).V8Value());
-    return EmptyPromise();
+    return ScriptPromise<Response>::Reject(script_state,
+                                           signal->reason(script_state));
   }
 
   request->SetDestination(network::mojom::RequestDestination::kEmpty);

@@ -8,6 +8,7 @@
 
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
+#include "base/metrics/histogram_functions.h"
 #include "chrome/browser/ui/webid/account_selection_view.h"
 #include "content/public/browser/identity_request_dialog_controller.h"
 #include "third_party/blink/public/mojom/webid/federated_auth_request.mojom-shared.h"
@@ -23,6 +24,7 @@
 #include "chrome/browser/ui/android/webid/jni_headers/Account_jni.h"
 #include "chrome/browser/ui/android/webid/jni_headers/ClientIdMetadata_jni.h"
 #include "chrome/browser/ui/android/webid/jni_headers/IdentityCredentialTokenError_jni.h"
+#include "chrome/browser/ui/android/webid/jni_headers/IdentityProviderData_jni.h"
 #include "chrome/browser/ui/android/webid/jni_headers/IdentityProviderMetadata_jni.h"
 
 using base::android::AppendJavaStringArrayToStringVector;
@@ -48,7 +50,8 @@ ScopedJavaLocalRef<jobject> ConvertToJavaAccount(JNIEnv* env,
       ConvertUTF8ToJavaString(env, account.name),
       ConvertUTF8ToJavaString(env, account.given_name),
       url::GURLAndroid::FromNativeGURL(env, account.picture), decoded_picture,
-      account.login_state == Account::LoginState::kSignIn);
+      account.login_state == Account::LoginState::kSignIn,
+      account.browser_trusted_login_state == Account::LoginState::kSignIn);
 }
 
 ScopedJavaLocalRef<jobject> ConvertToJavaIdentityProviderMetadata(
@@ -78,9 +81,13 @@ ScopedJavaLocalRef<jobject> ConvertToJavaIdentityCredentialTokenError(
 ScopedJavaLocalRef<jobject> ConvertToJavaClientIdMetadata(
     JNIEnv* env,
     const content::ClientMetadata& metadata) {
+  ScopedJavaLocalRef<jstring> java_brand_icon_url =
+      base::android::ConvertUTF8ToJavaString(env,
+                                             metadata.brand_icon_url.spec());
   return Java_ClientIdMetadata_Constructor(
       env, url::GURLAndroid::FromNativeGURL(env, metadata.terms_of_service_url),
-      url::GURLAndroid::FromNativeGURL(env, metadata.privacy_policy_url));
+      url::GURLAndroid::FromNativeGURL(env, metadata.privacy_policy_url),
+      java_brand_icon_url);
 }
 
 ScopedJavaLocalRef<jobjectArray> ConvertToJavaAccounts(
@@ -98,6 +105,23 @@ ScopedJavaLocalRef<jobjectArray> ConvertToJavaAccounts(
     env->SetObjectArrayElement(array.obj(), i, item.obj());
   }
   return array;
+}
+
+ScopedJavaLocalRef<jobject> ConvertToJavaIdentityProviderData(
+    JNIEnv* env,
+    const std::optional<content::IdentityProviderData>& new_accounts_idp) {
+  if (!new_accounts_idp) {
+    return ScopedJavaLocalRef<jobject>(env, nullptr);
+  }
+  return Java_IdentityProviderData_Constructor(
+      env, new_accounts_idp->idp_for_display,
+      ConvertToJavaAccounts(env, new_accounts_idp->accounts),
+      ConvertToJavaIdentityProviderMetadata(env,
+                                            new_accounts_idp->idp_metadata),
+      ConvertToJavaClientIdMetadata(env, new_accounts_idp->client_metadata),
+      static_cast<jint>(new_accounts_idp->rp_context),
+      new_accounts_idp->request_permission,
+      new_accounts_idp->has_login_status_mismatch);
 }
 
 Account ConvertFieldsToAccount(JNIEnv* env,
@@ -122,6 +146,32 @@ Account ConvertFieldsToAccount(JNIEnv* env,
   return Account(account_id, email, name, given_name, picture_url,
                  std::move(login_hints), std::move(domain_hints),
                  std::move(labels), login_state, browser_trusted_login_state);
+}
+// These values are persisted to logs. Entries should not be renumbered and
+// numeric values should never be reused.
+enum class FedCmJavaObjectCreationOutcome {
+  kNewObjectCreated = 0,
+  kObjectReused = 1,
+  kObjectCreationFailed = 2,
+  kNoNativeView = 3,
+  kNoWindow = 4,
+
+  kMaxValue = kNoWindow
+};
+
+void RecordJavaObjectCreationOutcome(
+    std::optional<blink::mojom::RpMode> rp_mode,
+    FedCmJavaObjectCreationOutcome outcome) {
+  // Rp mode may be unavailable in cases that the request is invoked from CCT.
+  // There's no need to record metrics in such case.
+  if (!rp_mode) {
+    return;
+  }
+  const char* mode =
+      *rp_mode == blink::mojom::RpMode::kWidget ? "Widget" : "Button";
+  base::UmaHistogramEnumeration(
+      base::StringPrintf("Blink.FedCm.JavaObjectCreationOutcome.%s", mode),
+      outcome);
 }
 
 }  // namespace
@@ -166,14 +216,18 @@ bool AccountSelectionViewAndroid::Show(
   ScopedJavaLocalRef<jobject> client_id_metadata_obj =
       ConvertToJavaClientIdMetadata(env,
                                     identity_provider_data[0].client_metadata);
+  ScopedJavaLocalRef<jobject> new_account_idp_obj =
+      ConvertToJavaIdentityProviderData(env, new_account_idp);
 
-  // TODO(crbug.com/41490360): Use `new_account_idp` on Android.
+  // TODO(crbug.com/329235198): Support auto re-authn on Android.
   Java_AccountSelectionBridge_showAccounts(
       env, java_object_internal_, rp_for_display,
       identity_provider_data[0].idp_for_display, accounts_obj, idp_metadata_obj,
-      client_id_metadata_obj, sign_in_mode == Account::SignInMode::kAuto,
+      client_id_metadata_obj,
+      sign_in_mode == Account::SignInMode::kAuto &&
+          rp_mode == blink::mojom::RpMode::kWidget,
       static_cast<jint>(identity_provider_data[0].rp_context),
-      identity_provider_data[0].request_permission);
+      identity_provider_data[0].request_permission, new_account_idp_obj);
   return true;
 }
 
@@ -265,8 +319,9 @@ void AccountSelectionViewAndroid::ShowUrl(LinkType link_type, const GURL& url) {
 }
 
 content::WebContents* AccountSelectionViewAndroid::ShowModalDialog(
-    const GURL& url) {
-  if (!MaybeCreateJavaObject()) {
+    const GURL& url,
+    blink::mojom::RpMode rp_mode) {
+  if (!MaybeCreateJavaObject(rp_mode)) {
     // The Java object is tied to the bottomsheet availability, so if we hadn't
     // created one and the bottomsheet is not available then the CCT will not be
     // opened.
@@ -280,9 +335,9 @@ content::WebContents* AccountSelectionViewAndroid::ShowModalDialog(
 }
 
 void AccountSelectionViewAndroid::CloseModalDialog() {
-  // The Java object needs to be recreated, as this is invoked for the
-  // CCT that was closed.
-  if (!MaybeCreateJavaObject()) {
+  // Since this is triggered only after the CCT is opened, leaving it out of the metrics
+  // to focus on cases where a UI cannot be displayed.
+  if (!MaybeCreateJavaObject(/*rp_mode=*/std::nullopt)) {
     return;
   }
   JNIEnv* env = AttachCurrentThread();
@@ -291,8 +346,8 @@ void AccountSelectionViewAndroid::CloseModalDialog() {
 
 content::WebContents* AccountSelectionViewAndroid::GetRpWebContents() {
   // The Java object needs to be recreated, as this is invoked for the
-  // CCT.
-  if (!MaybeCreateJavaObject()) {
+  // CCT. Rp mode isn't meaningful in this case so we don't pass it for metrics.
+  if (!MaybeCreateJavaObject(/*rp_mode=*/std::nullopt)) {
     return nullptr;
   }
   JNIEnv* env = AttachCurrentThread();
@@ -333,12 +388,20 @@ void AccountSelectionViewAndroid::OnAccountsDisplayed(JNIEnv* env) {
 }
 
 bool AccountSelectionViewAndroid::MaybeCreateJavaObject(
-    blink::mojom::RpMode rp_mode) {
-  if (delegate_->GetNativeView() == nullptr ||
-      delegate_->GetNativeView()->GetWindowAndroid() == nullptr) {
+    std::optional<blink::mojom::RpMode> rp_mode) {
+  if (!delegate_->GetNativeView()) {
+    RecordJavaObjectCreationOutcome(
+        rp_mode, FedCmJavaObjectCreationOutcome::kNoNativeView);
+    return false;
+  }
+  if (!delegate_->GetNativeView()->GetWindowAndroid()) {
+    RecordJavaObjectCreationOutcome(rp_mode,
+                                    FedCmJavaObjectCreationOutcome::kNoWindow);
     return false;  // No window attached (yet or anymore).
   }
   if (java_object_internal_) {
+    RecordJavaObjectCreationOutcome(
+        rp_mode, FedCmJavaObjectCreationOutcome::kObjectReused);
     return true;
   }
   JNIEnv* env = AttachCurrentThread();
@@ -346,7 +409,15 @@ bool AccountSelectionViewAndroid::MaybeCreateJavaObject(
       env, reinterpret_cast<intptr_t>(this),
       delegate_->GetWebContents()->GetJavaWebContents(),
       delegate_->GetNativeView()->GetWindowAndroid()->GetJavaObject(),
-      static_cast<jint>(rp_mode));
+      static_cast<jint>(rp_mode.value_or(blink::mojom::RpMode::kWidget)));
+
+  if (!!java_object_internal_) {
+    RecordJavaObjectCreationOutcome(
+        rp_mode, FedCmJavaObjectCreationOutcome::kNewObjectCreated);
+  } else {
+    RecordJavaObjectCreationOutcome(
+        rp_mode, FedCmJavaObjectCreationOutcome::kObjectCreationFailed);
+  }
   return !!java_object_internal_;
 }
 
@@ -360,11 +431,11 @@ std::unique_ptr<AccountSelectionView> AccountSelectionView::Create(
 int AccountSelectionView::GetBrandIconMinimumSize(
     blink::mojom::RpMode rp_mode) {
   return Java_AccountSelectionBridge_getBrandIconMinimumSize(
-      base::android::AttachCurrentThread());
+      base::android::AttachCurrentThread(), static_cast<jint>(rp_mode));
 }
 
 // static
 int AccountSelectionView::GetBrandIconIdealSize(blink::mojom::RpMode rp_mode) {
   return Java_AccountSelectionBridge_getBrandIconIdealSize(
-      base::android::AttachCurrentThread());
+      base::android::AttachCurrentThread(), static_cast<jint>(rp_mode));
 }

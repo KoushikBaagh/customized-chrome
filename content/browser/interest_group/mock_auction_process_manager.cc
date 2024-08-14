@@ -20,6 +20,7 @@
 #include "base/time/time.h"
 #include "content/browser/interest_group/auction_process_manager.h"
 #include "content/public/browser/site_instance.h"
+#include "content/services/auction_worklet/public/mojom/auction_worklet_service.mojom-forward.h"
 #include "content/services/auction_worklet/public/mojom/auction_worklet_service.mojom.h"
 #include "content/services/auction_worklet/public/mojom/bidder_worklet.mojom.h"
 #include "content/services/auction_worklet/public/mojom/private_aggregation_request.mojom.h"
@@ -126,8 +127,10 @@ void MockBidderWorklet::SendPendingSignalsRequests() {
 
 void MockBidderWorklet::ReportWin(
     bool is_for_additional_bid,
-    auction_worklet::mojom::ReportingIdField reporting_id_field,
-    const std::string& reporting_id,
+    const std::optional<std::string>& interest_group_name_reporting_id,
+    const std::optional<std::string>& buyer_reporting_id,
+    const std::optional<std::string>& buyer_and_seller_reporting_id,
+    const std::optional<std::string>& selected_buyer_and_seller_reporting_id,
     const std::optional<std::string>& auction_signals_json,
     const std::optional<std::string>& per_buyer_signals_json,
     const std::optional<GURL>& direct_from_seller_per_buyer_signals,
@@ -249,7 +252,10 @@ void MockBidderWorklet::InvokeGenerateBidCallback(
             /*code_ready_latency=*/std::nullopt,
             /*config_promises_latency=*/std::nullopt,
             /*direct_from_seller_signals_latency=*/std::nullopt,
-            /*trusted_bidding_signals_latency=*/std::nullopt);
+            /*trusted_bidding_signals_latency=*/std::nullopt,
+            /*deps_wait_start_time=*/base::TimeTicks::Now(),
+            /*generate_bid_start_time=*/base::TimeTicks::Now(),
+            /*generate_bid_finish_time=*/base::TimeTicks::Now());
   }
 
   std::vector<auction_worklet::mojom::BidderWorkletBidPtr> bids;
@@ -424,6 +430,8 @@ void MockSellerWorklet::ReportResult(
     const url::Origin& browser_signal_interest_group_owner,
     const std::optional<std::string>&
         browser_signal_buyer_and_seller_reporting_id,
+    const std::optional<std::string>&
+        browser_signal_selected_buyer_and_seller_reporting_id,
     const GURL& browser_signal_render_url,
     double browser_signal_bid,
     const std::optional<blink::AdCurrency>& browser_signal_bid_currency,
@@ -551,7 +559,8 @@ void MockAuctionProcessManager::LoadBidderWorklet(
     const url::Origin& top_window_origin,
     auction_worklet::mojom::AuctionWorkletPermissionsPolicyStatePtr
         permissions_policy_state,
-    std::optional<uint16_t> experiment_group_id) {
+    std::optional<uint16_t> experiment_group_id,
+    auction_worklet::mojom::TrustedSignalsPublicKeyPtr public_key) {
   load_bidder_worklet_count_++;
   last_load_bidder_worklet_threads_count_ = shared_storage_hosts.size();
 

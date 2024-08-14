@@ -16,10 +16,10 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
-#include "components/ip_protection/blind_sign_message_android_impl.h"
-#include "components/ip_protection/ip_protection_config_provider_helper.h"
-#include "components/ip_protection/ip_protection_proxy_config_fetcher.h"
-#include "components/ip_protection/ip_protection_proxy_config_retriever.h"
+#include "components/ip_protection/android/blind_sign_message_android_impl.h"
+#include "components/ip_protection/common/ip_protection_config_provider_helper.h"
+#include "components/ip_protection/common/ip_protection_proxy_config_fetcher.h"
+#include "components/ip_protection/common/ip_protection_proxy_config_retriever.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
@@ -136,8 +136,7 @@ class AwIpProtectionConfigProvider
   // Finish a call to `TryGetAuthTokens()` by recording the result and invoking
   // its callback.
   void TryGetAuthTokensComplete(
-      std::optional<std::vector<network::mojom::BlindSignedAuthTokenPtr>>
-          bsa_tokens,
+      std::optional<std::vector<network::BlindSignedAuthToken>> bsa_tokens,
       TryGetAuthTokensCallback callback,
       AwIpProtectionTryGetAuthTokensResult result);
 

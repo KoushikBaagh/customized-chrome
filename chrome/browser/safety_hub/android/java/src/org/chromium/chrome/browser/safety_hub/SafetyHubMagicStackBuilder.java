@@ -12,13 +12,14 @@ import androidx.annotation.NonNull;
 
 import org.chromium.base.Callback;
 import org.chromium.base.supplier.ObservableSupplier;
+import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.browser.magic_stack.ModuleConfigChecker;
 import org.chromium.chrome.browser.magic_stack.ModuleDelegate;
 import org.chromium.chrome.browser.magic_stack.ModuleProvider;
 import org.chromium.chrome.browser.magic_stack.ModuleProviderBuilder;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
-import org.chromium.components.browser_ui.settings.SettingsLauncher;
+import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.modelutil.PropertyKey;
 import org.chromium.ui.modelutil.PropertyModel;
 
@@ -27,17 +28,17 @@ public class SafetyHubMagicStackBuilder implements ModuleProviderBuilder, Module
     private final Context mContext;
     private final ObservableSupplier<Profile> mProfileSupplier;
     private final TabModelSelector mTabModelSelector;
-    private final SettingsLauncher mSettingsLauncher;
+    private final Supplier<ModalDialogManager> mModalDialogManagerSupplier;
 
     public SafetyHubMagicStackBuilder(
             @NonNull Context context,
             @NonNull ObservableSupplier<Profile> profileSupplier,
             @NonNull TabModelSelector tabModelSelector,
-            @NonNull SettingsLauncher settingsLauncher) {
+            @NonNull Supplier<ModalDialogManager> modalDialogManagerSupplier) {
         mContext = context;
         mProfileSupplier = profileSupplier;
         mTabModelSelector = tabModelSelector;
-        mSettingsLauncher = settingsLauncher;
+        mModalDialogManagerSupplier = modalDialogManagerSupplier;
     }
 
     @Override
@@ -46,7 +47,11 @@ public class SafetyHubMagicStackBuilder implements ModuleProviderBuilder, Module
         Profile profile = getRegularProfile();
         SafetyHubMagicStackCoordinator coordinator =
                 new SafetyHubMagicStackCoordinator(
-                        mContext, profile, mTabModelSelector, moduleDelegate, mSettingsLauncher);
+                        mContext,
+                        profile,
+                        mTabModelSelector,
+                        moduleDelegate,
+                        mModalDialogManagerSupplier);
         onModuleBuiltCallback.onResult(coordinator);
         return true;
     }

@@ -122,7 +122,7 @@ BASE_DECLARE_FEATURE(kExtensionTelemetryFileDataForCommandLineExtensions);
 
 // Enables the telemetry service to collect signals and generate reports to send
 // for enterprise.
-BASE_DECLARE_FEATURE(kExtensionTelemetryForEnteprise);
+BASE_DECLARE_FEATURE(kExtensionTelemetryForEnterprise);
 
 // Specifies the reporting interval for enterprise telemetry reports.
 extern const base::FeatureParam<int>
@@ -159,20 +159,14 @@ BASE_DECLARE_FEATURE(kExtensionTelemetryPotentialPasswordTheft);
 // Extension Telemetry service reports.
 BASE_DECLARE_FEATURE(kExtensionTelemetryDisableOffstoreExtensions);
 
-// Enables the new text, layout, links, and icons on both the privacy guide
-// and on the security settings page for the enhanced protection security
-// option.
-BASE_DECLARE_FEATURE(kFriendlierSafeBrowsingSettingsEnhancedProtection);
-
-// Enables the new text and layout on both the privacy guide and on the
-// security settings page for the standard protection security option.
-BASE_DECLARE_FEATURE(kFriendlierSafeBrowsingSettingsStandardProtection);
-
 // Prompt users to re-enable Android app verification on APK download.
 BASE_DECLARE_FEATURE(kGooglePlayProtectPrompt);
 
 // Whether to provide Google Play Protect status in APK telemetry pings
 BASE_DECLARE_FEATURE(kGooglePlayProtectInApkTelemetry);
+
+// Whether Google Play Protect should supercede file-type warnings
+BASE_DECLARE_FEATURE(kGooglePlayProtectReducesWarnings);
 
 // Sends hash-prefix real-time lookup requests on navigations for Standard Safe
 // Browsing users instead of hash-prefix database lookups.
@@ -184,6 +178,16 @@ extern const base::FeatureParam<std::string> kHashPrefixRealTimeLookupsRelayUrl;
 
 // Enable faster OHTTP key rotation for hash-prefix real-time lookups.
 BASE_DECLARE_FEATURE(kHashPrefixRealTimeLookupsFasterOhttpKeyRotation);
+
+// Send sample hash-prefix real-time lookups for real-time lookups to catch
+// "false positives" where real-time lookup says safe but hash-prefix lookup
+// says unsafe.
+// Check the design doc (go/sample-esb-ping-send-hprt) for further
+// details.
+BASE_DECLARE_FEATURE(kHashPrefixRealTimeLookupsSamplePing);
+// Determines the percentage of ESB lookups that we sample to send a background
+// HPRT lookup. The value should be between 0 and 100.
+extern const base::FeatureParam<int> kHashPrefixRealTimeLookupsSampleRate;
 
 // Show referrer URL on download item on chrome://downloads page. This will
 // replace the downloads url.
@@ -230,9 +234,6 @@ BASE_DECLARE_FEATURE(kSafeBrowsingCallNewGmsApiOnStartup);
 
 // Use new GMSCore API for hash database check on browser URLs.
 BASE_DECLARE_FEATURE(kSafeBrowsingNewGmsApiForBrowseUrlDatabaseCheck);
-
-// Use new GMSCore API for subresource filter checks.
-BASE_DECLARE_FEATURE(kSafeBrowsingNewGmsApiForSubresourceFilterCheck);
 #endif
 
 // Run Safe Browsing code on UI thread.

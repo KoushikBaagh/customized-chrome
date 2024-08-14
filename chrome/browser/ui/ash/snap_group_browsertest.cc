@@ -2,31 +2,43 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "ash/wm/snap_group/snap_group.h"
+
 #include "ash/constants/ash_features.h"
 #include "ash/display/display_move_window_util.h"
 #include "ash/screen_util.h"
 #include "ash/shell.h"
 #include "ash/style/icon_button.h"
+#include "ash/wm/desks/desk_action_context_menu.h"
+#include "ash/wm/desks/desks_test_api.h"
+#include "ash/wm/desks/desks_test_util.h"
+#include "ash/wm/desks/overview_desk_bar_view.h"
 #include "ash/wm/overview/overview_controller.h"
 #include "ash/wm/overview/overview_grid.h"
 #include "ash/wm/overview/overview_session.h"
 #include "ash/wm/overview/overview_test_util.h"
 #include "ash/wm/overview/overview_utils.h"
-#include "ash/wm/snap_group/snap_group.h"
 #include "ash/wm/snap_group/snap_group_controller.h"
+#include "ash/wm/snap_group/snap_group_test_util.h"
 #include "ash/wm/splitview/split_view_constants.h"
 #include "ash/wm/splitview/split_view_setup_view.h"
-#include "ash/wm/splitview/split_view_setup_view_old.h"
 #include "ash/wm/window_state.h"
 #include "ash/wm/wm_event.h"
+#include "base/memory/raw_ptr.h"
 #include "base/test/scoped_feature_list.h"
 #include "chrome/browser/ash/system_web_apps/system_web_app_manager.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/ash/ash_test_util.h"
+#include "chrome/browser/ui/ash/chrome_new_window_client.h"
 #include "chrome/browser/ui/ash/system_web_apps/system_web_app_ui_utils.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_list.h"
+#include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/tabs/tab_strip.h"
+#include "chrome/browser/ui/views/tabs/tab_strip_observer.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/test_navigation_observer.h"
@@ -34,6 +46,7 @@
 #include "ui/display/test/display_manager_test_api.h"
 #include "ui/events/test/event_generator.h"
 #include "ui/views/controls/button/button.h"
+#include "ui/views/controls/menu/menu_item_view.h"
 #include "ui/views/view_utils.h"
 #include "ui/wm/core/coordinate_conversion.h"
 #include "ui/wm/core/window_util.h"
@@ -56,7 +69,37 @@ const GURL& GetActiveUrl(Browser* browser) {
       ->GetLastCommittedURL();
 }
 
+// This class observes the `TabStripModelObserver` and reacts with predetermined
+// actions to manage tab behavior. In particular, it finalizes tab detachment
+// by releasing the left mouse button when a tab strip is removed from a window.
+class TabRemoveObserver : public TabStripModelObserver {
+ public:
+  TabRemoveObserver(Browser* browser, ui::test::EventGenerator* event_generator)
+      : browser_(browser), event_generator_(event_generator) {
+    browser_->tab_strip_model()->AddObserver(this);
+  }
+  TabRemoveObserver(const TabRemoveObserver&) = delete;
+  TabRemoveObserver& operator=(const TabRemoveObserver&) = delete;
+  ~TabRemoveObserver() override {
+    browser_->tab_strip_model()->RemoveObserver(this);
+  }
+
+  // TabStripModelObserver:
+  void OnTabWillBeRemoved(content::WebContents* contents, int index) override {
+    // Tab detachment is asynchronous. Release the mouse button after the tab
+    // move is done.
+    event_generator_->ReleaseLeftButton();
+  }
+
+ private:
+  raw_ptr<Browser> browser_;
+  raw_ptr<ui::test::EventGenerator> event_generator_;
+};
+
 }  // namespace
+
+// -----------------------------------------------------------------------------
+// FasterSplitScreenBrowserTest:
 
 using FasterSplitScreenBrowserTest = InProcessBrowserTest;
 
@@ -122,18 +165,11 @@ IN_PROC_BROWSER_TEST_F(FasterSplitScreenWithNewSettingsBrowserTest,
           window->GetRootWindow());
   ASSERT_TRUE(overview_grid);
 
-  views::Button* settings_button = nullptr;
-  if (ash::features::IsOverviewNewFocusEnabled()) {
-    auto* split_view_setup_view = overview_grid->GetSplitViewSetupView();
-    ASSERT_TRUE(split_view_setup_view);
-    settings_button = const_cast<views::Button*>(
-        views::AsViewClass<views::Button>(split_view_setup_view->GetViewByID(
-            ash::SplitViewSetupView::kSettingsButtonIDForTest)));
-  } else {
-    auto* split_view_setup_view = overview_grid->GetSplitViewSetupViewOld();
-    ASSERT_TRUE(split_view_setup_view);
-    settings_button = split_view_setup_view->settings_button();
-  }
+  auto* split_view_setup_view = overview_grid->GetSplitViewSetupView();
+  ASSERT_TRUE(split_view_setup_view);
+  views::Button* settings_button = const_cast<views::Button*>(
+      views::AsViewClass<views::Button>(split_view_setup_view->GetViewByID(
+          ash::SplitViewSetupView::kSettingsButtonIDForTest)));
   ASSERT_TRUE(settings_button);
 
   // Setup navigation observer to wait for the OS Settings page.
@@ -155,6 +191,9 @@ IN_PROC_BROWSER_TEST_F(FasterSplitScreenWithNewSettingsBrowserTest,
   ASSERT_TRUE(settings_browser);
   ASSERT_EQ(os_settings, GetActiveUrl(settings_browser));
 }
+
+// -----------------------------------------------------------------------------
+// FasterSplitScreenWithOldSettingsBrowserTest:
 
 class FasterSplitScreenWithOldSettingsBrowserTest
     : public FasterSplitScreenBrowserTest {
@@ -194,18 +233,11 @@ IN_PROC_BROWSER_TEST_F(FasterSplitScreenWithOldSettingsBrowserTest,
   auto* overview_grid =
       ash::OverviewController::Get()->overview_session()->GetGridWithRootWindow(
           window->GetRootWindow());
-  views::Button* settings_button = nullptr;
-  if (ash::features::IsOverviewNewFocusEnabled()) {
-    auto* split_view_setup_view = overview_grid->GetSplitViewSetupView();
-    ASSERT_TRUE(split_view_setup_view);
-    settings_button = const_cast<views::Button*>(
-        views::AsViewClass<views::Button>(split_view_setup_view->GetViewByID(
-            ash::SplitViewSetupView::kSettingsButtonIDForTest)));
-  } else {
-    auto* split_view_setup_view = overview_grid->GetSplitViewSetupViewOld();
-    ASSERT_TRUE(split_view_setup_view);
-    settings_button = split_view_setup_view->settings_button();
-  }
+  auto* split_view_setup_view = overview_grid->GetSplitViewSetupView();
+  ASSERT_TRUE(split_view_setup_view);
+  views::Button* settings_button = const_cast<views::Button*>(
+      views::AsViewClass<views::Button>(split_view_setup_view->GetViewByID(
+          ash::SplitViewSetupView::kSettingsButtonIDForTest)));
   ASSERT_TRUE(settings_button);
 
   // Setup navigation observer to wait for the OS Settings page.
@@ -228,11 +260,16 @@ IN_PROC_BROWSER_TEST_F(FasterSplitScreenWithOldSettingsBrowserTest,
   ASSERT_EQ(os_settings, GetActiveUrl(settings_browser));
 }
 
+// -----------------------------------------------------------------------------
+// SnapGroupBrowserTest:
+
 class SnapGroupBrowserTest : public InProcessBrowserTest {
  public:
   SnapGroupBrowserTest() {
     scoped_feature_list_.InitWithFeatures(
-        /*enabled_features=*/{ash::features::kSnapGroup},
+        /*enabled_features=*/{ash::features::kSnapGroup,
+                              ash::features::kForestFeature,
+                              ash::features::kSavedDeskUiRevamp},
         /*disabled_features=*/{});
   }
   SnapGroupBrowserTest(const SnapGroupBrowserTest&) = delete;
@@ -331,4 +368,136 @@ IN_PROC_BROWSER_TEST_F(SnapGroupBrowserTest, RotatedSnapGroup) {
   EXPECT_EQ(top_half, w1->GetBoundsInScreen());
   ASSERT_EQ(gfx::Rect(800, 579, 900, 573), bottom_half);
   EXPECT_EQ(bottom_half, w2->GetBoundsInScreen());
+}
+
+// Verify that dragging a tab within a Snap Group window does not break the
+// group.
+IN_PROC_BROWSER_TEST_F(SnapGroupBrowserTest, DoNotBreakGroupOnTabDragging) {
+  aura::Window* window1 = browser()->window()->GetNativeWindow();
+  chrome::AddTabAt(browser(), GURL(chrome::kChromeUITabSearchURL), -1, true);
+  ASSERT_EQ(2, browser()->tab_strip_model()->GetTabCount());
+
+  aura::Window* window2 =
+      CreateBrowser(browser()->profile())->window()->GetNativeWindow();
+
+  aura::Window* root_window = ash::Shell::GetPrimaryRootWindow();
+  ui::test::EventGenerator event_generator(root_window);
+  ash::SnapTwoTestWindows(window1, window2, /*horizontal=*/true,
+                          &event_generator);
+  ASSERT_TRUE(
+      ash::SnapGroupController::Get()->AreWindowsInSnapGroup(window1, window2));
+
+  TabStrip* tap_strip =
+      BrowserView::GetBrowserViewForBrowser(browser())->tabstrip();
+  const auto start_point =
+      tap_strip->tab_at(1)->GetBoundsInScreen().CenterPoint();
+  const auto end_point =
+      tap_strip->tab_at(0)->GetBoundsInScreen().left_center();
+  event_generator.MoveMouseTo(start_point);
+  event_generator.PressLeftButton();
+  event_generator.MoveMouseTo(end_point);
+  event_generator.ReleaseLeftButton();
+
+  EXPECT_EQ(2u, chrome::GetTotalBrowserCount());
+  EXPECT_TRUE(
+      ash::SnapGroupController::Get()->AreWindowsInSnapGroup(window1, window2));
+}
+
+// Verify that detaching a tab from a window within a Snap Group doesn't break
+// the group.
+IN_PROC_BROWSER_TEST_F(SnapGroupBrowserTest, DoNotBreakGroupOnTabDetaching) {
+  aura::Window* window1 = browser()->window()->GetNativeWindow();
+  chrome::AddTabAt(browser(), GURL(chrome::kChromeUITabSearchURL), -1, true);
+  ASSERT_EQ(2, browser()->tab_strip_model()->GetTabCount());
+
+  aura::Window* window2 =
+      CreateBrowser(browser()->profile())->window()->GetNativeWindow();
+
+  ui::test::EventGenerator event_generator(ash::Shell::GetPrimaryRootWindow());
+  ash::SnapTwoTestWindows(window1, window2, /*horizontal=*/true,
+                          &event_generator);
+  ASSERT_TRUE(
+      ash::SnapGroupController::Get()->AreWindowsInSnapGroup(window1, window2));
+
+  ASSERT_EQ(2u, chrome::GetTotalBrowserCount());
+
+  TabStrip* tap_strip =
+      BrowserView::GetBrowserViewForBrowser(browser())->tabstrip();
+  const gfx::Point start_point =
+      tap_strip->tab_at(1)->GetBoundsInScreen().CenterPoint();
+  const gfx::Point end_point = window2->GetBoundsInScreen().CenterPoint();
+  event_generator.MoveMouseTo(start_point);
+  event_generator.PressLeftButton();
+  TabRemoveObserver observer(browser(), &event_generator);
+  event_generator.MoveMouseTo(end_point);
+
+  // Verify that detaching a tab results in a new window being created and that
+  // `window1` and `window2` still belong to the Snap Group.
+  EXPECT_EQ(3u, chrome::GetTotalBrowserCount());
+  EXPECT_TRUE(
+      ash::SnapGroupController::Get()->AreWindowsInSnapGroup(window1, window2));
+}
+
+// Test that "Save Desk for Later" is not supported when both windows in a Snap
+// Group are in incognito mode.
+IN_PROC_BROWSER_TEST_F(SnapGroupBrowserTest,
+                       SaveDeskForLaterWithTwoIncognitoWindows) {
+  auto* desks_controller = ash::DesksController::Get();
+  desks_controller->NewDesk(ash::DesksCreationRemovalSource::kButton);
+  const auto& desks = desks_controller->desks();
+  ASSERT_EQ(2u, desks.size());
+  aura::Window* root_window = ash::Shell::GetPrimaryRootWindow();
+
+  // Explicitly move the default non-incognito browser window to another desk.
+  aura::Window* window = browser()->window()->GetNativeWindow();
+  desks_controller->MoveWindowFromActiveDeskTo(
+      window, desks[1].get(), root_window,
+      ash::DesksMoveWindowFromActiveDeskSource::kShortcut);
+
+  // Create a Snap Group with two incognito browser windows.
+  Browser* incognito_browser1 = CreateIncognitoBrowser();
+  aura::Window* window1 = incognito_browser1->window()->GetNativeWindow();
+  Browser* incognito_browser2 = CreateIncognitoBrowser();
+  aura::Window* window2 = incognito_browser2->window()->GetNativeWindow();
+
+  ui::test::EventGenerator event_generator(root_window);
+  ash::SnapTwoTestWindows(window1, window2, /*horizontal=*/true,
+                          &event_generator);
+  ash::OverviewController::Get()->StartOverview(
+      ash::OverviewStartAction::kOverviewButton);
+  ash::WaitForOverviewEntered();
+  ASSERT_TRUE(ash::IsInOverviewSession());
+
+  ASSERT_EQ(2u, ash::GetPrimaryRootDesksBarView()->mini_views().size());
+  ash::OverviewGrid* overview_grid = ash::GetOverviewGridForRoot(root_window);
+  EXPECT_EQ(1u, overview_grid->item_list().size());
+  auto* desks_bar_view0 = overview_grid->desks_bar_view();
+  ASSERT_TRUE(desks_bar_view0);
+  ash::DeskMiniView* desk_mini_view0 = desks_bar_view0->mini_views()[0];
+  ASSERT_TRUE(desk_mini_view0);
+
+  event_generator.MoveMouseTo(
+      desk_mini_view0->GetBoundsInScreen().CenterPoint());
+  event_generator.ClickRightButton();
+
+  // Activate the desk mini view to enable context menu.
+  ash::DeskActionContextMenu* mini_view_menu0 = desk_mini_view0->context_menu();
+  ASSERT_TRUE(mini_view_menu0);
+
+  const views::MenuItemView* save_for_later_item =
+      ash::DesksTestApi::GetDeskActionContextMenuItem(
+          mini_view_menu0,
+          ash::DeskActionContextMenu::CommandId::kSaveForLater);
+  ASSERT_TRUE(save_for_later_item);
+
+  // Click on the "Save Desk for Later" button in the context menu.
+  event_generator.MoveMouseTo(
+      save_for_later_item->GetBoundsInScreen().CenterPoint());
+  event_generator.ClickLeftButton();
+
+  // Verify that the "Save to Desk" feature is not supported as both windows
+  // within a Snap Group are in incognito mode.
+  EXPECT_TRUE(ash::IsInOverviewSession());
+  EXPECT_EQ(1u, overview_grid->item_list().size());
+  EXPECT_EQ(3u, chrome::GetTotalBrowserCount());
 }

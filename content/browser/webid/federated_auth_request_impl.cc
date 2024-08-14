@@ -341,76 +341,105 @@ std::string FormatOriginForDisplay(const url::Origin& origin) {
 }
 
 FedCmMetrics::NumAccounts ComputeNumMatchingAccounts(
-    const IdpNetworkRequestManager::AccountList& accounts) {
-  if (accounts.empty()) {
+    size_t accounts_remaining) {
+  if (accounts_remaining == 0u) {
     return FedCmMetrics::NumAccounts::kZero;
   }
-  if (accounts.size() == 1u) {
+  if (accounts_remaining == 1u) {
     return FedCmMetrics::NumAccounts::kOne;
   }
   return FedCmMetrics::NumAccounts::kMultiple;
 }
 
-void FilterAccountsWithLabel(const std::string& label,
+// Returns whether there are accounts remaining after applying the account label
+// filter.
+bool FilterAccountsWithLabel(const std::string& label,
                              IdpNetworkRequestManager::AccountList& accounts) {
   if (label.empty()) {
-    return;
+    return true;
   }
 
-  // Remove all accounts whose labels do not match the requested label.
+  // Filter out all accounts whose labels do not match the requested label.
   // Note that it is technically possible for us to end up with more than one
   // account afterwards, in which case the multiple account chooser would be
   // shown.
-  auto filter = [&label](const IdentityRequestAccount& account) {
-    return !base::Contains(account.labels, label);
-  };
-  std::erase_if(accounts, filter);
-  FedCmMetrics::NumAccounts num_matching = ComputeNumMatchingAccounts(accounts);
+  size_t accounts_remaining = 0u;
+  for (auto& account : accounts) {
+    if (!base::Contains(account.labels, label)) {
+      account.is_filtered_out = true;
+    } else {
+      ++accounts_remaining;
+    }
+  }
+  FedCmMetrics::NumAccounts num_matching =
+      ComputeNumMatchingAccounts(accounts_remaining);
   base::UmaHistogramEnumeration("Blink.FedCm.AccountLabel.NumMatchingAccounts",
                                 num_matching);
+  return accounts_remaining > 0u;
 }
 
-void FilterAccountsWithLoginHint(
+// Returns whether there are accounts remaining after applying the login hint
+// filter.
+bool FilterAccountsWithLoginHint(
     const std::string& login_hint,
     IdpNetworkRequestManager::AccountList& accounts) {
   if (login_hint.empty()) {
-    return;
+    return true;
   }
 
-  // Remove all accounts whose ID and whose email do not match the login hint.
-  // Note that it is technically possible for us to end up with more than one
-  // account afterwards, in which case the multiple account chooser would be
+  // Filter out all accounts whose ID and whose email do not match the login
+  // hint. Note that it is technically possible for us to end up with more than
+  // one account afterwards, in which case the multiple account chooser would be
   // shown.
-  auto filter = [&login_hint](const IdentityRequestAccount& account) {
-    return !base::Contains(account.login_hints, login_hint);
-  };
-  std::erase_if(accounts, filter);
-  FedCmMetrics::NumAccounts num_matching = ComputeNumMatchingAccounts(accounts);
+  size_t accounts_remaining = 0u;
+  for (auto& account : accounts) {
+    if (account.is_filtered_out) {
+      continue;
+    }
+    if (!base::Contains(account.login_hints, login_hint)) {
+      account.is_filtered_out = true;
+    } else {
+      ++accounts_remaining;
+    }
+  }
+
+  FedCmMetrics::NumAccounts num_matching =
+      ComputeNumMatchingAccounts(accounts_remaining);
   base::UmaHistogramEnumeration("Blink.FedCm.LoginHint.NumMatchingAccounts",
                                 num_matching);
+  return accounts_remaining > 0u;
 }
 
-void FilterAccountsWithDomainHint(
+// Returns whether there are accounts remaining after applying the domain hint
+// filter.
+bool FilterAccountsWithDomainHint(
     const std::string& domain_hint,
     IdpNetworkRequestManager::AccountList& accounts) {
   if (domain_hint.empty()) {
-    return;
+    return true;
   }
 
-  if (domain_hint == FederatedAuthRequestImpl::kWildcardDomainHint) {
-    auto filter = [](const IdentityRequestAccount& account) {
-      return account.domain_hints.empty();
-    };
-    std::erase_if(accounts, filter);
-  } else {
-    auto filter = [&domain_hint](const IdentityRequestAccount& account) {
-      return !base::Contains(account.domain_hints, domain_hint);
-    };
-    std::erase_if(accounts, filter);
+  size_t accounts_remaining = 0u;
+  for (auto& account : accounts) {
+    if (account.is_filtered_out) {
+      continue;
+    }
+    if (domain_hint == FederatedAuthRequestImpl::kWildcardDomainHint) {
+      if (account.domain_hints.empty()) {
+        account.is_filtered_out = true;
+        continue;
+      }
+    } else if (!base::Contains(account.domain_hints, domain_hint)) {
+      account.is_filtered_out = true;
+      continue;
+    }
+    ++accounts_remaining;
   }
-  FedCmMetrics::NumAccounts num_matching = ComputeNumMatchingAccounts(accounts);
+  FedCmMetrics::NumAccounts num_matching =
+      ComputeNumMatchingAccounts(accounts_remaining);
   base::UmaHistogramEnumeration("Blink.FedCm.DomainHint.NumMatchingAccounts",
                                 num_matching);
+  return accounts_remaining > 0u;
 }
 
 std::string GetTopFrameOriginForDisplay(const url::Origin& top_frame_origin) {
@@ -1680,12 +1709,6 @@ void FederatedAuthRequestImpl::MaybeShowAccountsDialog() {
         is_auto_reauthn_embargoed, time_from_embargo, requires_user_mediation);
   }
 
-  if (identity_selection_type_ == kAutoButton) {
-    OnAccountSelected(auto_reauthn_idp->idp_metadata.config_url,
-                      auto_reauthn_account->id, /*is_sign_in=*/true);
-    return;
-  }
-
   // The RenderFrameHost may be alive but not visible in the following
   // situations:
   // Situation #1: User switched tabs
@@ -2000,8 +2023,9 @@ void FederatedAuthRequestImpl::OnAccountsResponseReceived(
       RecordRawAccountsSize(accounts.size());
       if (webid::IsFedCmAuthzEnabled(render_frame_host(),
                                      url::Origin::Create(idp_config_url))) {
-        FilterAccountsWithLabel(idp_info->metadata.requested_label, accounts);
-        if (accounts.empty()) {
+        if (!FilterAccountsWithLabel(idp_info->metadata.requested_label,
+                                     accounts)) {
+          // No accounts remain, so treat as account fetch failure.
           render_frame_host().AddMessageToConsole(
               blink::mojom::ConsoleMessageLevel::kError,
               "Accounts were received, but none matched the label.");
@@ -2015,8 +2039,9 @@ void FederatedAuthRequestImpl::OnAccountsResponseReceived(
           return;
         }
       }
-      FilterAccountsWithLoginHint(idp_info->provider->login_hint, accounts);
-      if (accounts.empty()) {
+      if (!FilterAccountsWithLoginHint(idp_info->provider->login_hint,
+                                       accounts)) {
+        // No accounts remain, so treat as account fetch failure.
         render_frame_host().AddMessageToConsole(
             blink::mojom::ConsoleMessageLevel::kError,
             "Accounts were received, but none matched the loginHint.");
@@ -2029,8 +2054,9 @@ void FederatedAuthRequestImpl::OnAccountsResponseReceived(
             TokenStatus::kAccountsListEmpty);
         return;
       }
-      FilterAccountsWithDomainHint(idp_info->provider->domain_hint, accounts);
-      if (accounts.empty()) {
+      if (!FilterAccountsWithDomainHint(idp_info->provider->domain_hint,
+                                        accounts)) {
+        // No accounts remain, so treat as account fetch failure.
         render_frame_host().AddMessageToConsole(
             blink::mojom::ConsoleMessageLevel::kError,
             "Accounts were received, but none matched the domainHint.");
@@ -2043,6 +2069,11 @@ void FederatedAuthRequestImpl::OnAccountsResponseReceived(
             TokenStatus::kAccountsListEmpty);
         return;
       }
+      // TODO(crbug.com/354977893): pass filtered out accounts to UI.
+      auto filter = [](const IdentityRequestAccount& account) {
+        return account.is_filtered_out;
+      };
+      std::erase_if(accounts, filter);
       RecordReadyToShowAccountsSize(accounts.size());
       ComputeLoginStateAndReorderAccounts(
           idp_info->provider->config->config_url, accounts);
@@ -2068,8 +2099,13 @@ void FederatedAuthRequestImpl::OnAccountsResponseReceived(
         // is moved.
         GURL client_metadata_endpoint = idp_info->endpoints.client_metadata;
         std::string client_id = idp_info->provider->config->client_id;
+        int icon_ideal_size =
+            request_dialog_controller_->GetBrandIconIdealSize(rp_mode_);
+        int icon_minimum_size =
+            request_dialog_controller_->GetBrandIconMinimumSize(rp_mode_);
         network_manager_->FetchClientMetadata(
-            client_metadata_endpoint, client_id,
+            client_metadata_endpoint, client_id, icon_ideal_size,
+            icon_minimum_size,
             base::BindOnce(
                 &FederatedAuthRequestImpl::OnClientMetadataResponseReceived,
                 weak_ptr_factory_.GetWeakPtr(), std::move(idp_info),
@@ -2406,10 +2442,12 @@ void FederatedAuthRequestImpl::ShowModalDialog(DialogType dialog_type,
   // dialog?
   dialog_type_ = dialog_type;
   config_url_ = idp_config_url;
+  UMA_HISTOGRAM_ENUMERATION("Blink.FedCm.Popup.DialogType", dialog_type_);
 
   WebContents* web_contents = request_dialog_controller_->ShowModalDialog(
-      url_to_show, base::BindOnce(&FederatedAuthRequestImpl::OnDialogDismissed,
-                                  weak_ptr_factory_.GetWeakPtr()));
+      url_to_show, rp_mode_,
+      base::BindOnce(&FederatedAuthRequestImpl::OnDialogDismissed,
+                     weak_ptr_factory_.GetWeakPtr()));
   // This may be null on Android, as the method cannot return the WebContents of
   // the CCT that will be created.
   if (web_contents) {
@@ -2532,11 +2570,13 @@ void FederatedAuthRequestImpl::OnTokenResponseReceived(
   // fast, we still want to show the "Verify" sheet for at least
   // `kTokenRequestDelay` seconds for better UX.
   // Note that for button flow we can complete without delay because the UI
-  // difference between the verifying UI and its predecessors are minor.
+  // difference between the verifying UI and its predecessors are minor in case
+  // of manual sign-in where a user has read and made selection explicitly.
   id_assertion_response_time_ = base::TimeTicks::Now();
   base::TimeDelta fetch_time =
       id_assertion_response_time_ - select_account_time_;
-  if (should_complete_request_immediately_ || rp_mode_ == RpMode::kButton ||
+  if (should_complete_request_immediately_ ||
+      (rp_mode_ == RpMode::kButton && identity_selection_type_ == kExplicit) ||
       fetch_time >= kTokenRequestDelay) {
     std::move(complete_request_callback).Run();
     return;
@@ -2636,33 +2676,6 @@ void FederatedAuthRequestImpl::CompleteTokenRequest(
               (accounts_dialog_display_time_ -
                ready_to_display_accounts_dialog_time_));
 
-      if (IsFedCmMetricsEndpointEnabled()) {
-        for (const auto& metrics_endpoint_kv : metrics_endpoints_) {
-          const GURL& metrics_endpoint = metrics_endpoint_kv.second;
-          if (!metrics_endpoint.is_valid()) {
-            continue;
-          }
-
-          if (metrics_endpoint_kv.first == idp_config_url) {
-            network_manager_->SendSuccessfulTokenRequestMetrics(
-                metrics_endpoint,
-                ready_to_display_accounts_dialog_time_ - start_time_,
-                select_account_time_ - accounts_dialog_display_time_,
-                id_assertion_response_time_ - select_account_time_,
-                id_assertion_response_time_ - start_time_ -
-                    (accounts_dialog_display_time_ -
-                     ready_to_display_accounts_dialog_time_));
-          } else {
-            // Send kUserFailure so that IDP cannot tell difference between user
-            // selecting a different IDP and user dismissing dialog without
-            // selecting any IDP.
-            network_manager_->SendFailedTokenRequestMetrics(
-                metrics_endpoint, IdpNetworkRequestManager::
-                                      MetricsEndpointErrorCode::kUserFailure);
-          }
-        }
-      }
-
       CompleteRequest(FederatedAuthRequestResult::kSuccess,
                       TokenStatus::kSuccessUsingTokenInHttpResponse,
                       /*token_error=*/std::nullopt, idp_config_url,
@@ -2719,8 +2732,12 @@ void FederatedAuthRequestImpl::CompleteRequest(
         selected_idp_config_url, rp_mode_);
   }
 
-  if (!errors_logged_to_console_ &&
-      result != FederatedAuthRequestResult::kSuccess) {
+  if (result == FederatedAuthRequestResult::kSuccess) {
+    DCHECK(selected_idp_config_url);
+    if (IsFedCmMetricsEndpointEnabled()) {
+      SendSuccessfulTokenRequestMetrics(*selected_idp_config_url);
+    }
+  } else if (!errors_logged_to_console_) {
     errors_logged_to_console_ = true;
 
     AddDevToolsIssue(result);
@@ -2777,6 +2794,36 @@ void FederatedAuthRequestImpl::SendFailedTokenRequestMetrics(
   network_manager_->SendFailedTokenRequestMetrics(
       metrics_endpoint,
       FederatedAuthRequestResultToMetricsEndpointErrorCode(result));
+}
+
+void FederatedAuthRequestImpl::SendSuccessfulTokenRequestMetrics(
+    const GURL& idp_config_url) {
+  DCHECK(IsFedCmMetricsEndpointEnabled());
+
+  for (const auto& metrics_endpoint_kv : metrics_endpoints_) {
+    const GURL& metrics_endpoint = metrics_endpoint_kv.second;
+    if (!metrics_endpoint.is_valid()) {
+      continue;
+    }
+
+    if (metrics_endpoint_kv.first == idp_config_url) {
+      network_manager_->SendSuccessfulTokenRequestMetrics(
+          metrics_endpoint,
+          ready_to_display_accounts_dialog_time_ - start_time_,
+          select_account_time_ - accounts_dialog_display_time_,
+          id_assertion_response_time_ - select_account_time_,
+          id_assertion_response_time_ - start_time_ -
+              (accounts_dialog_display_time_ -
+               ready_to_display_accounts_dialog_time_));
+    } else {
+      // Send kUserFailure so that IDP cannot tell difference between user
+      // selecting a different IDP and user dismissing dialog without
+      // selecting any IDP.
+      network_manager_->SendFailedTokenRequestMetrics(
+          metrics_endpoint,
+          IdpNetworkRequestManager::MetricsEndpointErrorCode::kUserFailure);
+    }
+  }
 }
 
 void FederatedAuthRequestImpl::CleanUp() {

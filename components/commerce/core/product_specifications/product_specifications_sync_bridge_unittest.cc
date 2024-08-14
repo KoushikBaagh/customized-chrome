@@ -22,8 +22,8 @@
 #include "components/sync/protocol/entity_data.h"
 #include "components/sync/protocol/entity_specifics.pb.h"
 #include "components/sync/protocol/product_comparison_specifics.pb.h"
-#include "components/sync/test/mock_model_type_change_processor.h"
-#include "components/sync/test/model_type_store_test_util.h"
+#include "components/sync/test/data_type_store_test_util.h"
+#include "components/sync/test/mock_data_type_local_change_processor.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -169,7 +169,7 @@ class ProductSpecificationsSyncBridgeObserver
 class ProductSpecificationsSyncBridgeTest : public testing::Test {
  public:
   void SetUp() override {
-    store_ = syncer::ModelTypeStoreTestUtil::CreateInMemoryStoreForTest();
+    store_ = syncer::DataTypeStoreTestUtil::CreateInMemoryStoreForTest();
     AddInitialSpecifics();
     ON_CALL(processor_, IsTrackingMetadata())
         .WillByDefault(testing::Return(true));
@@ -177,7 +177,7 @@ class ProductSpecificationsSyncBridgeTest : public testing::Test {
         .WillByDefault(
             testing::ReturnRef(sync_pb::EntitySpecifics::default_instance()));
     bridge_ = std::make_unique<ProductSpecificationsSyncBridge>(
-        syncer::ModelTypeStoreTestUtil::FactoryForForwardingStore(store_.get()),
+        syncer::DataTypeStoreTestUtil::FactoryForForwardingStore(store_.get()),
         processor_.CreateForwardingProcessor(), base::DoNothing(), observer());
     base::RunLoop().RunUntilIdle();
     initial_store_ = GetAllStoreData();
@@ -187,7 +187,7 @@ class ProductSpecificationsSyncBridgeTest : public testing::Test {
   ProductSpecificationsSyncBridge& bridge() { return *bridge_; }
 
   void AddInitialSpecifics() {
-    std::unique_ptr<syncer::ModelTypeStore::WriteBatch> batch =
+    std::unique_ptr<syncer::DataTypeStore::WriteBatch> batch =
         store_->CreateWriteBatch();
     for (uint64_t i = 0; i < kInitUuid.size(); i++) {
       sync_pb::ProductComparisonSpecifics product_comparison_specifics;
@@ -219,7 +219,7 @@ class ProductSpecificationsSyncBridgeTest : public testing::Test {
   }
 
   void CommitToStoreAndWait(
-      std::unique_ptr<syncer::ModelTypeStore::WriteBatch> batch) {
+      std::unique_ptr<syncer::DataTypeStore::WriteBatch> batch) {
     base::RunLoop loop;
     store_->CommitWriteBatch(
         std::move(batch),
@@ -242,7 +242,7 @@ class ProductSpecificationsSyncBridgeTest : public testing::Test {
            std::map<std::string, sync_pb::ProductComparisonSpecifics>*
                storage_key_to_specifics,
            const std::optional<syncer::ModelError>& error,
-           std::unique_ptr<syncer::ModelTypeStore::RecordList> data_records) {
+           std::unique_ptr<syncer::DataTypeStore::RecordList> data_records) {
           for (auto& record : *data_records.get()) {
             sync_pb::ProductComparisonSpecifics specifics;
             specifics.ParseFromString(record.value);
@@ -319,14 +319,9 @@ class ProductSpecificationsSyncBridgeTest : public testing::Test {
     return set.ToProto();
   }
 
-  syncer::ModelTypeStore* store() { return store_.get(); }
+  syncer::DataTypeStore* store() { return store_.get(); }
 
-  syncer::MockModelTypeChangeProcessor& processor() { return processor_; }
-
-  void EnableMultiSpecFlag() {
-    scoped_feature_list_.InitAndEnableFeature(
-        commerce::kProductSpecificationsMultiSpecifics);
-  }
+  syncer::MockDataTypeLocalChangeProcessor& processor() { return processor_; }
 
   void UpdateSpecifics(const sync_pb::ProductComparisonSpecifics& specifics) {
     bridge().UpdateSpecifics(specifics);
@@ -336,15 +331,35 @@ class ProductSpecificationsSyncBridgeTest : public testing::Test {
     return &observer_;
   }
 
- private:
-  testing::NiceMock<syncer::MockModelTypeChangeProcessor> processor_;
+  std::unique_ptr<syncer::EntityData> CreateEntityData(
+      const sync_pb::ProductComparisonSpecifics& specifics) {
+    return bridge().CreateEntityData(specifics);
+  }
+
+  sync_pb::ProductComparisonSpecifics TrimSpecificsForCaching(
+      const sync_pb::ProductComparisonSpecifics& specifics) {
+    return bridge().TrimSpecificsForCaching(specifics);
+  }
+
+ protected:
+  testing::NiceMock<syncer::MockDataTypeLocalChangeProcessor> processor_;
   testing::NiceMock<ProductSpecificationsSyncBridgeObserver> observer_;
   base::test::SingleThreadTaskEnvironment task_environment_;
-  std::unique_ptr<syncer::ModelTypeStore> store_;
+  std::unique_ptr<syncer::DataTypeStore> store_;
   std::unique_ptr<ProductSpecificationsSyncBridge> bridge_;
   std::map<std::string, sync_pb::ProductComparisonSpecifics> initial_entries_;
   std::map<std::string, sync_pb::ProductComparisonSpecifics> initial_store_;
   base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+class ProductSpecificationsSyncMultiSpecsBridgeTest
+    : public ProductSpecificationsSyncBridgeTest {
+ public:
+  void SetUp() override {
+    ProductSpecificationsSyncBridgeTest::SetUp();
+    scoped_feature_list_.InitAndEnableFeature(
+        commerce::kProductSpecificationsMultiSpecifics);
+  }
 };
 
 TEST_F(ProductSpecificationsSyncBridgeTest, TestGetStorageKey) {
@@ -588,7 +603,7 @@ TEST_F(ProductSpecificationsSyncBridgeTest, TestSupportedFieldsMetadataCache) {
   entity_metadata.mutable_possibly_trimmed_base_specifics()
       ->mutable_product_comparison()
       ->set_name(kInitName[0]);
-  std::unique_ptr<syncer::ModelTypeStore::WriteBatch> batch =
+  std::unique_ptr<syncer::DataTypeStore::WriteBatch> batch =
       store()->CreateWriteBatch();
   batch->GetMetadataChangeList()->UpdateMetadata(kInitUuid[0], entity_metadata);
   CommitToStoreAndWait(std::move(batch));
@@ -599,7 +614,7 @@ TEST_F(ProductSpecificationsSyncBridgeTest, TestSupportedFieldsMetadataCache) {
   base::RunLoop loop;
   std::unique_ptr<ProductSpecificationsSyncBridge> new_bridge =
       std::make_unique<ProductSpecificationsSyncBridge>(
-          syncer::ModelTypeStoreTestUtil::FactoryForForwardingStore(store()),
+          syncer::DataTypeStoreTestUtil::FactoryForForwardingStore(store()),
           processor().CreateForwardingProcessor(),
           base::BindOnce([](base::OnceClosure done) { std::move(done).Run(); },
                          loop.QuitClosure()),
@@ -612,7 +627,7 @@ TEST_F(ProductSpecificationsSyncBridgeTest,
        TestNoSupportedFieldsMetadataCache) {
   sync_pb::EntityMetadata entity_metadata;
   // Simulate entity with no supported field in cache.
-  std::unique_ptr<syncer::ModelTypeStore::WriteBatch> batch =
+  std::unique_ptr<syncer::DataTypeStore::WriteBatch> batch =
       store()->CreateWriteBatch();
   batch->GetMetadataChangeList()->UpdateMetadata(kInitUuid[0], entity_metadata);
   CommitToStoreAndWait(std::move(batch));
@@ -623,7 +638,7 @@ TEST_F(ProductSpecificationsSyncBridgeTest,
   base::RunLoop loop;
   std::unique_ptr<ProductSpecificationsSyncBridge> new_bridge =
       std::make_unique<ProductSpecificationsSyncBridge>(
-          syncer::ModelTypeStoreTestUtil::FactoryForForwardingStore(store()),
+          syncer::DataTypeStoreTestUtil::FactoryForForwardingStore(store()),
           processor().CreateForwardingProcessor(),
           base::BindOnce([](base::OnceClosure done) { std::move(done).Run(); },
                          loop.QuitClosure()),
@@ -631,5 +646,171 @@ TEST_F(ProductSpecificationsSyncBridgeTest,
   loop.Run();
   EXPECT_EQ(3u, bridge_entries_size(new_bridge.get()));
 }
+
+TEST_F(ProductSpecificationsSyncBridgeTest, TestCreateEntityDataLegacy) {
+  sync_pb::ProductComparisonSpecifics specifics;
+  specifics.set_uuid("70000000-0000-0000-0000-000000000000");
+  specifics.set_creation_time_unix_epoch_millis(1000000000000);
+  specifics.set_update_time_unix_epoch_millis(2000000000000);
+  specifics.set_name("test_name");
+  sync_pb::ComparisonData* data = specifics.add_data();
+  data->set_url("https://a.example.com");
+  sync_pb::ComparisonData* another_data = specifics.add_data();
+  another_data->set_url("https://b.example.com");
+
+  std::unique_ptr<syncer::EntityData> entity_data = CreateEntityData(specifics);
+  EXPECT_EQ("test_name_70000000-0000-0000-0000-000000000000",
+            entity_data->name);
+  EXPECT_EQ("70000000-0000-0000-0000-000000000000",
+            entity_data->specifics.product_comparison().uuid());
+  EXPECT_EQ(1000000000000, entity_data->specifics.product_comparison()
+                               .creation_time_unix_epoch_millis());
+  EXPECT_EQ(2000000000000, entity_data->specifics.product_comparison()
+                               .update_time_unix_epoch_millis());
+  EXPECT_EQ("test_name", entity_data->specifics.product_comparison().name());
+  EXPECT_EQ("https://a.example.com",
+            entity_data->specifics.product_comparison().data()[0].url());
+  EXPECT_EQ("https://b.example.com",
+            entity_data->specifics.product_comparison().data()[1].url());
+}
+
+TEST_F(ProductSpecificationsSyncBridgeTest, TestCreateEntityDataFallback) {
+  sync_pb::ProductComparisonSpecifics specifics;
+  specifics.set_uuid("70000000-0000-0000-0000-000000000000");
+  specifics.set_creation_time_unix_epoch_millis(1000000000000);
+  specifics.set_update_time_unix_epoch_millis(2000000000000);
+  sync_pb::ComparisonData* data = specifics.add_data();
+  data->set_url("https://a.example.com");
+  sync_pb::ComparisonData* another_data = specifics.add_data();
+  another_data->set_url("https://b.example.com");
+
+  std::unique_ptr<syncer::EntityData> entity_data = CreateEntityData(specifics);
+  EXPECT_EQ("70000000-0000-0000-0000-000000000000", entity_data->name);
+  EXPECT_EQ("70000000-0000-0000-0000-000000000000",
+            entity_data->specifics.product_comparison().uuid());
+  EXPECT_EQ(1000000000000, entity_data->specifics.product_comparison()
+                               .creation_time_unix_epoch_millis());
+  EXPECT_EQ(2000000000000, entity_data->specifics.product_comparison()
+                               .update_time_unix_epoch_millis());
+  EXPECT_EQ("https://a.example.com",
+            entity_data->specifics.product_comparison().data()[0].url());
+  EXPECT_EQ("https://b.example.com",
+            entity_data->specifics.product_comparison().data()[1].url());
+}
+
+TEST_F(ProductSpecificationsSyncMultiSpecsBridgeTest,
+       TestCreateEntityDataTopLevelSpecifics) {
+  sync_pb::ProductComparisonSpecifics specifics;
+  specifics.set_uuid("70000000-0000-0000-0000-000000000000");
+  specifics.set_creation_time_unix_epoch_millis(1000000000000);
+  specifics.set_update_time_unix_epoch_millis(2000000000000);
+  specifics.mutable_product_comparison()->set_name("test_name");
+
+  std::unique_ptr<syncer::EntityData> entity_data = CreateEntityData(specifics);
+
+  EXPECT_EQ("product_comparison_70000000-0000-0000-0000-000000000000_test_name",
+            entity_data->name);
+  EXPECT_EQ("70000000-0000-0000-0000-000000000000",
+            entity_data->specifics.product_comparison().uuid());
+  EXPECT_EQ(1000000000000, entity_data->specifics.product_comparison()
+                               .creation_time_unix_epoch_millis());
+  EXPECT_EQ(2000000000000, entity_data->specifics.product_comparison()
+                               .update_time_unix_epoch_millis());
+  EXPECT_EQ(
+      "test_name",
+      entity_data->specifics.product_comparison().product_comparison().name());
+}
+
+TEST_F(ProductSpecificationsSyncMultiSpecsBridgeTest,
+       TestCreateEntityDataItemLevelSpecifics) {
+  sync_pb::ProductComparisonSpecifics specifics;
+  specifics.set_uuid("50000000-0000-0000-0000-000000000000");
+  specifics.set_creation_time_unix_epoch_millis(1000000000000);
+  specifics.set_update_time_unix_epoch_millis(2000000000000);
+  specifics.mutable_product_comparison_item()->set_product_comparison_uuid(
+      "70000000-0000-0000-0000-000000000000");
+  specifics.mutable_product_comparison_item()->set_url("https://a.example.com");
+  syncer::UniquePosition unique_position =
+      syncer::UniquePosition::InitialPosition(
+          syncer::UniquePosition::RandomSuffix());
+  *specifics.mutable_product_comparison_item()->mutable_unique_position() =
+      unique_position.ToProto();
+
+  std::unique_ptr<syncer::EntityData> entity_data = CreateEntityData(specifics);
+
+  EXPECT_EQ(
+      "product_comparison_item_70000000-0000-0000-0000-000000000000_50000000-"
+      "0000-0000-0000-"
+      "000000000000",
+      entity_data->name);
+  EXPECT_EQ("50000000-0000-0000-0000-000000000000",
+            entity_data->specifics.product_comparison().uuid());
+  EXPECT_EQ(1000000000000, entity_data->specifics.product_comparison()
+                               .creation_time_unix_epoch_millis());
+  EXPECT_EQ(2000000000000, entity_data->specifics.product_comparison()
+                               .update_time_unix_epoch_millis());
+  EXPECT_EQ("70000000-0000-0000-0000-000000000000",
+            entity_data->specifics.product_comparison()
+                .product_comparison_item()
+                .product_comparison_uuid());
+  EXPECT_EQ("https://a.example.com", entity_data->specifics.product_comparison()
+                                         .product_comparison_item()
+                                         .url());
+  EXPECT_TRUE(unique_position.Equals(syncer::UniquePosition::FromProto(
+      entity_data->specifics.product_comparison()
+          .product_comparison_item()
+          .unique_position())));
+}
+
+// TODO(crbug.com/354231134) expand TestTrimSpecificsForCachingTopLevelSpecific
+// and TestTrimSpecificsForCachingProductComparisonItem to include unsupported
+// fields.
+TEST_F(ProductSpecificationsSyncMultiSpecsBridgeTest,
+       TestTrimSpecificsForCachingTopLevelSpecific) {
+  sync_pb::ProductComparisonSpecifics specifics;
+  specifics.set_uuid("50000000-0000-0000-0000-000000000000");
+  specifics.set_creation_time_unix_epoch_millis(1000000000000);
+  specifics.set_update_time_unix_epoch_millis(2000000000000);
+  specifics.mutable_product_comparison()->set_name("test_name");
+
+  sync_pb::ProductComparisonSpecifics trimmed_specifics =
+      TrimSpecificsForCaching(specifics);
+  EXPECT_FALSE(trimmed_specifics.has_uuid());
+  EXPECT_FALSE(trimmed_specifics.has_creation_time_unix_epoch_millis());
+  EXPECT_FALSE(trimmed_specifics.has_update_time_unix_epoch_millis());
+  EXPECT_FALSE(trimmed_specifics.has_name());
+  EXPECT_TRUE(trimmed_specifics.data().empty());
+  EXPECT_FALSE(trimmed_specifics.has_product_comparison());
+  EXPECT_FALSE(trimmed_specifics.has_product_comparison_item());
+}
+
+TEST_F(ProductSpecificationsSyncMultiSpecsBridgeTest,
+       TestTrimSpecificsForCachingProductComparisonItem) {
+  sync_pb::ProductComparisonSpecifics specifics;
+  specifics.set_uuid("50000000-0000-0000-0000-000000000000");
+  specifics.set_creation_time_unix_epoch_millis(1000000000000);
+  specifics.set_update_time_unix_epoch_millis(2000000000000);
+  specifics.mutable_product_comparison_item()->set_product_comparison_uuid(
+      "70000000-0000-0000-0000-000000000000");
+  specifics.mutable_product_comparison_item()->set_url("https://a.example.com");
+  syncer::UniquePosition unique_position =
+      syncer::UniquePosition::InitialPosition(
+          syncer::UniquePosition::RandomSuffix());
+  *specifics.mutable_product_comparison_item()->mutable_unique_position() =
+      unique_position.ToProto();
+
+  sync_pb::ProductComparisonSpecifics trimmed_specifics =
+      TrimSpecificsForCaching(specifics);
+  EXPECT_FALSE(trimmed_specifics.has_uuid());
+  EXPECT_FALSE(trimmed_specifics.has_creation_time_unix_epoch_millis());
+  EXPECT_FALSE(trimmed_specifics.has_update_time_unix_epoch_millis());
+  EXPECT_FALSE(trimmed_specifics.has_name());
+  EXPECT_TRUE(trimmed_specifics.data().empty());
+  EXPECT_FALSE(trimmed_specifics.has_product_comparison());
+  EXPECT_FALSE(trimmed_specifics.has_product_comparison_item());
+}
+
+// TODO(crbug.com/354165274) write a test that ensures no single specifics
+// format specifics are written when the multi specifics flag is on.
 
 }  // namespace commerce

@@ -5,7 +5,7 @@
 
 load("//lib/builder_config.star", "builder_config")
 load("//lib/builder_health_indicators.star", "health_spec")
-load("//lib/builders.star", "os", "siso")
+load("//lib/builders.star", "builders", "os", "siso")
 load("//lib/branches.star", "branches")
 load("//lib/ci.star", "ci")
 load("//lib/consoles.star", "consoles")
@@ -78,8 +78,10 @@ ci.builder(
         ],
     ),
     targets = targets.bundle(
-        additional_compile_targets = "android_lint",
+        additional_compile_targets = "all",
     ),
+    ssd = True,
+    free_space = builders.free_space.high,
     console_view_entry = consoles.console_view_entry(
         category = "builder|arm64",
         short_name = "dbg",
@@ -122,6 +124,9 @@ ci.builder(
             "webview_trichrome",
         ],
     ),
+    targets = targets.bundle(
+        additional_compile_targets = "all",
+    ),
     console_view_entry = consoles.console_view_entry(
         category = "builder|arm64",
         short_name = "rel",
@@ -161,6 +166,11 @@ ci.builder(
             "webview_shell",
         ],
     ),
+    targets = targets.bundle(
+        additional_compile_targets = "all",
+    ),
+    ssd = True,
+    free_space = builders.free_space.high,
     console_view_entry = consoles.console_view_entry(
         category = "builder|x64",
         short_name = "dbg",
@@ -204,6 +214,9 @@ ci.builder(
             "webview_trichrome",
             "webview_shell",
         ],
+    ),
+    targets = targets.bundle(
+        additional_compile_targets = "all",
     ),
     console_view_entry = consoles.console_view_entry(
         category = "builder|x64",

@@ -10,10 +10,13 @@ import android.text.TextUtils;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.tasks.tab_groups.TabGroupModelFilter;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiMetricsHelper.TabGroupCreationDialogResultAction;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiMetricsHelper.TabGroupCreationFinalSelections;
 import org.chromium.chrome.tab_ui.R;
+import org.chromium.components.feature_engagement.FeatureConstants;
 import org.chromium.components.tab_groups.TabGroupColorId;
 import org.chromium.ui.modaldialog.DialogDismissalCause;
 import org.chromium.ui.modaldialog.ModalDialogManager;
@@ -79,6 +82,9 @@ public class TabGroupCreationDialogManager {
                         TabGroupCreationDialogResultAction.DISMISSED_OTHER);
             }
 
+            TrackerFactory.getTrackerForProfile(mTabGroupModelFilter.getTabModel().getProfile())
+                    .dismissed(FeatureConstants.TAB_GROUP_CREATION_DIALOG_SYNC_TEXT_FEATURE);
+
             mTabGroupVisualDataDialogManager.hideDialog();
             if (mOnTabGroupCreation != null) {
                 mOnTabGroupCreation.run();
@@ -113,8 +119,6 @@ public class TabGroupCreationDialogManager {
      * @param filter The current TabGroupModelFilter that this group is created on.
      */
     public void showDialog(int rootId, TabGroupModelFilter filter) {
-        if (TabGroupModelFilter.SKIP_TAB_GROUP_CREATION_DIALOG.getValue()) return;
-
         mTabGroupCreationDialogController = new TabGroupCreationDialogController(rootId, filter);
         mTabGroupVisualDataDialogManager.showDialog(
                 rootId, filter, mTabGroupCreationDialogController);
@@ -144,5 +148,29 @@ public class TabGroupCreationDialogManager {
 
     ModalDialogProperties.Controller getDialogControllerForTesting() {
         return mTabGroupCreationDialogController;
+    }
+
+    /**
+     * Returns whether the group creation dialog will be skipped based on current flags.
+     *
+     * @param shouldShow Whether the creation dialog should show if TabGroupCreationDialogAndroid is
+     *     enabled. Currently it should only show for drag and drop merge and bulk selection editor
+     *     merge. It should not show for context menu group creations.
+     */
+    public static boolean shouldSkipGroupCreationDialog(boolean shouldShow) {
+        if (ChromeFeatureList.sTabGroupCreationDialogAndroid.isEnabled()) {
+            return !shouldShow;
+        } else {
+            return TabGroupModelFilter.SKIP_TAB_GROUP_CREATION_DIALOG.getValue();
+        }
+    }
+
+    /**
+     * Returns whether the group creation dialog should be shown based on the setting switch for
+     * auto showing under tab settings. If it is not enabled, return true since that is the default
+     * case for all callsites.
+     */
+    public static boolean shouldShowGroupCreationDialogViaSettingsSwitch() {
+        return TabGroupModelFilter.shouldShowGroupCreationDialogViaSettingsSwitch();
     }
 }

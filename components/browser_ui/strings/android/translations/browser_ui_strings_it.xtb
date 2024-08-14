@@ -5,7 +5,6 @@
 <translation id="1036348656032585052">Disattiva</translation>
 <translation id="1044891598689252897">I siti funzioneranno normalmente</translation>
 <translation id="1073417869336441572">Aiutaci a migliorare Chrome spiegandoci perché hai consentito i cookie di terze parti. <ph name="BEGIN_LINK" />Invia feedback<ph name="END_LINK" /></translation>
-<translation id="1113435009358629918">Nascondi scheda sul calo di prezzo</translation>
 <translation id="1178581264944972037">Pausa</translation>
 <translation id="1181037720776840403">Rimuovi</translation>
 <translation id="1192844206376121885">Verranno eliminati tutti i dati e i cookie memorizzati da <ph name="ORIGIN" />.</translation>
@@ -24,6 +23,7 @@
 <translation id="1415402041810619267">URL troncato</translation>
 <translation id="1448064542941920355">Diminuisci lo zoom</translation>
 <translation id="146867109637325312">{COUNT,plural, =1{<ph name="SITE_COUNT" /> sito}other{<ph name="SITE_COUNT" /> siti}}</translation>
+<translation id="1500473259453106018">Nascondi scheda Cali di prezzo nelle schede</translation>
 <translation id="1510341833810331442">I siti non sono autorizzati a salvare dati sul dispositivo</translation>
 <translation id="1547123415014299762">Sono consentiti i cookie di terze parti</translation>
 <translation id="1568470248891039841">I siti visitati possono incorporare contenuti di altri siti, ad esempio immagini, annunci e testo. Questi altri siti possono chiedere l'autorizzazione a usare le informazioni su di te che hanno salvato durante la tua navigazione dei siti. <ph name="BEGIN_LINK" />Scopri di più sui contenuti incorporati<ph name="END_LINK" /></translation>
@@ -91,7 +91,6 @@
 <translation id="2498359688066513246">Guida e feedback</translation>
 <translation id="2501278716633472235">Indietro</translation>
 <translation id="2546283357679194313">Cookie e dati dei siti</translation>
-<translation id="2550801787432930915">Scheda sul calo di prezzo</translation>
 <translation id="2570922361219980984">L'accesso alla posizione è disattivato anche per questo dispositivo. Attivalo nelle <ph name="BEGIN_LINK" />Impostazioni Android<ph name="END_LINK" />.</translation>
 <translation id="257931822824936280">Espanso. Fai clic per comprimere.</translation>
 <translation id="2586657967955657006">Appunti</translation>
@@ -113,6 +112,7 @@
 <translation id="2891975107962658722">Impedisci a un sito di salvare dati sul dispositivo</translation>
 <translation id="2903493209154104877">Indirizzi</translation>
 <translation id="2910701580606108292">Chiedi prima di consentire ai siti di riprodurre contenuti protetti</translation>
+<translation id="2918484639460781603">Passa alle impostazioni</translation>
 <translation id="2932883381142163287">Segnala abuso</translation>
 <translation id="2939338015096024043">Quando l'opzione è attiva, i siti possono chiedere di monitorare la posizione della fotocamera e scoprire di più sull'ambiente circostante. Quando l'opzione è disattivata, i siti non possono monitorare la posizione della fotocamera o scoprire l'ambiente circostante.</translation>
 <translation id="2968755619301702150">Visualizzatore certificati</translation>
@@ -133,6 +133,7 @@
 <translation id="3227137524299004712">Microfono</translation>
 <translation id="3232293466644486101">Elimina dati di navigazione…</translation>
 <translation id="3242646949159196181">Quando l'opzione è attiva, i siti possono riprodurre suoni. Quando l'opzione è disattivata, i siti non possono riprodurre l'audio.</translation>
+<translation id="3273479183583863618">Cali di prezzo nelle schede</translation>
 <translation id="3277252321222022663">Consenti ai siti di accedere ai sensori (opzione consigliata)</translation>
 <translation id="3285500645985761267">Consenti ai siti correlati di vedere le tue attività nel gruppo</translation>
 <translation id="3295019059349372795">Capitolo 11: La splendida Città di smeraldo di Oz</translation>
@@ -161,6 +162,7 @@
 <translation id="3721953990244350188">Chiudi e mostra la prossima azione disponibile</translation>
 <translation id="3744111561329211289">Sincronizzazione in background</translation>
 <translation id="3763247130972274048">Tocca due volte il video a sinistra o a destra per saltare di 10 secondi</translation>
+<translation id="3779154269823594982">Cambia le password</translation>
 <translation id="3797520601150691162">Non applicare il tema scuro a un sito specifico</translation>
 <translation id="3803367742635802571">I siti che visiti potrebbero non funzionare più come previsto</translation>
 <translation id="3804247818991980532"><ph name="TYPE_1" />. <ph name="TYPE_2" />.</translation>
@@ -171,6 +173,7 @@
 <translation id="385051799172605136">Indietro</translation>
 <translation id="3859306556332390985">Posiziona avanti</translation>
 <translation id="3895926599014793903">Attivazione forzata dello zoom</translation>
+<translation id="3905475044299942653">Interrompi notifiche eccessive</translation>
 <translation id="3908288065506437185">Blocca i cookie di terze parti in modalità di navigazione in incognito</translation>
 <translation id="3913461097001554748"><ph name="DOMAIN_URL" /> <ph name="SEPARATOR1" /> <ph name="DEVICE_NAME" /></translation>
 <translation id="3918378745482005425">Alcune funzionalità potrebbero non essere disponibili. I siti correlati possono comunque utilizzare i cookie di terze parti.</translation>
@@ -218,6 +221,7 @@
 <translation id="4751476147751820511">Sensori di movimento o della luce</translation>
 <translation id="4755971844837804407">Quando l'opzione è attiva, i siti possono mostrarti qualsiasi annuncio. Quando l'opzione è disattivata, i siti non possono mostrare annunci invasivi o fuorvianti.</translation>
 <translation id="4779083564647765204">Zoom</translation>
+<translation id="4807122856660838973">Attiva Navigazione sicura</translation>
 <translation id="4811450222531576619">Scopri la fonte e l'argomento</translation>
 <translation id="4836046166855586901">Chiedi conferma quando un sito vuole sapere quando usi attivamente questo dispositivo</translation>
 <translation id="483914009762354899">Includi tutti i siti di questo dominio</translation>
@@ -231,6 +235,7 @@
 <translation id="4994033804516042629">Nessun contatto trovato</translation>
 <translation id="4996978546172906250">Condividi tramite</translation>
 <translation id="5001526427543320409">Cookie di terze parti</translation>
+<translation id="5007392906805964215">Visualizza</translation>
 <translation id="5039804452771397117">Consenti</translation>
 <translation id="5048398596102334565">Consenti ai siti di accedere ai sensori di movimento (opzione consigliata)</translation>
 <translation id="5050380848339752099">Questo sito sta per condividere informazioni con un'app esterna alla modalità di navigazione in incognito.</translation>
@@ -346,7 +351,6 @@
 <translation id="6612358246767739896">Contenuti protetti</translation>
 <translation id="662080504995468778">Rimani</translation>
 <translation id="6653342741369270081">Premi il pulsante Indietro per uscire dalla modalità a schermo intero.</translation>
-<translation id="6670377348676659110">{TILE_COUNT,plural, =1{Nascondi Continua con questa scheda}other{Nascondi Continua con queste schede}}</translation>
 <translation id="6689172468748959065">Foto del profilo</translation>
 <translation id="6697925417670533197">Download attivi</translation>
 <translation id="6722828510648505498">Blocca le richieste di accesso da servizi di identità.</translation>
@@ -356,7 +360,9 @@
 <translation id="6787751205395685251">Seleziona un'opzione per <ph name="SITE_NAME" /></translation>
 <translation id="6790428901817661496">Riproduci</translation>
 <translation id="6818926723028410516">Seleziona elementi</translation>
+<translation id="6840760312327750441">Per raggruppare le schede, tocca e tienine premuta una. Poi trascinala su un'altra scheda.</translation>
 <translation id="6864395892908308021">Questo dispositivo non può leggere la tecnologia NFC</translation>
+<translation id="6870169401250095575">Nascondi scheda Controllo di sicurezza</translation>
 <translation id="6912998170423641340">Impedisci ai siti di leggere testo e immagini negli appunti</translation>
 <translation id="6945221475159498467">Seleziona</translation>
 <translation id="6950072572526089586">Un sito che visiti può salvare informazioni su ciò che stai facendo affinché possa funzionare come previsto, ad esempio per mantenere l'accesso al sito o salvare gli articoli nel tuo carrello degli acquisti. Spesso i siti salvano temporaneamente queste informazioni sul dispositivo.</translation>
@@ -389,6 +395,7 @@
 <translation id="7366415735885268578">Aggiungi un sito</translation>
 <translation id="7368695150573390554">I dati offline verranno eliminati</translation>
 <translation id="7383715096023715447">Impostazioni di <ph name="DOMAIN" /></translation>
+<translation id="7399802613464275309">Controllo di sicurezza</translation>
 <translation id="7406113532070524618">Questa impostazione funziona senza identificarti o consentire ai siti di vedere la cronologia di navigazione, ma i siti possono condividere una piccola quantità di informazioni durante la verifica</translation>
 <translation id="7423098979219808738">Chiedi prima</translation>
 <translation id="7423538860840206698">Lettura degli appunti non consentita</translation>
@@ -423,6 +430,7 @@
 <translation id="7986741934819883144">Seleziona un contatto</translation>
 <translation id="7990211076305263060">Quando l'opzione è attiva, i siti potrebbero chiedere l'utilizzo del microfono. Quando l'opzione è disattivata, i siti non possono utilizzare il microfono.</translation>
 <translation id="8007176423574883786">Disattivata per questo dispositivo</translation>
+<translation id="8010630645305864042">{TILE_COUNT,plural, =1{Nascondi scheda Continua con questa scheda}other{Nascondi scheda Continua con queste schede}}</translation>
 <translation id="802154636333426148">Download non riuscito</translation>
 <translation id="8042586301629853791">Ordina per:</translation>
 <translation id="8067883171444229417">Guarda il video</translation>
@@ -511,5 +519,6 @@
 <translation id="9162462602695099906">Questa pagina è pericolosa</translation>
 <translation id="930525582205581608">Vuoi eliminare questo sito?</translation>
 <translation id="947156494302904893">I siti che visiti possono verificare che sei una persona reale e non un bot</translation>
+<translation id="959682366969460160">Organizzazione</translation>
 <translation id="967624055006145463">Dati memorizzati</translation>
 </translationbundle>

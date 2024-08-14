@@ -358,6 +358,9 @@ class FirstRunParameterizedInteractiveUiTest
     // as intended.
     command_line->AppendSwitchASCII(switches::kSearchEngineChoiceCountry, "BE");
 
+    command_line->AppendSwitch(
+        switches::kIgnoreNoFirstRunForSearchEngineChoiceScreen);
+
     // The default browser step is normally only shown on Windows. If it's
     // forced, it should be shown on the other platforms for testing.
     command_line->AppendSwitch(switches::kForceFreDefaultBrowserStep);
@@ -1002,8 +1005,7 @@ IN_PROC_BROWSER_TEST_P(FirstRunParameterizedInteractiveUiTest,
 
   EXPECT_FALSE(
       identity_manager->HasPrimaryAccount(signin::ConsentLevel::kSignin));
-  EXPECT_FALSE(
-      chrome::enterprise_util::UserAcceptedAccountManagement(profile()));
+  EXPECT_FALSE(enterprise_util::UserAcceptedAccountManagement(profile()));
   EXPECT_EQ(u"Person 1", GetProfileName());
   EXPECT_TRUE(IsUsingDefaultProfileName());
 
